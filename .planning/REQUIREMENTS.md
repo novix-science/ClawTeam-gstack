@@ -189,30 +189,32 @@ Explicit exclusions to prevent scope creep. Anti-features from `research/FEATURE
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation (Step 8).
+Which phase covers which requirement. Finalized during roadmap creation (see `.planning/ROADMAP.md`).
+
+Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Sprint Engine + Preventions, 3 Team & Methodology, 4 Interactive/Routing/Verification, 5 Tool-Heavy Skills, 6 Browser/Design/Memory, 7 Parallel Sprints + Cost.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CORE-01 | Phase 1 | Pending |
 | CORE-02 | Phase 1 | Pending |
 | CORE-03 | Phase 0 | Pending |
-| CORE-04 | Phase 2 | Pending |
+| CORE-04 | Phase 1 | Pending |
 | CORE-05 | Phase 2 | Pending |
-| CORE-06 | Phase 5 | Pending |
+| CORE-06 | Phase 7 | Pending |
 | CORE-07 | Phase 2 | Pending |
 | INT-01 | Phase 1 | Pending |
 | INT-02 | Phase 1 | Pending |
-| INT-03 | Phase 5 | Pending |
-| INT-04 | Phase 5 | Pending |
-| INT-05 | Phase 5 | Pending |
+| INT-03 | Phase 7 | Pending |
+| INT-04 | Phase 7 | Pending |
+| INT-05 | Phase 7 | Pending |
 | INT-06 | Phase 2 | Pending |
-| MEM-01 | Phase 4 | Pending |
-| MEM-02 | Phase 4 | Pending |
-| MEM-03 | Phase 4 | Pending |
-| MEM-04 | Phase 4 | Pending |
-| MEM-05 | Phase 4 | Pending |
-| MEM-06 | Phase 4 | Pending |
-| MEM-07 | Phase 4 | Pending |
+| MEM-01 | Phase 6 | Pending |
+| MEM-02 | Phase 6 | Pending |
+| MEM-03 | Phase 6 | Pending |
+| MEM-04 | Phase 6 | Pending |
+| MEM-05 | Phase 6 | Pending |
+| MEM-06 | Phase 6 | Pending |
+| MEM-07 | Phase 6 | Pending |
 | TEAM-01 | Phase 3 | Pending |
 | TEAM-02 | Phase 3 | Pending |
 | TEAM-03 | Phase 3 | Pending |
@@ -221,9 +223,9 @@ Which phases cover which requirements. Populated during roadmap creation (Step 8
 | TEAM-06 | Phase 0 | Pending |
 | SPRINT-01 | Phase 2 | Pending |
 | SPRINT-02 | Phase 2 | Pending |
-| SPRINT-03 | Phase 3 | Pending |
-| SPRINT-04 | Phase 3 | Pending |
-| SPRINT-05 | Phase 3 | Pending |
+| SPRINT-03 | Phase 4 | Pending |
+| SPRINT-04 | Phase 4 | Pending |
+| SPRINT-05 | Phase 4 | Pending |
 | SPRINT-06 | Phase 3 | Pending |
 | SKILL-01 | Phase 3 | Pending |
 | SKILL-02 | Phase 3 | Pending |
@@ -234,34 +236,34 @@ Which phases cover which requirements. Populated during roadmap creation (Step 8
 | SKILL-07 | Phase 3 | Pending |
 | SKILL-08 | Phase 3 | Pending |
 | SKILL-09 | Phase 2 | Pending |
-| SKILL-10 | Phase 4 | Pending |
-| SKILL-11 | Phase 4 | Pending |
-| SKILL-12 | Phase 4 | Pending |
-| SKILL-13 | Phase 4 | Pending |
-| SKILL-14 | Phase 3 | Pending |
-| SKILL-15 | Phase 3 | Pending |
-| SKILL-16 | Phase 3 | Pending |
-| SKILL-17 | Phase 3 | Pending |
-| SKILL-18 | Phase 3 | Pending |
-| SKILL-19 | Phase 3 | Pending |
+| SKILL-10 | Phase 6 | Pending |
+| SKILL-11 | Phase 6 | Pending |
+| SKILL-12 | Phase 6 | Pending |
+| SKILL-13 | Phase 5 | Pending |
+| SKILL-14 | Phase 5 | Pending |
+| SKILL-15 | Phase 5 | Pending |
+| SKILL-16 | Phase 5 | Pending |
+| SKILL-17 | Phase 5 | Pending |
+| SKILL-18 | Phase 5 | Pending |
+| SKILL-19 | Phase 5 | Pending |
 | SAFETY-01 | Phase 2 | Pending |
 | SAFETY-02 | Phase 2 | Pending |
 | SAFETY-03 | Phase 2 | Pending |
 | SAFETY-04 | Phase 2 | Pending |
-| SAFETY-05 | Phase 3 | Pending |
+| SAFETY-05 | Phase 4 | Pending |
 | QUALITY-01 | Phase 2 | Pending |
 | QUALITY-02 | Phase 2 | Pending |
 | QUALITY-03 | Phase 2 | Pending |
-| QUALITY-04 | Phase 5 | Pending |
-| QUALITY-05 | Phase 5 | Pending |
+| QUALITY-04 | Phase 7 | Pending |
+| QUALITY-05 | Phase 7 | Pending |
 | QUALITY-06 | Phase 2 | Pending |
-| QUALITY-07 | Phase 3 | Pending |
+| QUALITY-07 | Phase 4 | Pending |
 | QUALITY-08 | Phase 2 | Pending |
-| QUALITY-09 | Phase 3 | Pending |
-| QUALITY-10 | Phase 4 | Pending |
+| QUALITY-09 | Phase 4 | Pending |
+| QUALITY-10 | Phase 6 | Pending |
 | QUALITY-11 | Phase 2 | Pending |
-| QUALITY-12 | Phase 5 | Pending |
-| QUALITY-13 | Phase 3 | Pending |
+| QUALITY-12 | Phase 7 | Pending |
+| QUALITY-13 | Phase 4 | Pending |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
 | UX-01 | Phase 3 | Pending |
@@ -269,16 +271,26 @@ Which phases cover which requirements. Populated during roadmap creation (Step 8
 | UX-03 | Phase 2 | Pending |
 | UX-04 | Phase 2 | Pending |
 | UX-05 | Phase 2 | Pending |
-| UX-06 | Phase 5 | Pending |
+| UX-06 | Phase 7 | Pending |
 | UX-07 | Phase 3 | Pending |
 | UX-08 | Phase 0 | Pending |
 | UX-09 | Phase 2 | Pending |
 
-**Coverage (preliminary — phase mapping refined by roadmapper):**
-- v1 requirements: 77 total
-- Mapped to phases: 77
+**Coverage:**
+- v1 requirements: 80 total (CORE 7 + INT 6 + MEM 7 + TEAM 6 + SPRINT 6 + SKILL 19 + SAFETY 5 + QUALITY 15 + UX 9)
+- Mapped to phases: 80
 - Unmapped: 0
+
+**Per-phase counts:**
+- Phase 0: 5 (CORE-03, TEAM-06, QUALITY-14, QUALITY-15, UX-08)
+- Phase 1: 5 (CORE-01, CORE-02, CORE-04, INT-01, INT-02)
+- Phase 2: 21 (CORE-05, CORE-07, INT-06, SPRINT-01/02, SKILL-09, SAFETY-01..04, QUALITY-01/02/03/06/08/11, UX-02/03/04/05/09)
+- Phase 3: 16 (TEAM-01..05, SKILL-01..08, SPRINT-06, UX-01, UX-07)
+- Phase 4: 7 (SPRINT-03/04/05, SAFETY-05, QUALITY-07/09/13)
+- Phase 5: 7 (SKILL-13..19)
+- Phase 6: 11 (MEM-01..07, SKILL-10..12, QUALITY-10)
+- Phase 7: 8 (CORE-06, INT-03..05, QUALITY-04/05/12, UX-06)
 
 ---
 *Requirements defined: 2026-04-15*
-*Last updated: 2026-04-15 after initial definition*
+*Last updated: 2026-04-15 after roadmap traceability finalization (8 phases, fine granularity)*

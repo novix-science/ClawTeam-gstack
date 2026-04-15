@@ -1,0 +1,359 @@
+# Roadmap: ClawTeam-gstack (v1 — hire-your-team milestone)
+
+## Overview
+
+This roadmap delivers the gstack-as-team integration in eight phases, moving from foundation safety nets through the target upstream-PR core, then building the 11-agent team product surface on top, and finally unlocking parallel-sprint force-multiplier UX. Phases are ordered so every pitfall prevention ships with the feature it protects (evidence gates with the sprint engine, provenance with `/learn`, cost controls with parallel sprints), because retrofitting these preventions after adoption is painful per `research/PITFALLS.md`. Phases 0-2 are the target upstream PR bundle; Phase 3+ is gstack-specific fork content.
+
+**Milestone:** v1.0 — "You hire a virtual engineering team, and over time they get better at working with you."
+**Granularity:** fine (8-12 phases)
+**Critical path:** Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 (product surface exists) -> Phase 4 (product surface works end-to-end) -> Phase 7 (parallel sprints narrative)
+**Upstream-PR scope:** Phases 0, 1, 2 (additive core substrate + plugin hooks; zero changes to existing template semantics)
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (0-7): Planned milestone work
+- Decimal phases (2.1, 3.1, ...): Urgent insertions (marked INSERTED) — created via `/gsd-insert-phase` if needed
+
+- [ ] **Phase 0: Foundation & Upstream RFC** - Backwards-compat regression matrix, env secret-scrubbing, balanced model default, `clawteam doctor`, upstream RFC for extension API
+- [ ] **Phase 1: Core Harness Extensions** - `PhaseRegistry`, `SprintState`, `InteractionGate`; target-upstream core with no semantic changes to existing templates
+- [ ] **Phase 2: Sprint Engine, Evidence Gates & Theater/Drift/Deadlock Prevention** - Single-sprint end-to-end with EvidenceGates, cycle detector, structured-response envelope, safety-rail primitives, and sprint CLI (start/status/show/list/pause/resume)
+- [ ] **Phase 3: Gstack Team Template & Methodology Port** - Ships `gstack.toml` (11 agents) + `GstackSprintPlugin` with per-role methodology prompts baked in; first runnable Think->Ship sprint on the real team roster
+- [ ] **Phase 4: Interactive State Machines, Smart Review Routing & Cross-Agent Verification** - Interactive gstack skills (`/office-hours`, `/design-consultation`, `/investigate`) as state machines; SHA-pinned CODEOWNERS-style reviewer routing; parallel reviewer decorrelation; cross-agent verification gates; Ship-phase human-approval gate
+- [ ] **Phase 5: Tool-Heavy Skills (Ship, SRE, Codex)** - `/ship`, `/land-and-deploy`, `/document-release`, `/canary`, `/benchmark`, `/setup-deploy`, `/codex` — the surfaces engineer/shipper/sre invoke at runtime
+- [ ] **Phase 6: Browser Skills, Design Pipeline & Team Memory** - `clawteam[browser]` extra, `/browse`, `/design-shotgun`, `/design-html`, and `/learn` memory store with provenance + decay + human gate on high-impact entries
+- [ ] **Phase 7: Parallel Sprints, AttentionQueue UX & Cost Controls** - `SprintConductor` concurrency caps, `clawteam attend` typed-priority queue with digest mode, cost dashboard, prompt caching, rate-limit-aware scheduling
+
+## Phase Details
+
+### Phase 0: Foundation & Upstream RFC
+
+**Goal**: Lay down cheap-to-add-now, expensive-to-retrofit foundations (backwards-compat test matrix, env secret-scrubbing, default model profile, missing-tool detection) and get upstream buy-in on the plugin API shape before any core code lands.
+
+**Depends on**: Nothing (first phase).
+
+**Requirements**: CORE-03, TEAM-06, QUALITY-14, QUALITY-15, UX-08
+
+**Success Criteria** (what must be TRUE):
+  1. Running the full existing test suite against `software-dev`, `hedge-fund`, `code-review`, `harness-default`, `research-paper`, and `strategy-room` templates continues to pass on CI with no code changes to those templates — verified by a new `tests/test_template_regression_matrix.py` that spawns and advances each template through its existing phase sequence.
+  2. Running `clawteam team spawn software-dev --name foo` followed by any command that emits event hooks never leaks `*_TOKEN`, `*_KEY`, `*_SECRET`, `*PASSWORD*`-shaped environment values into `/learn` entries, board views, or event-log files — verified by a secret-scrubbing unit test on `clawteam/events/hooks.py::_env_snapshot()` with a fixture env that seeds `OPENAI_API_KEY`/`GITHUB_TOKEN`/`DB_PASSWORD` and asserts none appear in the mirrored `CLAWTEAM_*` env dict, mailbox payloads, or artifact writes.
+  3. Running `clawteam doctor` on a machine without Chromium, Codex CLI, ngrok, or watchdog prints per-OS install instructions for each missing optional tool (`pip install 'clawteam[browser]' && playwright install chromium`, `npm install -g @openai/codex`, platform-specific ngrok) and exits 0; on a fully-provisioned machine prints a green report of what's detected.
+  4. An upstream RFC document exists at `docs/rfcs/001-phase-registry.md` proposing the three optional `HarnessPlugin` hooks (`contribute_phases`, `contribute_phase_roles`, `contribute_review_routers`) with empty defaults, the `PhaseRegistry` class shape, additive-only contract guarantees, and a worked example showing `software-dev.toml` continues to work unchanged — opened as a PR or discussion thread against the upstream ClawTeam repo with at least one maintainer acknowledgement.
+  5. `clawteam/templates/` scaffolding used by `gstack.toml` (which lands in Phase 3) reads a default `model_profile = "balanced"` when unset, and the template-loading code path rejects `quality` as a silent default (must be explicitly opted into via `--model-profile quality` or config) — verified by a template-loading unit test that asserts an unspecified profile resolves to `balanced`, not `quality`.
+
+**Canonical refs**:
+- research/PITFALLS.md Pitfalls 14 (BC regression), 15 (upstream API drift), 17 (secret leakage), 12 (cost blowup default)
+- codebase/CONCERNS.md "Secrets in env" (`clawteam/events/hooks.py:80-88`)
+- research/SUMMARY.md Phase 0 section + Gaps to Address #1 (Windows scope) and #4 (default aggressiveness)
+- research/STACK.md "No new required deps" envelope
+
+**Upstream-PR status**: Part of target upstream bundle. RFC + regression matrix are prerequisites that benefit every template, not just gstack.
+
+**Plans**: TBD
+
+Plans:
+- [ ] 00-01: TBD (outlined during `/gsd-plan-phase 0`)
+
+---
+
+### Phase 1: Core Harness Extensions
+
+**Goal**: Add the three new harness primitives (`PhaseRegistry`, `SprintState`, `InteractionGate`) and the three optional `HarnessPlugin` hooks with empty defaults, landing the cleanest possible upstream-PR-ready core changes.
+
+**Depends on**: Phase 0 (regression matrix must exist before we modify harness surface).
+
+**Requirements**: CORE-01, CORE-02, CORE-04, INT-01, INT-02
+
+**Success Criteria** (what must be TRUE):
+  1. `PhaseRegistry` exists at `clawteam/harness/phase_registry.py` as a pure in-memory registry that plugins populate via the new optional `HarnessPlugin.contribute_phases()` / `contribute_gates()` / `contribute_phase_roles()` hooks; calling `HarnessOrchestrator.__init__` with `phases=None` consults the registry and constructs `PhaseState.phases` from the plugin contributions — verified by a unit test that registers a test plugin contributing three phases and asserts `PhaseState.phases == [...plugin_phases]`.
+  2. Phase-name collisions across plugins raise `ValueError` at registration time (not runtime) — verified by a test that registers two test plugins with overlapping phase names and asserts the exception.
+  3. `SprintState` exists at `clawteam/sprint/state.py` as a pydantic v2 model with required fields (`sprint_id`, `goal`, `team`, `current_phase`, `phase_history`, `artifacts`, `participants`, `pending_question_ids`, `auto_advance`, `workspace_branch`, `created_at`) that round-trips through `file_locked()` atomic JSON persistence under `~/.clawteam/teams/<team>/sprints/<id>/state.json` — verified by a write-then-read test and a concurrent-writer test that confirms last-write-wins with no corruption.
+  4. `InteractionGate` exists at `clawteam/harness/interaction_gate.py` as a `PhaseGate` subclass that returns `(False, "Open questions: ...")` when `sprint/<id>/questions/N.md` has no sibling `answers/N.md` and returns `(True, "")` otherwise — verified by a unit test that creates one question file, asserts gate fails, creates the answer file, asserts gate passes.
+  5. Phase agents can write structured question markdown files with H3 per-question headings + numbered choices (or freeform fields), and human answer files support selecting an option or providing freeform reply — verified by a schema-parsing test over fixture question/answer pairs.
+  6. Running the Phase 0 regression matrix after these additions continues to pass — every existing template spawns + advances + passes its existing tests with no new failures.
+
+**Canonical refs**:
+- research/ARCHITECTURE.md Pattern 1 (Phase machine as plugin-populated list) + Pattern 4 (InteractionGate mechanics)
+- research/SUMMARY.md Phase 1 section
+- research/PITFALLS.md Pitfall 14 (BC regression reinforced) + Pitfall 15 (additive-only contract)
+
+**Upstream-PR status**: Core of the target upstream bundle. No gstack-specific logic lands here; this is the pluggability delta.
+
+**Research flag**: NONE. Codebase already chose "open `str`" for `Phase`/`AgentRole`; plugin-registry patterns are well-established.
+
+**Plans**: TBD
+
+Plans:
+- [ ] 01-01: TBD (outlined during `/gsd-plan-phase 1`)
+
+---
+
+### Phase 2: Sprint Engine, Evidence Gates & Theater/Drift/Deadlock Prevention
+
+**Goal**: Land a single-sprint end-to-end runnable sprint engine that ships with evidence-checking gates, a cycle detector, the structured-response envelope protocol, artifact size caps, safety-rail primitives, and the sprint CLI (start/status/show/list/pause/resume) — because letting gameable gates, drift-prone messages, or deadlock-prone transports exist for even one demo means downstream data is contaminated.
+
+**Depends on**: Phase 1 (requires `PhaseRegistry`, `SprintState`, `InteractionGate`).
+
+**Requirements**: CORE-05, CORE-07, INT-06, SPRINT-01, SPRINT-02, SKILL-09, SAFETY-01, SAFETY-02, SAFETY-03, SAFETY-04, QUALITY-01, QUALITY-02, QUALITY-03, QUALITY-06, QUALITY-08, QUALITY-11, UX-02, UX-03, UX-04, UX-05, UX-09
+
+**Success Criteria** (what must be TRUE):
+  1. User can run `clawteam sprint start --team <name> --goal "add a dark-mode toggle"` against any team (existing or Phase-3 gstack) whose plugin contributes 7 phases, and a sprint record appears under `~/.clawteam/teams/<name>/sprints/<id>/state.json`; `clawteam sprint status <id>` shows current phase, assigned participants, pending-question count, and most-recent artifact; `clawteam sprint show <id>` prints full phase history; `clawteam sprint list --team <name>` lists all sprints with phase + status; every command also supports `--json` for machine-readable output.
+  2. Attempting to advance from Think -> Plan by writing an empty `design-doc.md` is blocked by `EvidenceGate`: the gate validates that the doc contains all required sections (forcing questions, scope boundaries, success criteria) with non-stub content — verified by a replay test where a "TBD"-filled design-doc fails the gate and an evidence-full one passes. Test reports must reference a real test-runner output hash (gate re-runs pytest on the cited test IDs); ship notes must parse as structured markdown with a deploy URL field; review reports must cite real diff line ranges.
+  3. Pausing a running sprint with `clawteam sprint pause <id>` writes a checkpoint that survives a full `HarnessOrchestrator` restart; running `clawteam sprint resume <id>` rehydrates `SprintState` and re-emits the last pending phase-transition event, returning the sprint to its pre-pause gate state — verified by an integration test that kills and restarts the orchestrator mid-sprint.
+  4. Every agent turn across every role emits a structured response envelope with persona-identity header, step label, output-schema-conforming body, and explicit `{done: true|false}` termination signal — verified by a protocol-conformance test harness that rejects malformed envelopes. An agent attempting to echo a peer's voice for 8+ consecutive turns triggers a drift-regression alarm event on the EventBus.
+  5. A synthetic back-and-forth loop between two agents on the same `(sender, recipient, topic)` hash exceeding 3 round-trips within a rolling window trips the transport-level cycle detector, breaks the cycle by escalating the topic to the AttentionQueue (Phase 7) or an `InteractionGate` (immediate), and emits an `agent_deadlock_detected` event — verified by a cycle-injection test.
+  6. An agent turn that produces zero new artifact bytes and zero new AttentionQueue entries counts as a no-progress turn; two consecutive no-progress turns escalate to human via the `forced_progress_gate` — verified by a theater-simulation test where an agent merely echoes previous messages and the gate fires.
+  7. Running `clawteam sprint status <id>` surfaces `artifact_delta_per_hour` and `token_per_useful_byte` as primary metrics; anomaly thresholds (e.g., tokens/byte > 100x rolling average) emit alarm events.
+  8. `/careful`, `/freeze <path>`, `/guard`, `/unfreeze` are registered as harness-level primitives via `EventBus` hooks on file-write tool calls; an agent attempting `rm -rf /` receives a blocked-tool-call event with a destructive-command warning before execution; an agent attempting to write outside a `/freeze`-locked path receives a workspace-manager error — verified by safety-rail unit tests against `clawteam/workspace/manager.py`.
+  9. Artifact writes per phase are capped by a configurable size budget (default 50 KB per artifact, 500 KB per phase); exceeding the cap triggers a compaction hook or a phase-level InteractionGate asking "prune what?" — verified by a size-cap stress test.
+  10. Running the Phase 0 regression matrix after these additions continues to pass — existing templates (software-dev, hedge-fund, code-review, harness-default, research-paper, strategy-room) spawn + advance + pass their existing tests unchanged.
+
+**Canonical refs**:
+- research/ARCHITECTURE.md Pattern 2 (team-wide task queue) + EvidenceGate family
+- research/PITFALLS.md Pitfalls 1 (persona drift), 2 (deadlock), 8 (gate gaming), 11 (theater) — all ship-blockers mitigated here; partial coverage of 3 (context exhaustion) via artifact caps and 6 (workspace conflicts) via hardening
+- research/SUMMARY.md Phase 2 section
+- codebase/ARCHITECTURE.md `PhaseRunner`, `ArtifactStore`, `EventBus` primitives
+
+**Upstream-PR status**: Included in target upstream bundle. `EvidenceGate` supersedes (not replaces) `ArtifactRequiredGate`; existing templates continue to use the old gate; gstack opts into the new one via plugin choice.
+
+**Research flag**: MEDIUM. EvidenceGate schemas per artifact type benefit from a quick research pass at plan time — well-documented patterns exist (Three Dots Labs replay-verification, deterministic side-channels) but the per-artifact schema detail is worth sharpening. Cycle-detector implementation has published precedent (Paperclip #390).
+
+**Plans**: TBD
+
+Plans:
+- [ ] 02-01: TBD (outlined during `/gsd-plan-phase 2`)
+
+---
+
+### Phase 3: Gstack Team Template & Methodology Port
+
+**Goal**: Ship the actual product surface — `gstack.toml` with 11 agents, `GstackSprintPlugin` wiring them to the 7-phase sprint engine, and per-role methodology prompts ported from the pure-rubric gstack skills (`/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/retro`, `/plan-design-review`, `/design-review`, `/plan-devex-review`, `/devex-review`, `/review`, `/qa-only`, `/cso`) — so a user can run one `clawteam team spawn gstack --name <name>` and immediately see a coherent 11-specialist team with methodology baked into every role prompt.
+
+**Depends on**: Phase 2 (requires sprint engine, evidence gates, structured-response envelope, safety-rail primitives).
+
+**Requirements**: TEAM-01, TEAM-02, TEAM-03, TEAM-04, TEAM-05, SKILL-01, SKILL-02, SKILL-03, SKILL-04, SKILL-05, SKILL-06, SKILL-07, SKILL-08, SPRINT-06, UX-01, UX-07
+
+**Success Criteria** (what must be TRUE):
+  1. User can run `clawteam team spawn gstack --name myteam --model-profile balanced` and `clawteam team show myteam` shows exactly 11 agents — pm, ceo, eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre — each with its own persistent worktree "desk" under `~/.clawteam/teams/myteam/agents/<role>/` and a distinct role-prompt file; each agent spawned via the existing `clawteam/spawn/` backend registry.
+  2. `GstackSprintPlugin` registers 7 phases (Think -> Plan -> Build -> Review -> Test -> Ship -> Reflect) via `PhaseRegistry` when the plugin is loaded; these phases appear only for the `gstack` template, and spawning any existing template (`software-dev`, etc.) continues to use its original phase set with no gstack phase leakage — verified by a cross-template isolation test.
+  3. Each of the 11 role prompts contains the per-role methodology port, verified by a golden-prompt test against fixtures: pm prompt includes all 6 office-hours forcing questions and the challenge-framing instruction; ceo prompt includes the 4 plan-ceo-review modes (Expansion/Selective/Hold/Reduction) with decision output schema; eng-mgr prompt includes architecture lock + data-flow diagrams + edge-case matrix + test-plan + per-person retro breakdown; designer prompt includes the 0-10 rubric + AI-slop detection checklist + interactive-per-dimension instruction + design-system research prompt; dx-lead prompt includes persona exploration + TTHW benchmarking + friction tracing; reviewer prompt includes production-bug detection + iron-law root-cause (no fix without investigation; halt after 3 failed hypotheses); qa prompt includes bug-fix + regression-test loop with `/qa-only` suppression variant; security prompt includes OWASP Top 10 + STRIDE checklist + 17 false-positive exclusions + 8/10+ confidence gate.
+  4. ceo is configured as the team leader in `gstack.toml`: only ceo can call `SprintConductor.advance_phase()`; ceo's role prompt explicitly owns scope decisions + phase-transition calls + consulting human via InteractionGate on scope cuts.
+  5. A sprint completing the Reflect phase triggers the eng-mgr role to write `retro.md` AND invoke `/learn` against the team-shared memory store (Phase 6 implementation); until Phase 6 ships, the `/learn` call is a stub that writes to a placeholder file with a feature-flag log entry — verified by a sprint-completion integration test.
+  6. `clawteam team show myteam` displays a dashboard: member list (all 11 roles + current status), memory highlights (most-recent `/learn` entries, placeholder until Phase 6), active sprint progress bars with phase indicator, and a per-agent token/cost rollup (placeholder values until Phase 7 full observability lands).
+  7. Running the Phase 0 regression matrix after these additions continues to pass — no existing template is affected by `gstack.toml` shipping or `GstackSprintPlugin` being importable (but not loaded for other templates).
+
+**Canonical refs**:
+- research/ARCHITECTURE.md Pattern 5 (TeamMemory layered) + GstackSprintPlugin wiring
+- research/FEATURES.md Differentiators #1 (11-role pre-configured team) + #2 (7-phase sprint as product)
+- research/PITFALLS.md Pitfall 7 (skill port collapse — classified at Phase 2 port-audit; rubric-pure skills land here, interactive skills deferred to Phase 4)
+- PROJECT.md Key Decisions row 1 (11-agent roster) + row 3 (team is persistent, sprint is transient)
+
+**Upstream-PR status**: Fork-only. This is the first phase with gstack-specific content. Everything here lives in `GstackSprintPlugin` + `gstack.toml`; delete those two assets and the rest of the codebase continues to run.
+
+**Research flag**: HIGH (partial — the interactive-skill subset is deferred to Phase 4). Per `research/SUMMARY.md` Phase 3 section and Gaps to Address #2: "We don't yet have a source of native gstack golden traces. Options: (a) run native gstack against a fixture repo and record transcripts, (b) derive expected shapes from the skill markdown itself, (c) co-design with Garry Tan." **Recommend running `/gsd-research-phase 3` before implementation** to settle: per-persona role-reassertion field schemas for the structured-response envelope; golden-trace sourcing strategy; per-role prompt length budget.
+
+**Plans**: TBD
+
+Plans:
+- [ ] 03-01: TBD (outlined during `/gsd-plan-phase 3`)
+
+---
+
+### Phase 4: Interactive State Machines, Smart Review Routing & Cross-Agent Verification
+
+**Goal**: Port the interactive/Socratic gstack skills (`/office-hours`, `/design-consultation`, `/investigate`) as proper multi-turn state machines (not one-shot prompt bakings); ship `SmartReviewRouter` with SHA-pinned multi-signal routing; enforce reviewer decorrelation and cross-agent verification; wire the Ship-phase human-approval gate — because these are the "HIGH research-flag" slices per `research/SUMMARY.md` and they collectively determine whether the Review/Investigate/Ship loops feel real or feel like generic Claude pretending.
+
+**Depends on**: Phase 3 (requires 11-agent team + methodology prompts + plugin surface).
+
+**Requirements**: SPRINT-03, SPRINT-04, SPRINT-05, SAFETY-05, QUALITY-07, QUALITY-09, QUALITY-13
+
+**Success Criteria** (what must be TRUE):
+  1. `/office-hours` runs as a multi-turn state machine owned by pm — issuing the 6 forcing questions one at a time (not batched), persisting per-question state between turns, and preserving per-question interactivity across agent restarts — verified by a golden-trace comparison against a fixture transcript of native gstack `/office-hours` showing matching turn count and Q&A branch structure.
+  2. `/design-consultation` and `/investigate` similarly run as state machines with per-dimension (design) or per-hypothesis (investigate) progression; `/investigate` auto-applies `/freeze` to the module under investigation for the duration of the investigation and releases on completion.
+  3. Entering the Review phase on a sprint whose diff touches UI files (e.g., `src/components/*.tsx`) automatically pulls the designer agent into the review participants; touching `src/auth/` or `**/crypto/**` automatically pulls security; touching `app/api/**` or `package.json` pulls dx-lead; reviewer (staff eng) always participates — verified by a routing golden test over at least 8 fixture diffs including adversarial cases (renamed files, test files that import crypto, no-op whitespace-only diffs).
+  4. Every reviewer participant records the diff SHA being reviewed in its report frontmatter; if the sprint branch HEAD advances before the review completes, a mid-review-thrash event fires and the reviewer chooses between extending the review to the new SHA or marking the prior review as superseded — verified by a mid-review-push integration test.
+  5. Parallel reviewers receive distinct decorrelated system prompts (reviewer=staff-eng-cross-cutting, security=threat-model-first, designer=rubric-first, dx-lead=friction-first) and run without access to peer drafts until the synthesis step; `reviewer` (staff eng) aggregates into a single `review-report.md`; the aggregated report passes the phase gate, not individual reports; agreement-rate > 90% across parallel reviewers triggers a sycophancy-cascade alarm event — verified by a decorrelation test measuring disagreement rate across a fixture panel.
+  6. Cross-agent verification gates are wired: qa must verify engineer's `test-report.md` references real pytest output hashes; reviewer must verify designer's `design-doc.md` covers all 6 forcing-question answers — verified by cross-verification integration tests on fixture artifacts.
+  7. Advancing from Test -> Ship is blocked by an `InteractionGate` subclass that ignores any `auto_advance: true` team config (production blast radius); the human must explicitly edit a `ship-approval.md` artifact or run `clawteam sprint approve <id> --phase ship`, regardless of other config — verified by an auto-advance-override test.
+
+**Canonical refs**:
+- research/ARCHITECTURE.md Pattern 6 (SmartReviewRouter rules-first) + reviewer-decorrelation notes
+- research/PITFALLS.md Pitfalls 7 (interactive state machines), 9 (review routing SHA-pinning + multi-signal), 13 (sycophancy cascade decorrelation); reinforces 8 (gate gaming) via cross-agent verification; SPRINT-05 forces the always-human ship approval
+- research/SUMMARY.md Phase 3 research-flag recommendation applies to this phase's state-machine work
+- PROJECT.md Key Decisions row 6 (parallel reviewers + reviewer aggregates)
+
+**Upstream-PR status**: Fork-only. `SmartReviewRouter` is generic substrate (could upstream eventually), but the per-persona decorrelation prompts and the specific rule config live in `gstack.toml`.
+
+**Research flag**: HIGH. Depends on the Phase 3 research pass having settled: golden-trace sourcing; per-persona role-reassertion field schema; adversarial-diff handling rules. Re-run `/gsd-research-phase 4` if Phase 3's research outputs don't sufficiently cover the state-machine schema per interactive skill.
+
+**Plans**: TBD
+
+Plans:
+- [ ] 04-01: TBD (outlined during `/gsd-plan-phase 4`)
+
+---
+
+### Phase 5: Tool-Heavy Skills (Ship, SRE, Codex)
+
+**Goal**: Port the tool-heavy gstack skills that give engineer/shipper/sre/reviewer actual external-tool surfaces: `/codex` cross-model second opinion, `/ship` + `/land-and-deploy` + `/document-release` ship pipeline, `/canary` + `/benchmark` + `/setup-deploy` SRE pipeline. These are invokable ClawTeam skill modules (not prompt baking), binding to specific roles declared in `gstack.toml`.
+
+**Depends on**: Phase 3 (requires 11-agent team + plugin surface so skills can bind to roles); Phase 4 optional for human-gated Ship (SPRINT-05 already in place).
+
+**Requirements**: SKILL-13, SKILL-14, SKILL-15, SKILL-16, SKILL-17, SKILL-18, SKILL-19
+
+**Success Criteria** (what must be TRUE):
+  1. `engineer` or `reviewer` can invoke `/codex` through the existing `NativeCliAdapter` to get an independent OpenAI Codex CLI opinion in three modes (review/adversarial/consultation); the result lands as a `codex-review.md` artifact tagged with the mode; when the `codex` CLI binary is missing, the skill emits a setup hint ("install codex: `npm install -g @openai/codex`") and returns a structured `SkillUnavailable` error instead of crashing — verified by a skill-invocation test with and without the `codex` binary present.
+  2. `shipper` invoking `/ship` on a Build-phase-complete sprint runs: sync main, run tests (bootstrapping a test framework if none exists on the branch), audit coverage against a configurable threshold, push the branch, open a PR — producing `ship-notes.md` with a PR URL; auto-invokes `/document-release` to cross-reference the diff against doc files and update stale ones.
+  3. `shipper` invoking `/land-and-deploy` on a merged PR waits for CI green, deploys via the `gstack.toml`-configured deploy target (or a stub if `/setup-deploy` hasn't been run), verifies production health, and emits a `deploy.md` artifact referencing the deploy URL — the Ship-phase EvidenceGate validates this deploy URL dereferences (HEAD request returns 2xx or 3xx) before allowing Reflect to start.
+  4. `sre` invoking `/canary` on a freshly deployed build runs the post-deploy monitoring loop (console errors, perf regressions against a baseline) for a configurable window and emits `canary-report.md` with regression flags.
+  5. `sre` invoking `/benchmark` runs Core Web Vitals + page-load baselines against before/after deploys on every PR; results land in `benchmark-report.md` with a regression threshold configured in `gstack.toml`.
+  6. `sre` invoking `/setup-deploy` on a greenfield project runs the one-time deployment configuration wizard and writes the result to `gstack.toml`'s `[deploy]` block — idempotent on re-run.
+  7. All six skills have per-skill tests covering happy-path, missing-tool, and adversarial-input cases; skill invocation through MCP tool call completes round-trip with structured responses.
+
+**Canonical refs**:
+- research/FEATURES.md P1 list for `/codex`, `/ship`, `/land-and-deploy`, `/document-release`, `/canary`, `/benchmark`, `/setup-deploy`
+- research/SUMMARY.md Phase 3 section "Tool-heavy skill ports for Build/Ship/Test/SRE" — grouped here as its own phase in fine granularity
+- research/PITFALLS.md Pitfall 8 (gate gaming) — `/ship` must emit a real deploy URL for EvidenceGate to dereference
+
+**Upstream-PR status**: Fork-only. Tool-heavy skills are gstack-specific; they bind to `gstack.toml` role assignments.
+
+**Research flag**: LOW. Each skill has a clear gstack-native behavior reference; porting is implementation work, not new design.
+
+**Plans**: TBD
+
+Plans:
+- [ ] 05-01: TBD (outlined during `/gsd-plan-phase 5`)
+
+---
+
+### Phase 6: Browser Skills, Design Pipeline & Team Memory
+
+**Goal**: Deliver the two biggest user-facing differentiators that make the "team that learns your taste" narrative real: the browser pipeline (`/browse`, `/open-gstack-browser`, `/setup-browser-cookies`, `/design-shotgun`, `/design-html`) via a `clawteam[browser]` optional extra (Playwright), and the layered `/learn` team memory store with provenance + decay + human gate on high-impact entries.
+
+**Depends on**: Phase 3 (per-role skill binding + designer owning `/design-shotgun`, `/design-html`); Phase 4 (InteractionGate needed for high-impact memory human gate via QUALITY-10).
+
+**Requirements**: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05, MEM-06, MEM-07, SKILL-10, SKILL-11, SKILL-12, QUALITY-10
+
+**Success Criteria** (what must be TRUE):
+  1. `pip install 'clawteam[browser]' && playwright install chromium` installs `playwright>=1.58,<2`; on a machine without the extra, `designer`/`engineer`/`qa`/`dx-lead` invoking `/browse` or `/open-gstack-browser` or `/setup-browser-cookies` receives a structured `SkillUnavailable` error with the exact install commands — verified by feature-detection test with and without the extra.
+  2. `designer` invoking `/design-shotgun` generates multiple mockup variants (configurable count, default 4), renders them to a comparison board as screenshots/HTML, and supports iterative refinement; the skill writes to the designer's per-agent `/learn` memory scope a taste-observation entry per iteration citing which variant the user picked and why.
+  3. `designer` invoking `/design-html` takes a chosen mockup and emits production HTML following the Pretext pattern, auto-detecting the project's framework (React/Svelte/Vue/plain HTML) from `package.json` + import analysis.
+  4. `TeamMemoryStore` exists under `~/.clawteam/teams/<team>/memory/` with two tiers: `memory/team/` (shared) and `memory/agents/<role>/` (private); writes are append-only JSONL with per-entry frontmatter containing `id`, `author`, `sprint_id`, `phase`, `timestamp`, `tags`, `evidence` (path:line or artifact ref), `confidence`, and `learned_from` (one of `user|artifact|self-inferred`).
+  5. `clawteam memory search <query> [--tag foo] [--scope shared|role]` retrieves entries via grep-first keyword + tag match, ranked by recency × provenance-weight (user-grounded > artifact-grounded > self-inferred); entries without evidence citation are flagged and ranked below evidence-bearing ones, not blocked — verified by a retrieval ranking test.
+  6. Writing a memory entry tagged `impact:high` or to `memory/team/decisions/` triggers an `InteractionGate`-backed human confirmation flow (a `memory-confirm-<id>.md` question file lands in the current sprint's questions dir); the entry is staged, not committed, until the human answers — verified by a high-impact-write integration test.
+  7. Memory entries inherit a per-tag TTL (patterns: 90 days; preferences: indefinite; incidents: 180 days); expired entries rank below unexpired on retrieval but are never auto-deleted — verified by a decay-ranking test.
+  8. Adding a new entry that contradicts an existing one (same tag, opposite assertion) triggers a conflict-detection event; the writer sees "conflicts with memory/team/X.md entry Y" and must resolve via an explicit `/learn --resolve` invocation — verified by a conflict-injection test.
+  9. `clawteam memory review` lists recent entries with provenance flags; `clawteam memory purge <id>` audits and removes an entry, writing a purge-event to the team event log — both commands support `--json`.
+  10. Per-team namespace isolation: no agent on team A can read `memory/team/` or `memory/agents/*` entries from team B — verified by a cross-team isolation test.
+
+**Canonical refs**:
+- research/STACK.md "Playwright as optional extra" + "grep-first team memory, embeddings in v2"
+- research/ARCHITECTURE.md Pattern 5 (TeamMemory layered) + `/learn` skill rules
+- research/PITFALLS.md Pitfall 10 (memory poisoning — ship-blocker if `/learn` ships with write path) — all preventions from this pitfall land here; Pitfall 3 (context exhaustion) partially mitigated via MemGPT-tiered memory design
+- research/SUMMARY.md Phase 4 section + Gaps to Address #3 (memory poisoning defense tradeoffs)
+
+**Upstream-PR status**: Fork-only. Browser skills are gstack-specific. `TeamMemoryStore` is generic substrate and could upstream eventually under `clawteam/memory/`, but the `/learn` UX is currently gstack-scoped.
+
+**Research flag**: MEDIUM. Memory provenance + decay schema benefits from a planning pass per `research/SUMMARY.md` — MINJA/MemoryGraft/SSGM papers describe the problem but concrete schema choice needs a product decision. Browser skills use well-documented Playwright patterns. **Consider `/gsd-research-phase 6` if the memory write-path preventions feel under-specified at plan time.**
+
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: TBD (outlined during `/gsd-plan-phase 6`)
+
+**UI hint**: yes
+
+---
+
+### Phase 7: Parallel Sprints, AttentionQueue UX & Cost Controls
+
+**Goal**: Unlock the parallel-sprints force multiplier by landing `SprintConductor` concurrency caps, dormancy discipline, rate-limit-aware scheduling, `clawteam attend` with typed-priority queue + digest mode + `--auto-accept-reversible`, the team cost dashboard with 50/80/100% alarms and model fallback ladder, and sprint pause/resume at scale — because parallel sprints compound every earlier risk (resource blowup + attention fatigue + cost blowup are all nonlinear in sprint count).
+
+**Depends on**: Phase 3 (team + plugin needed to exercise multi-sprint); Phase 4 (routing + cross-agent verification needed under load); Phase 6 (memory + `/learn` present under the load test). Safe to plan in parallel with Phase 5 if capacity allows.
+
+**Requirements**: CORE-06, INT-03, INT-04, INT-05, QUALITY-04, QUALITY-05, QUALITY-12, UX-06
+
+**Success Criteria** (what must be TRUE):
+  1. One `gstack` team can hold 10 concurrent sprints; running `clawteam sprint list --team <name>` shows all 10 with their individual phase states; no race conditions on the team-level TaskStore, memory store, or attention queue — verified by a 10-sprint load-test integration test under a 5-minute duration cap and a 4 GB RAM budget.
+  2. `SprintConductor` caps concurrent active sprints via `asyncio.Semaphore(max_concurrent_sprints)` (default 10, user-configurable per team); sprints beyond the cap sit in a `queued` state and auto-advance when capacity frees; an `asyncio.Semaphore(max_tasks_per_agent)` (default 1) serializes per-agent dispatch — verified by an over-cap test that asserts the 11th sprint enters `queued`.
+  3. Active-agent slot pool caps concurrent active agents at N (default 6); idle agents sleep-poll (no Claude keepalive burn); a Think phase with only pm + ceo active doesn't wake engineer/shipper/sre — verified by an agent-state-sampling test over a 10-sprint run showing active-agent count never exceeds the cap.
+  4. Running `clawteam attend` surfaces the top-N pending questions across all of the user's teams and sprints, priority-sorted by `URGENCY + BLOCKING + AGE_BOOST + EXPLICIT_TAG` (additive); the CLI opens the chosen question in `$EDITOR`; on save, the gate unblocks and the next priority question is offered — verified by a 10-sprint attention-queue test.
+  5. `clawteam attend --summary` shows the digest view ("4 sprints stalled >2h, 1 CRITICAL, 2 reversible auto-accept candidates") rolling related questions into single decisions; `clawteam attend --auto-accept-reversible` applies default-accept-with-TTL to questions flagged `reversibility: easy`.
+  6. With the optional `watchdog` package installed, the attention queue auto-refreshes on filesystem events the moment an answer file is saved; without `watchdog`, the queue falls back to a 2-second polling interval — verified by a watchdog-with/without test.
+  7. `clawteam team show <name>` displays a cost dashboard: per-agent token usage, per-sprint cost rollup with Opus/Sonnet/Haiku breakdown, cache hit rate, and 50/80/100%-of-budget alarms; when 80% of the configured budget is reached, further agent invocations prefer cached prompts and downgrade to the model fallback ladder (Opus -> Sonnet -> Haiku) with a flagged note per invocation — verified by a budget-exhaustion test.
+  8. Role prompts are cached per session (90% discount on repeat reads), team memory core is cached per team, per-sprint artifacts are cached per sprint; cache hit rate > 50% on a steady-state 10-sprint run — measured in the load test.
+  9. Rate-limit-aware scheduling: when Anthropic TPM is saturated, new phase starts queue behind in-flight work instead of erroring; pause/resume across rate-limit windows is seamless — verified by a mock-rate-limiter test.
+  10. Disk-budget alarm per team (default 5 GB soft, 10 GB hard) + zombie-worktree auto-GC cleans up dead worktrees older than 30 days — verified by a disk-budget-stress test.
+
+**Canonical refs**:
+- research/ARCHITECTURE.md Pattern 2 (team-wide task queue + semaphore caps) + Pattern 3 (AttentionQueue priority scoring)
+- research/PITFALLS.md Pitfalls 4 (resource blowup), 5 (attention fatigue), 12 (cost blowup), 16 (resume brittleness); reinforces 1 (drift regression alarm in `team show`)
+- research/SUMMARY.md Phase 5 section + Gaps to Address #4 (cost-control default aggressiveness)
+- research/STACK.md "questionary + rich — already in ClawTeam" for `attend` UX
+
+**Upstream-PR status**: Fork-only. `SprintConductor` and `AttentionQueue` are generic substrates (could upstream eventually under `clawteam/sprint/` and `clawteam/attention/`), but their defaults and policies are gstack-tuned for now.
+
+**Research flag**: MEDIUM. Anthropic prompt-caching + rate-limit backoff have clear docs; attention-queue digest-mode UX benefits from a quick iteration with real users (post-Phase 3 dogfooding).
+
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: TBD (outlined during `/gsd-plan-phase 7`)
+
+**UI hint**: yes
+
+---
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgent insertion becomes a decimal phase (e.g., 2.1) and slots in between integer phases. Phase 5 and Phase 6 have independent dependencies on Phase 3; if capacity permits, they may be planned in parallel (`parallelization: true` per config), but final sequencing is per `/gsd-plan-phase` output.
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 0. Foundation & Upstream RFC | 0/TBD | Not started | - |
+| 1. Core Harness Extensions | 0/TBD | Not started | - |
+| 2. Sprint Engine & Theater/Drift/Deadlock Prevention | 0/TBD | Not started | - |
+| 3. Gstack Team Template & Methodology Port | 0/TBD | Not started | - |
+| 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
+| 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
+| 6. Browser Skills, Design Pipeline & Team Memory | 0/TBD | Not started | - |
+| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 0/TBD | Not started | - |
+
+## Critical Path
+
+The minimum sequence that delivers a demonstrable end-to-end v1 product:
+
+```
+0 (foundation)
+ -> 1 (core extensions)
+ -> 2 (single-sprint engine with evidence + theater prevention)
+ -> 3 (gstack team + methodology — product surface exists)
+ -> 4 (interactive skills + routing + ship-gate — product surface works end-to-end)
+ -> 7 (parallel sprints — the marketing hook: "run 10 sprints on one team")
+```
+
+Phases 5 (tool-heavy skills) and 6 (browser + memory) are critical-path-adjacent: without Phase 5, `shipper` and `sre` have no external-tool hooks and the Ship-phase EvidenceGate can't dereference a real deploy URL. Without Phase 6, the "team learns your taste" narrative (memory) + flagship visual iteration (`/design-shotgun`) are missing. Both are required for v1.0 shipping; only the parallel-sprints marketing narrative (Phase 7) gates on the concurrency + cost work.
+
+## Coverage
+
+Every v1 requirement from `.planning/REQUIREMENTS.md` maps to exactly one phase. Full traceability is maintained in `REQUIREMENTS.md § Traceability`.
+
+| Phase | Requirements Mapped |
+|-------|---------------------|
+| 0 | CORE-03, TEAM-06, QUALITY-14, QUALITY-15, UX-08 (5) |
+| 1 | CORE-01, CORE-02, CORE-04, INT-01, INT-02 (5) |
+| 2 | CORE-05, CORE-07, INT-06, SPRINT-01, SPRINT-02, SKILL-09, SAFETY-01, SAFETY-02, SAFETY-03, SAFETY-04, QUALITY-01, QUALITY-02, QUALITY-03, QUALITY-06, QUALITY-08, QUALITY-11, UX-02, UX-03, UX-04, UX-05, UX-09 (21) |
+| 3 | TEAM-01, TEAM-02, TEAM-03, TEAM-04, TEAM-05, SKILL-01, SKILL-02, SKILL-03, SKILL-04, SKILL-05, SKILL-06, SKILL-07, SKILL-08, SPRINT-06, UX-01, UX-07 (16) |
+| 4 | SPRINT-03, SPRINT-04, SPRINT-05, SAFETY-05, QUALITY-07, QUALITY-09, QUALITY-13 (7) |
+| 5 | SKILL-13, SKILL-14, SKILL-15, SKILL-16, SKILL-17, SKILL-18, SKILL-19 (7) |
+| 6 | MEM-01, MEM-02, MEM-03, MEM-04, MEM-05, MEM-06, MEM-07, SKILL-10, SKILL-11, SKILL-12, QUALITY-10 (11) |
+| 7 | CORE-06, INT-03, INT-04, INT-05, QUALITY-04, QUALITY-05, QUALITY-12, UX-06 (8) |
+
+**Total mapped:** 80 / 80 v1 requirements (100%). No orphaned requirements. No duplicates.
+
+---
+
+*Roadmap created: 2026-04-15*
+*Granularity: fine*
+*Milestone: v1.0 (hire-your-team + parallel-sprint gstack integration)*
