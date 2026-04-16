@@ -33,6 +33,44 @@ console = Console()
 
 _json_output: bool = False
 _data_dir: str | None = None
+_DOCTOR_TOOLS: tuple[tuple[str, str, str], ...] = (
+    ("chromium (Playwright)", "python-pkg", "playwright"),
+    ("codex", "cli", "codex"),
+    ("ngrok", "cli", "ngrok"),
+    ("watchdog", "python-pkg", "watchdog"),
+)
+
+
+def _doctor_install_hint(tool: str, platform: str) -> str:
+    """Return a per-OS install command for the given doctor tool."""
+    hints: dict[str, dict[str, str]] = {
+        "chromium (Playwright)": {
+            "darwin": "pip install 'clawteam[browser]' && playwright install chromium",
+            "win32": "pip install 'clawteam[browser]' && playwright install chromium",
+            "linux": "pip install 'clawteam[browser]' && playwright install chromium",
+        },
+        "codex": {
+            "darwin": "brew install codex  # or: npm install -g @openai/codex",
+            "win32": "winget install OpenAI.Codex  # or: npm install -g @openai/codex",
+            "linux": "npm install -g @openai/codex",
+        },
+        "ngrok": {
+            "darwin": "brew install ngrok",
+            "win32": "winget install Ngrok.Ngrok  # or: choco install ngrok",
+            "linux": "curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && echo 'deb https://ngrok-agent.s3.amazonaws.com buster main' | sudo tee /etc/apt/sources.list.d/ngrok.list && sudo apt update && sudo apt install ngrok",
+        },
+        "watchdog": {
+            "darwin": "pip install watchdog",
+            "win32": "pip install watchdog",
+            "linux": "pip install watchdog",
+        },
+    }
+    per_tool = hints.get(tool, {})
+    if platform == "darwin":
+        return per_tool.get("darwin", "")
+    if platform == "win32":
+        return per_tool.get("win32", "")
+    return per_tool.get("linux", "")
 
 
 def _version_callback(value: bool):
@@ -1141,6 +1179,49 @@ def config_health():
         console.print(f"  Mount point: {'[yellow]yes (remote/shared)[/yellow]' if d['is_mount'] else '[dim]no (local)[/dim]'}")
         console.print(f"  Teams:      {d['teams_count']}")
         console.print(f"  User:       {d['user'] or '(not set)'}  [dim]({d['user_source']})[/dim]")
+
+    _output(checks, _human)
+
+
+# ============================================================================
+# Doctor Command
+# ============================================================================
+
+
+@app.command("doctor")
+def doctor():
+    """Detect optional external tools and print per-OS install hints."""
+    import shutil
+    from importlib.util import find_spec
+
+    checks: dict[str, dict[str, object]] = {"os": {"platform": sys.platform}}
+    for name, kind, probe_target in _DOCTOR_TOOLS:
+        if kind == "cli":
+            path = shutil.which(probe_target) or ""
+            found = bool(path)
+        else:
+            spec = find_spec(probe_target)
+            path = "python package" if spec else ""
+            found = spec is not None
+        checks[name] = {
+            "found": found,
+            "path": path,
+            "kind": kind,
+            "install_hint": "" if found else _doctor_install_hint(name, sys.platform),
+        }
+
+    def _human(d):
+        console.print(f"\nDoctor OS: [cyan]{d['os']['platform']}[/cyan]")
+        for name, _, _ in _DOCTOR_TOOLS:
+            info = d[name]
+            if info["found"]:
+                console.print(
+                    f"  {name}: [green]OK[/green]  [dim]{info['path'] or '(available)'}[/dim]"
+                )
+            else:
+                console.print(f"  {name}: [yellow]missing[/yellow]")
+                if info["install_hint"]:
+                    console.print(f"    [dim]{info['install_hint']}[/dim]")
 
     _output(checks, _human)
 
