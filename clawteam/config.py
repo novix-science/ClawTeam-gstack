@@ -52,6 +52,7 @@ class ClawTeamConfig(BaseModel):
     user: str = ""
     default_team: str = ""
     default_profile: str = ""
+    default_model_profile: str = "balanced"  # model tier preset (balanced | quality | budget)
     transport: str = ""
     task_store: str = ""  # "file" (default) — extensible for redis/sql later
     workspace: str = "auto"  # "auto" | "always" | "never" | ""
@@ -99,12 +100,16 @@ def get_effective(key: str) -> tuple[str, str]:
     """Get effective value for a config key. Returns (value, source).
 
     Priority: env var > config file > default.
+    `default_model_profile` is intentionally excluded from env overrides to prevent
+    silent profile promotion; non-default values must come from CLI or config file.
     """
     env_map = {
         "data_dir": "CLAWTEAM_DATA_DIR",
         "user": "CLAWTEAM_USER",
         "default_team": "CLAWTEAM_TEAM_NAME",
         "default_profile": "CLAWTEAM_DEFAULT_PROFILE",
+        # `default_model_profile` is deliberately omitted: non-default model tiers
+        # must be an explicit CLI or config-file opt-in, never an env override.
         "transport": "CLAWTEAM_TRANSPORT",
         "task_store": "CLAWTEAM_TASK_STORE",
         "workspace": "CLAWTEAM_WORKSPACE",
