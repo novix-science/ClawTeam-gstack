@@ -85,3 +85,53 @@ def test_doctor_install_hints_follow_platform_dispatch(monkeypatch):
     linux_payload = json.loads(linux.output)
     assert "npm install -g @openai/codex" in linux_payload["codex"]["install_hint"]
     assert "apt install ngrok" in linux_payload["ngrok"]["install_hint"]
+
+
+def test_doctor_human_output_preserves_browser_extra(monkeypatch):
+    """Regression: Chromium install hint must render `clawteam[browser]` literally.
+
+    Prior to the Rich-markup-escape fix, `console.print(f"[dim]{hint}[/dim]")`
+    interpreted the literal substring `[browser]` inside the hint value
+    `pip install 'clawteam[browser]' && playwright install chromium` as an
+    unknown Rich markup tag and silently elided it — so users saw
+    `pip install 'clawteam' && playwright install chromium` (wrong extra).
+    Gap closure for UAT test 2 (severity: major).
+    """
+    runner = CliRunner()
+
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+    monkeypatch.setattr("importlib.util.find_spec", lambda _name: None)
+
+    result = runner.invoke(app, ["doctor"])
+
+    assert result.exit_code == 0, result.output
+    # Positive assertion: the literal extras spec must survive rendering.
+    assert "clawteam[browser]" in result.output, (
+        "Rich markup elided `[browser]` from the chromium install hint; "
+        f"stdout was:\n{result.output}"
+    )
+    # Belt-and-braces: the misrendered form must NOT appear.
+    assert "pip install 'clawteam' && playwright install chromium" not in result.output
+
+
+def test_doctor_json_install_hint_preserves_browser_extra_unescaped(monkeypatch):
+    """The JSON path must emit the underlying hint WITHOUT backslash escapes.
+
+    Guardrail: a sloppy fix that mutates the hint data (e.g. pre-escaping
+    install_hint at construction time) would corrupt the JSON API surface.
+    Fix must live in the rendering layer only.
+    """
+    runner = CliRunner()
+
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+    monkeypatch.setattr("importlib.util.find_spec", lambda _name: None)
+
+    result = runner.invoke(app, ["--json", "doctor"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    chromium_hint = payload["chromium (Playwright)"]["install_hint"]
+    # Exact string — no backslash, no escape, no mutation.
+    assert chromium_hint == (
+        "pip install 'clawteam[browser]' && playwright install chromium"
+    ), f"JSON install_hint was mutated: {chromium_hint!r}"
