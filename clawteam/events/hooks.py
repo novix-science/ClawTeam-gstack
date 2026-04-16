@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from clawteam.events.bus import EventBus
 from clawteam.events.types import HarnessEvent
+from clawteam.secrets import scrub_env
 
 
 class HookDef(BaseModel):
@@ -74,19 +75,25 @@ def _resolve_event_type(name: str) -> type[HarnessEvent] | None:
     return resolve_event_type(name)
 
 
+def _env_snapshot(event: HarnessEvent) -> dict[str, str]:
+    """Build the env dict a shell hook receives: inherited env + CLAWTEAM_*/OH_* event fields."""
+    env = os.environ.copy()
+    env["CLAWTEAM_EVENT_TYPE"] = type(event).__name__
+    for key, value in asdict(event).items():
+        env_key = f"CLAWTEAM_{key.upper()}"
+        if isinstance(value, list):
+            env[env_key] = ",".join(str(v) for v in value)
+        else:
+            env[env_key] = str(value) if value is not None else ""
+        env[f"OH_{key.upper()}"] = env[env_key]
+    return env
+
+
 def _make_shell_handler(command: str):
     """Create a handler that runs a shell command with event data as env vars."""
 
     def handler(event: HarnessEvent) -> int | None:
-        env = os.environ.copy()
-        env["CLAWTEAM_EVENT_TYPE"] = type(event).__name__
-        for key, value in asdict(event).items():
-            env_key = f"CLAWTEAM_{key.upper()}"
-            if isinstance(value, list):
-                env[env_key] = ",".join(str(v) for v in value)
-            else:
-                env[env_key] = str(value) if value is not None else ""
-            env[f"OH_{key.upper()}"] = env[env_key]
+        env = scrub_env(_env_snapshot(event))
         try:
             result = subprocess.run(
                 command,
