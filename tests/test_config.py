@@ -110,3 +110,38 @@ class TestGetEffective:
         val, source = get_effective("nonexistent_key")
         assert val == ""
         assert source == "default"
+
+
+class TestDefaultModelProfile:
+    def test_default_without_env_or_file_is_balanced(self, monkeypatch):
+        monkeypatch.delenv("CLAWTEAM_DEFAULT_MODEL_PROFILE", raising=False)
+        val, source = get_effective("default_model_profile")
+        assert val == "balanced"
+        assert source == "default"
+
+    def test_model_fields_include_default_model_profile(self):
+        assert "default_model_profile" in ClawTeamConfig.model_fields
+
+    def test_default_value_on_model(self):
+        cfg = ClawTeamConfig()
+        assert cfg.default_model_profile == "balanced"
+
+    def test_custom_value_is_preserved(self):
+        cfg = ClawTeamConfig(default_model_profile="quality")
+        assert cfg.default_model_profile == "quality"
+
+    def test_legacy_config_missing_field_loads_balanced(self):
+        cfg = ClawTeamConfig.model_validate({"data_dir": "", "default_profile": "x"})
+        assert cfg.default_profile == "x"
+        assert cfg.default_model_profile == "balanced"
+
+    def test_save_and_load_roundtrip_preserves_default_model_profile(self):
+        save_config(ClawTeamConfig(default_model_profile="budget"))
+        loaded = load_config()
+        assert loaded.default_model_profile == "budget"
+
+    def test_env_var_is_ignored_by_get_effective(self, monkeypatch):
+        monkeypatch.setenv("CLAWTEAM_DEFAULT_MODEL_PROFILE", "quality")
+        val, source = get_effective("default_model_profile")
+        assert val == "balanced"
+        assert source == "default"
