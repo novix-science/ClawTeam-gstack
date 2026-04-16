@@ -1,21 +1,22 @@
 ---
 phase: 00-foundation-upstream-rfc
 verified: 2026-04-16T19:05:00Z
-status: human_needed
-score: 5/5 must-haves verified (SC#4 split: doc-artifact PASS + upstream-submission HUMAN)
-overrides_applied: 0
+status: passed
+score: 5/5 must-haves verified (SC#4 scope-trimmed to fork-only document artifact per user decision)
+overrides_applied: 1
 re_verification:
   previous_status: none (initial verification after Wave 3 gap-closure)
   previous_score: UAT recorded 4 pass / 2 issues / 1 blocked
   gaps_closed:
     - "Test 2 (doctor `[browser]` elision) — closed by plan 00-06 via rich.markup.escape"
     - "Test 6 (RFC missing two hooks) — closed by plan 00-07 via §4.3a and §4.3b additions"
+    - "Test 7 (upstream PR ack) — scope-dropped 2026-04-16; SC#4 upstream-submission clause deferred to v1 post-ship per Deferred Items UP-01; ROADMAP.md SC#4 retrimmed to document-only"
   gaps_remaining: []
   regressions: []
-human_verification:
-  - test: "Open `docs/rfcs/001-phase-registry.md` as a PR or discussion thread against `HKUDS/ClawTeam` upstream, tag a maintainer, and obtain at least one acknowledgement (Phase 0 Success Criterion #4, second clause)"
-    expected: "PR or discussion URL recorded in ROADMAP.md Phase 0 section; maintainer ack timestamp noted"
-    why_human: "GitHub PR creation against an external org requires authenticated human action and a maintainer reply is asynchronous — neither can be performed or polled by the verifier. The document artifact (both README.md + 001-phase-registry.md) is fully satisfied; only the upstream submission step remains."
+scope_decisions:
+  - decision: "SC#4 upstream-submission clause removed from Phase 0 acceptance"
+    rationale: "User (2026-04-16): ClawTeam-gstack v1 builds on the fork; upstream PR + maintainer ack already deferred to v1 post-ship per Deferred Items UP-01. The original SC#4 wording contradicted the Deferred Items table."
+    recorded_in: ".planning/ROADMAP.md (SC#4 trimmed); memory/project_upstream_scope.md"
 ---
 
 # Phase 0: Foundation & Upstream RFC — Verification Report
