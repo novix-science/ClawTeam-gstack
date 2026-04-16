@@ -49,10 +49,14 @@ This roadmap delivers the gstack-as-team integration in eight phases, moving fro
 
 **Upstream-PR status**: Part of target upstream bundle. RFC + regression matrix are prerequisites that benefit every template, not just gstack.
 
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 00-01: TBD (outlined during `/gsd-plan-phase 0`)
+- [ ] 00-01-PLAN.md — Env deny-filter: scrub_env helper + hooks.py wiring + unit/integration tests (QUALITY-15)
+- [ ] 00-02-PLAN.md — clawteam doctor CLI subcommand with per-OS install hints for Chromium/codex/ngrok/watchdog (UX-08)
+- [ ] 00-03-PLAN.md — Default model_profile scaffold field on ClawTeamConfig (TEAM-06 + Pitfall #12)
+- [ ] 00-04-PLAN.md — BC regression matrix: parametrized pytest over 6 packaged templates (CORE-03, TEAM-06, QUALITY-14)
+- [ ] 00-05-PLAN.md — Upstream RFC 001 (PhaseRegistry + HarnessPlugin.contribute_phases + SprintState + InteractionGate)
 
 ---
 
