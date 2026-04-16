@@ -17,33 +17,33 @@ must_haves:
     - "ClawTeamConfig().default_model_profile equals the string 'balanced' when no value is supplied."
     - "ClawTeamConfig.model_fields contains 'default_model_profile' so downstream code can enumerate it."
     - "Deserialising an existing config.json that lacks 'default_model_profile' produces a model with default_model_profile='balanced' (additive-only, BC guaranteed)."
-    - "get_effective('default_model_profile') consults env var CLAWTEAM_DEFAULT_MODEL_PROFILE, then file, then default — identical priority logic as default_profile."
+    - "get_effective('default_model_profile') returns ('balanced', 'default') when nothing is set — NO env-var override path (per ROADMAP Phase 0 success criterion 5: opt-in only via --model-profile CLI flag or config file, never via env var)."
   artifacts:
     - path: "clawteam/config.py"
-      provides: "ClawTeamConfig.default_model_profile = 'balanced' field + CLAWTEAM_DEFAULT_MODEL_PROFILE env map entry"
+      provides: "ClawTeamConfig.default_model_profile = 'balanced' field — scaffold only, NO env_map entry (ROADMAP criterion 5)"
       contains: "default_model_profile: str = \"balanced\""
     - path: "tests/test_config.py"
-      provides: "Assertions that (a) default is 'balanced', (b) missing-field BC load produces 'balanced', (c) env var CLAWTEAM_DEFAULT_MODEL_PROFILE overrides file value via get_effective"
+      provides: "Assertions that (a) default is 'balanced', (b) missing-field BC load produces 'balanced', (c) CLAWTEAM_DEFAULT_MODEL_PROFILE env var is IGNORED (regression guard against Pitfall #12 silent quality promotion)"
       contains: "default_model_profile"
   key_links:
     - from: "clawteam/config.py::ClawTeamConfig.default_model_profile"
-      to: "clawteam/config.py::get_effective env_map"
-      via: "key 'default_model_profile' maps to env var 'CLAWTEAM_DEFAULT_MODEL_PROFILE'"
-      pattern: "\"default_model_profile\": \"CLAWTEAM_DEFAULT_MODEL_PROFILE\""
+      to: "clawteam/config.py::get_effective"
+      via: "get_effective reads the field from config file only — env_map deliberately does NOT contain default_model_profile"
+      pattern: "default_model_profile"
 ---
 
 <objective>
-Scaffold the default model profile field on `ClawTeamConfig` (TEAM-06 + Pitfall #12 cost-blowup prevention): a single pydantic v2 field `default_model_profile: str = "balanced"` added adjacent to the existing `default_profile` at `clawteam/config.py:54`, plus a matching entry in the `env_map` at `config.py:103-119` so the env var `CLAWTEAM_DEFAULT_MODEL_PROFILE` participates in the existing env → file → default priority chain.
+Scaffold the default model profile field on `ClawTeamConfig` (TEAM-06 + Pitfall #12 cost-blowup prevention): a single pydantic v2 field `default_model_profile: str = "balanced"` added adjacent to the existing `default_profile` at `clawteam/config.py:54`. Deliberately NO env_map entry — per ROADMAP Phase 0 success criterion 5, opt-in to a non-default profile is restricted to `--model-profile` CLI flag or config file, never env var. This prevents the "silent quality promotion via an exported `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` shell" failure mode (Pitfall #12).
 
 Purpose: Closes TEAM-06 (gstack.toml additive — existing templates unchanged because they never read this field; Phase 3's `gstack.toml` loader will). Establishes the resolution PATH; the actual profile-to-model mapping (Opus/Sonnet/Haiku per role) ships in Phase 3 (`gstack.toml`) and Phase 7 (cost observability with fallback ladder per QUALITY-12).
 
 Output:
-- Modified `clawteam/config.py`: one new pydantic field, one new env_map entry.
-- Extended `tests/test_config.py`: three small assertions verifying default value, backward-compat load, and env-var override priority.
+- Modified `clawteam/config.py`: one new pydantic field. NO env_map edit (deliberate divergence from `default_profile` pattern — see ROADMAP criterion 5).
+- Extended `tests/test_config.py`: assertions verifying default value, backward-compat load, and a REGRESSION GUARD that `CLAWTEAM_DEFAULT_MODEL_PROFILE` env var is ignored by `get_effective`.
 
-Scope boundary (per RESEARCH.md A1): Phase 0 does NOT ship the balanced/quality/cost → actual model-name mapping. That's Phase 3 + Phase 7 work. This plan only establishes the scaffold field.
+Scope boundary (per RESEARCH.md A1): Phase 0 does NOT ship the balanced/quality/budget → actual model-name mapping. That's Phase 3 + Phase 7 work. This plan only establishes the scaffold field.
 
-Scope boundary (per PATTERNS.md §config.py): Do NOT add `Literal["balanced", "quality", "cost"]` validation. PROJECT.md defers the 3-value restriction to later phases; any string is accepted here, mirroring how `workspace: str = "auto"` accepts any string today.
+Scope boundary (per PATTERNS.md §config.py): Do NOT add `Literal["balanced", "quality", "budget"]` validation. PROJECT.md defers the 3-value restriction to later phases; any string is accepted here, mirroring how `workspace: str = "auto"` accepts any string today. The three canonical values (per REQUIREMENTS.md TEAM-05) are **balanced**, **quality**, **budget** — NOT "cost".
 </objective>
 
 <execution_context>
@@ -117,7 +117,7 @@ def get_effective(key: str) -> tuple[str, str]:
     - Serialising a default-constructed config and re-loading round-trips default_model_profile correctly.
   </behavior>
   <action>
-    Modify `clawteam/config.py` with two minimal additive edits:
+    Modify `clawteam/config.py` with ONE additive edit (pydantic field only; env_map is deliberately NOT touched).
 
     ### Edit 1 — Insert new pydantic field at line 55 (immediately below `default_profile` at line 54)
 
@@ -132,44 +132,29 @@ def get_effective(key: str) -> tuple[str, str]:
     ```python
         default_team: str = ""
         default_profile: str = ""
-        default_model_profile: str = "balanced"  # model tier preset (balanced | quality | cost); NEVER silently 'quality'
+        default_model_profile: str = "balanced"  # model tier preset (balanced | quality | budget); NEVER silently 'quality'
         transport: str = ""
     ```
 
-    Rules (per PATTERNS.md §clawteam/config.py):
+    Rules (per PATTERNS.md §clawteam/config.py, but renamed tier value to align with REQUIREMENTS.md TEAM-05):
     - Placement: immediately below `default_profile` at line 54 to keep related fields adjacent.
-    - Type: `str` (not `Literal["balanced","quality","cost"]`). PROJECT.md defers value-validation to later phases; this field is the RESOLUTION PATH, not the constraint.
+    - Type: `str` (not `Literal["balanced","quality","budget"]`). PROJECT.md defers value-validation to later phases; this field is the RESOLUTION PATH, not the constraint.
     - Default: `"balanced"` — MANDATORY per ROADMAP Phase 0 success criterion 5 + Pitfall #12. Never `"quality"`.
-    - Trailing comment explains the three-value convention for future readers. Comment style matches sibling fields (e.g. line 57 `# "file" (default) — extensible for redis/sql later`, line 58 `# "auto" | "always" | "never" | ""`).
+    - Trailing comment documents the three canonical tier values per REQUIREMENTS.md TEAM-05 (**balanced | quality | budget**). NOT "cost" — the user-facing flag is `--model-profile balanced|quality|budget`.
     - Simple scalar default — immediate value `= "balanced"`, NOT `Field(default_factory=...)`. (Sibling scalars at 51-66 all use direct defaults; only `profiles`, `presets`, `hooks`, `plugins` use `Field(default_factory=...)` because they're mutable containers.)
 
-    ### Edit 2 — Insert new env_map entry at line 108 (immediately below `default_profile` entry at line 107)
+    ### Edit 2 — (INTENTIONALLY OMITTED) NO env_map entry
 
-    Current (lines 106-108):
-    ```python
-            "default_team": "CLAWTEAM_TEAM_NAME",
-            "default_profile": "CLAWTEAM_DEFAULT_PROFILE",
-            "transport": "CLAWTEAM_TRANSPORT",
-    ```
+    Do NOT add `"default_model_profile": "CLAWTEAM_DEFAULT_MODEL_PROFILE"` to the `env_map` inside `get_effective`.
 
-    Change to:
-    ```python
-            "default_team": "CLAWTEAM_TEAM_NAME",
-            "default_profile": "CLAWTEAM_DEFAULT_PROFILE",
-            "default_model_profile": "CLAWTEAM_DEFAULT_MODEL_PROFILE",
-            "transport": "CLAWTEAM_TRANSPORT",
-    ```
+    Rationale (ROADMAP Phase 0 success criterion 5 is the source of truth):
+    > "the template-loading code path rejects `quality` as a silent default (must be explicitly opted into via `--model-profile quality` or config)"
 
-    Rules (per PATTERNS.md §clawteam/config.py + CONVENTIONS.md §Naming §Environment variables):
-    - Key matches the pydantic field name (`default_model_profile`).
-    - Env var follows `CLAWTEAM_<FIELD_UPPER>` convention (mirrors every other entry in this map: `CLAWTEAM_DATA_DIR` ↔ `data_dir`, `CLAWTEAM_DEFAULT_PROFILE` ↔ `default_profile`).
-    - Placement adjacent to `default_profile` entry for consistency.
+    Env-var opt-in is explicitly excluded from that list. Wiring `CLAWTEAM_DEFAULT_MODEL_PROFILE` into `env_map` would enable the exact "silent quality promotion via exported shell var" failure mode Pitfall #12 forbids. The scaffold deliberately diverges from the `default_profile` pattern on this point.
 
-    **CRITICAL — PATTERNS.md note vs RESEARCH.md Pitfall #4 tension:**
-    - PATTERNS.md §clawteam/config.py explicitly instructs: add the env_map entry.
-    - RESEARCH.md Pitfall #4 warns about `CLAWTEAM_DEFAULT_PROFILE=quality` silently overriding to Quality tier.
-    - Resolution: the orchestrator prompt reaffirms PATTERNS.md — add the env_map entry. The Pitfall #4 concern is legitimate, but PATTERNS.md already cites PROJECT.md Decision row 1 as the source of truth that the SCAFFOLD needs the env-map entry for parity with `default_profile`. The mitigation for silent-quality-promotion belongs to Phase 3's resolver (see RESEARCH.md §Pattern 4 `resolve_model_profile` — reserved for Phase 3 `gstack.toml` loading), NOT to Phase 0's scaffold.
-    - To make the trade-off explicit in the codebase, add a short docstring sentence to `get_effective` describing the intentional env-var inclusion — see Edit 3.
+    RESEARCH.md line 711 reached the same conclusion: *"Keep `default_model_profile` OUT of the env-var map in `get_effective()`. Resolution order: CLI flag → template field → config file → hard-coded 'balanced'. No env-var shortcut."*
+
+    PATTERNS.md originally recommended parity with `default_profile` (adding the env_map line); that recommendation is **superseded** by ROADMAP criterion 5 for this field. A separate pass updates PATTERNS.md to reflect this.
 
     ### Edit 3 — Docstring update on get_effective (lines 99-101)
 
@@ -189,19 +174,22 @@ def get_effective(key: str) -> tuple[str, str]:
 
         Priority: env var > config file > default.
 
-        Note: callers that must reject silent promotion of ``default_model_profile`` to a
-        non-default value (e.g. to protect against Pitfall #12 cost blowup from an
-        unexpectedly-set ``CLAWTEAM_DEFAULT_MODEL_PROFILE=quality``) should consume the
-        value via a dedicated resolver (see Phase 3's ``resolve_model_profile``) rather
-        than treating this function's result as authoritative.
+        Note: ``default_model_profile`` is deliberately NOT in ``env_map`` — per the
+        Phase 0 scaffold contract (ROADMAP success criterion 5), opt-in to a non-default
+        profile is restricted to the ``--model-profile`` CLI flag or the config file.
+        Calling ``get_effective("default_model_profile")`` returns the value from the
+        config file if present, else the pydantic default ``"balanced"`` — env vars are
+        ignored for this key to prevent Pitfall #12 silent quality promotion.
         """
     ```
 
-    This documents the intent for Phase 3 implementers without altering Phase 0's behavior.
+    This documents the intent both for Phase 3 implementers and for anyone auditing why this one key diverges from the `default_profile` pattern.
 
     ### What NOT to do
 
-    - Do NOT add `Literal["balanced","quality","cost"]` to the field type (PATTERNS.md §config.py "What NOT to add yet").
+    - Do NOT add `Literal["balanced","quality","budget"]` to the field type (PATTERNS.md §config.py "What NOT to add yet").
+    - Do NOT add `default_model_profile` to the `env_map` in `get_effective`. ROADMAP success criterion 5 forbids env-var opt-in for this key. This is a deliberate divergence from the `default_profile` pattern and is the primary Pitfall #12 prevention baked into the scaffold layer.
+    - Do NOT use the value "cost" anywhere in comments, tests, or docstrings. The three canonical tier values are **balanced | quality | budget** per REQUIREMENTS.md TEAM-05.
     - Do NOT add validation hooks or `model_validator` functions. Scope creep.
     - Do NOT write a new `resolve_model_profile` helper in this plan — that lives in Phase 3 per REQUIREMENTS.md traceability. Phase 0 only establishes the RESOLUTION PATH field; Phase 3 consumes it.
     - Do NOT modify `scalar_config_keys()` — that function auto-introspects `ClawTeamConfig.model_fields` and already excludes `profiles` / `presets` by name; `default_model_profile` will appear automatically in `clawteam config show` output.
@@ -213,7 +201,7 @@ def get_effective(key: str) -> tuple[str, str]:
     <automated>cd /home/jac/repos/ClawTeam-gstack && ruff check clawteam/config.py && python -c "from clawteam.config import ClawTeamConfig, get_effective; c = ClawTeamConfig(); assert c.default_model_profile == 'balanced', repr(c.default_model_profile); assert 'default_model_profile' in ClawTeamConfig.model_fields; print('config smoke OK')"</automated>
   </verify>
   <done>
-    `clawteam/config.py` has `default_model_profile: str = "balanced"` field at line 55, `"default_model_profile": "CLAWTEAM_DEFAULT_MODEL_PROFILE"` entry in env_map at line 108, docstring note on get_effective. Passes ruff. `ClawTeamConfig().default_model_profile == "balanced"` smoke check passes.
+    `clawteam/config.py` has `default_model_profile: str = "balanced"` field at line 55 (tier values documented as `balanced | quality | budget` per REQUIREMENTS.md TEAM-05). No env_map entry added (deliberate per ROADMAP criterion 5). Updated docstring on `get_effective` documents the divergence. Passes ruff. `ClawTeamConfig().default_model_profile == "balanced"` smoke check passes.
   </done>
 </task>
 
@@ -221,11 +209,13 @@ def get_effective(key: str) -> tuple[str, str]:
   <name>Task 2: Extend tests/test_config.py with default_model_profile assertions</name>
   <files>tests/test_config.py</files>
   <behavior>
-    - test_default_model_profile_is_balanced: ClawTeamConfig().default_model_profile == "balanced".
-    - test_default_model_profile_in_model_fields: "default_model_profile" in ClawTeamConfig.model_fields.
-    - test_default_model_profile_backward_compat_load: a config.json lacking the new key deserialises cleanly with default_model_profile == "balanced" (additive-only BC per TEAM-06).
-    - test_default_model_profile_env_override: setting CLAWTEAM_DEFAULT_MODEL_PROFILE=quality in env causes get_effective("default_model_profile") to return ("quality", "env"); unsetting it returns ("balanced", "default"). (We test that the env-var wiring EXISTS; Phase 3's resolver layer is responsible for preventing silent quality promotion.)
-    - test_default_model_profile_never_quality_by_default: with NO env var and NO config file changes, default_model_profile resolves to "balanced", NOT "quality". (Direct Pitfall #12 regression guard.)
+    - test_default_value_is_balanced: ClawTeamConfig().default_model_profile == "balanced".
+    - test_field_present_in_model_fields: "default_model_profile" in ClawTeamConfig.model_fields.
+    - test_backward_compat_missing_key_loads_with_default: a config.json lacking the new key deserialises cleanly with default_model_profile == "balanced" (additive-only BC per TEAM-06).
+    - test_env_var_is_ignored_by_get_effective (REGRESSION GUARD against Pitfall #12): setting CLAWTEAM_DEFAULT_MODEL_PROFILE=quality in env does NOT cause get_effective("default_model_profile") to return "quality". The value must come from config file or the "balanced" default only. Env var is deliberately not in env_map per ROADMAP criterion 5.
+    - test_default_without_env_or_file_is_balanced: with NO env var and NO config file changes, default_model_profile resolves to "balanced", NOT "quality". (Direct Pitfall #12 regression guard.)
+    - test_serialisation_roundtrip_preserves_default: save_config + load_config round-trips the field value.
+    - test_scalar_config_keys_includes_new_field: scalar_config_keys() auto-introspects model_fields; new field appears automatically for `clawteam config show`.
   </behavior>
   <action>
     First, read the existing `tests/test_config.py` to find the correct insertion point (add to the existing file rather than creating a new one — the file's name mirrors `clawteam/config.py` per TESTING.md convention). Open `tests/test_config.py` and append the new tests at the end.
@@ -268,14 +258,25 @@ def get_effective(key: str) -> tuple[str, str]:
             assert cfg.default_model_profile == "balanced"
             assert cfg.default_profile == "some-existing-profile"
 
-        def test_env_override_returns_env_value_via_get_effective(self, monkeypatch):
-            """CLAWTEAM_DEFAULT_MODEL_PROFILE is wired into get_effective priority chain."""
+        def test_env_var_is_ignored_by_get_effective(self, monkeypatch):
+            """Pitfall #12 regression: CLAWTEAM_DEFAULT_MODEL_PROFILE env var must NOT reach get_effective.
+
+            ROADMAP Phase 0 success criterion 5 requires explicit opt-in via --model-profile
+            CLI flag or config file only — never via env var. This test guards against a
+            future PR accidentally adding the key back to env_map.
+            """
             from clawteam.config import get_effective
 
             monkeypatch.setenv("CLAWTEAM_DEFAULT_MODEL_PROFILE", "quality")
             value, source = get_effective("default_model_profile")
-            assert value == "quality"
-            assert source == "env"
+            assert value == "balanced", (
+                "default_model_profile must ignore CLAWTEAM_DEFAULT_MODEL_PROFILE env var; "
+                f"got {value!r} from source {source!r}"
+            )
+            assert source == "default", (
+                "env_map must not contain default_model_profile (Pitfall #12 prevention); "
+                f"got source {source!r}"
+            )
 
         def test_default_without_env_or_file_is_balanced(self, monkeypatch):
             """Pitfall #12 regression: no env, no file override → 'balanced', NEVER 'quality'."""
@@ -321,7 +322,7 @@ def get_effective(key: str) -> tuple[str, str]:
     <automated>cd /home/jac/repos/ClawTeam-gstack && ruff check tests/test_config.py && pytest tests/test_config.py::TestDefaultModelProfile -v</automated>
   </verify>
   <done>
-    `tests/test_config.py` has a new `TestDefaultModelProfile` class appended (minimum 6 tests). All tests pass. Existing tests in the file are unaffected (pure append, no in-place edits). Ruff exit 0.
+    `tests/test_config.py` has a new `TestDefaultModelProfile` class appended (minimum 7 tests, including `test_env_var_is_ignored_by_get_effective` as the Pitfall #12 regression guard). All tests pass. Existing tests in the file are unaffected (pure append, no in-place edits). Ruff exit 0.
   </done>
 </task>
 
@@ -332,17 +333,17 @@ def get_effective(key: str) -> tuple[str, str]:
 
 | Boundary | Description |
 |----------|-------------|
-| env var → resolved default_model_profile | `CLAWTEAM_DEFAULT_MODEL_PROFILE` crosses from the shell environment to config resolution. An attacker with shell access could set `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` to silently escalate model spend. |
-| config file → resolved default_model_profile | User-writable `~/.clawteam/config.json` could be modified by malware or another user on a shared host. |
+| env var → resolved default_model_profile | `CLAWTEAM_DEFAULT_MODEL_PROFILE` deliberately does NOT cross into config resolution (no env_map entry). An attacker with shell access setting `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` has no effect on the resolved profile. |
+| config file → resolved default_model_profile | User-writable `~/.clawteam/config.json` could be modified by malware or another user on a shared host. Opt-in to non-default profile must happen here (or via `--model-profile` CLI flag in Phase 3). |
 
 ## STRIDE Threat Register
 
 | Threat ID | Category | Component | Disposition | Mitigation Plan |
 |-----------|----------|-----------|-------------|-----------------|
-| T-00-11 | Elevation of Privilege (cost) | `clawteam/config.py::ClawTeamConfig.default_model_profile` default | mitigate | Default is `"balanced"`, mandated by ROADMAP Phase 0 success criterion 5. `test_default_without_env_or_file_is_balanced` is an explicit regression guard: any future PR that changes the default triggers immediate test failure. This closes the "silently Opus on every spawn" cost-blowup pattern from Pitfall #12. |
-| T-00-12 | Elevation of Privilege (cost) | `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` stealth env override | accept (Phase 0) / mitigate (Phase 3) | PATTERNS.md and RESEARCH.md Pitfall #4 disagree on whether Phase 0 should wire the env-map entry. This plan follows PATTERNS.md (add the entry) because the Phase 0 scaffold must match the resolution path `default_profile` uses, for consistency. The mitigation (preventing silent quality promotion when config / env says quality but user never opted in) belongs to Phase 3's `resolve_model_profile` resolver per RESEARCH.md §Pattern 4 + REQUIREMENTS.md traceability. Phase 0's responsibility ends at documenting the intent in `get_effective`'s docstring. |
+| T-00-11 | Elevation of Privilege (cost blowup) | `clawteam/config.py::ClawTeamConfig.default_model_profile` default | mitigate | Default is `"balanced"`, mandated by ROADMAP Phase 0 success criterion 5. `test_default_without_env_or_file_is_balanced` is an explicit regression guard: any future PR that changes the default triggers immediate test failure. This closes the "silently Opus on every spawn" cost-blowup pattern from Pitfall #12. |
+| T-00-12 | Elevation of Privilege (cost blowup) | `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` stealth env override | mitigate (by design) | ROADMAP Phase 0 success criterion 5 restricts opt-in to `--model-profile` flag or config file — explicitly NOT env var. This plan deliberately omits the env_map entry that would wire the env var in (PATTERNS.md originally recommended adding it for parity with `default_profile`; that recommendation is superseded by the ROADMAP criterion for this field). `test_env_var_is_ignored_by_get_effective` is the direct regression guard: it sets the env var and asserts `get_effective("default_model_profile")` returns `("balanced", "default")`, not `("quality", "env")`. Any future PR that re-introduces the env_map entry fails this test. |
 | T-00-13 | Tampering | user modifies config.json to set `default_model_profile: "experimental-8x-model"` | accept | No `Literal` validation in v1 — any string accepted. This is a DELIBERATE scope choice (PATTERNS.md "What NOT to add yet"). Future Phase 3 resolver can reject unknown profiles, but Phase 0 only scaffolds. Risk is low because an attacker with config.json write access already has bigger leverage. |
-| T-00-14 | Information Disclosure | default_model_profile value printed in `clawteam config show` output | accept | `scalar_config_keys()` auto-includes the new field; `config show` will display it alongside other scalar config values. This is BY DESIGN — users need to see what profile they're using. Value is an enum-like string ("balanced"/"quality"/"cost"), not a secret. |
+| T-00-14 | Information Disclosure | default_model_profile value printed in `clawteam config show` output | accept | `scalar_config_keys()` auto-includes the new field; `config show` will display it alongside other scalar config values. This is BY DESIGN — users need to see what profile they're using. Value is an enum-like string (`balanced` / `quality` / `budget` per REQUIREMENTS.md TEAM-05), not a secret. |
 </threat_model>
 
 <verification>
@@ -363,9 +364,9 @@ Expected:
 - Config smoke: default is `balanced`, field is in model_fields.
 - Priority smoke: clean env → `('balanced', 'default')`.
 
-BC regression check (env-var scaffold exists):
+Env-var-ignored regression check (Pitfall #12 prevention — env var must NOT promote to quality):
 ```bash
-CLAWTEAM_DEFAULT_MODEL_PROFILE=quality python -c "from clawteam.config import get_effective; v, s = get_effective('default_model_profile'); assert v == 'quality' and s == 'env'; print('Env override wired')"
+CLAWTEAM_DEFAULT_MODEL_PROFILE=quality python -c "from clawteam.config import get_effective; v, s = get_effective('default_model_profile'); assert v == 'balanced' and s == 'default', f'env var leaked: got ({v!r}, {s!r})'; print('env var correctly ignored')"
 ```
 
 Existing template BC (no existing template reads default_model_profile, so launch should be unaffected):
@@ -376,23 +377,25 @@ pytest tests/test_templates.py -q
 </verification>
 
 <success_criteria>
-1. `clawteam/config.py` has new `default_model_profile: str = "balanced"` field immediately below `default_profile` (line ~55).
-2. `clawteam/config.py::get_effective::env_map` has new `"default_model_profile": "CLAWTEAM_DEFAULT_MODEL_PROFILE"` entry immediately below `default_profile` (line ~108).
-3. `clawteam/config.py::get_effective` docstring has a note about Pitfall #12 cost-blowup prevention and deferral of the resolver logic to Phase 3.
+1. `clawteam/config.py` has new `default_model_profile: str = "balanced"` field immediately below `default_profile` (line ~55), with trailing comment documenting the three canonical tier values `balanced | quality | budget` per REQUIREMENTS.md TEAM-05.
+2. `clawteam/config.py::get_effective::env_map` does NOT contain a `default_model_profile` entry — this is the deliberate divergence from the `default_profile` pattern, mandated by ROADMAP Phase 0 success criterion 5.
+3. `clawteam/config.py::get_effective` docstring explains why `default_model_profile` is absent from `env_map` (Pitfall #12 prevention; opt-in via `--model-profile` CLI or config file only).
 4. `ClawTeamConfig()` constructs with `default_model_profile == "balanced"`.
-5. `get_effective("default_model_profile")` returns `("balanced", "default")` when nothing is set and `("quality", "env")` when `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` is exported.
-6. `tests/test_config.py` gains a `TestDefaultModelProfile` class with ≥6 tests; all pass.
+5. `get_effective("default_model_profile")` returns `("balanced", "default")` both when nothing is set AND when `CLAWTEAM_DEFAULT_MODEL_PROFILE=quality` is exported (env var is ignored by design).
+6. `tests/test_config.py` gains a `TestDefaultModelProfile` class with ≥7 tests including the `test_env_var_is_ignored_by_get_effective` regression guard; all pass.
 7. Existing `tests/test_config.py` tests unchanged and still pass (no in-place edits to existing tests).
 8. `ruff check clawteam/config.py tests/test_config.py` exits 0.
 9. Serialisation roundtrip preserves the field (save_config → load_config → same value).
 10. BC guarantee: `ClawTeamConfig.model_validate({"data_dir": "", "default_profile": "x"})` (legacy JSON missing the new field) produces a valid model with `default_model_profile == "balanced"`.
+11. No occurrence of the value `"cost"` as a tier name anywhere in the plan-modified files — the canonical values are `balanced`, `quality`, `budget`.
 </success_criteria>
 
 <output>
 After completion, create `.planning/phases/00-foundation-upstream-rfc/00-03-SUMMARY.md` following `@$HOME/.claude/get-shit-done/templates/summary.md`, documenting:
-- Field added: `default_model_profile: str = "balanced"` — Pitfall #12 cost-blowup prevention default
-- Env var wired: `CLAWTEAM_DEFAULT_MODEL_PROFILE` (consistent with `default_profile` / `CLAWTEAM_DEFAULT_PROFILE` pattern)
-- Explicit non-change: no `Literal[...]` validation (deferred to Phase 3 resolver per REQUIREMENTS.md traceability)
-- Explicit non-change: no `resolve_model_profile` helper (Phase 3 scope per RESEARCH.md §Pattern 4)
-- Open decision surface for Phase 3: the `get_effective` docstring already flags the Pitfall #4 concern; Phase 3's resolver must consume `default_model_profile` via a dedicated path that can reject silent env-var promotion if that's the product choice
+- Field added: `default_model_profile: str = "balanced"` — Pitfall #12 cost-blowup prevention default.
+- Canonical tier values: `balanced | quality | budget` per REQUIREMENTS.md TEAM-05 (NOT `cost` — previous draft referenced `cost` incorrectly; this was corrected before execution).
+- Deliberate divergence from `default_profile` pattern: `default_model_profile` is NOT wired into `env_map`. Rationale: ROADMAP Phase 0 success criterion 5 restricts opt-in to `--model-profile` CLI flag or config file, never env var. Regression guard: `test_env_var_is_ignored_by_get_effective`.
+- Explicit non-change: no `Literal[...]` validation (deferred to Phase 3 resolver per REQUIREMENTS.md traceability).
+- Explicit non-change: no `resolve_model_profile` helper (Phase 3 scope per RESEARCH.md §Pattern 4).
+- Hand-off to Phase 3: the resolver will add the `--model-profile` CLI flag and template-field precedence; Phase 0 guarantees that until then, no env var can silently promote to `quality`.
 </output>

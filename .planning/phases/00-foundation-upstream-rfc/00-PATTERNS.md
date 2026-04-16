@@ -176,24 +176,29 @@ class ClawTeamConfig(BaseModel):
     user: str = ""
     default_team: str = ""
     default_profile: str = ""
-    default_model_profile: str = "balanced"   # NEW — model tier preset (balanced | quality | cost)
+    default_model_profile: str = "balanced"   # NEW — model tier preset (balanced | quality | budget)
     transport: str = ""
     ...
 ```
-Rules: pydantic v2 `str` field with immediate default (matches all sibling scalar fields at 51–66); no `Field(default_factory=...)` — this is a simple scalar, not a mutable container; trailing line comment in the same style as existing ones (`"file" (default) — extensible for redis/sql later`, `"tmux" | "subprocess"`); default must be `"balanced"` per PROJECT.md Decision row 1 — NEVER `"quality"`.
+Rules: pydantic v2 `str` field with immediate default (matches all sibling scalar fields at 51–66); no `Field(default_factory=...)` — this is a simple scalar, not a mutable container; trailing line comment in the same style as existing ones (`"file" (default) — extensible for redis/sql later`, `"tmux" | "subprocess"`); default must be `"balanced"` per PROJECT.md Decision row 1 — NEVER `"quality"`. Canonical tier values are **balanced | quality | budget** per REQUIREMENTS.md TEAM-05 (NOT `cost` — the user-facing CLI flag is `--model-profile balanced|quality|budget`).
 
-**Required companion edit — `get_effective` env map** at `config.py:103-119`:
+**Deliberate divergence from `default_profile` pattern — DO NOT add an env_map entry:**
+
+Earlier drafts of this PATTERNS.md recommended adding `"default_model_profile": "CLAWTEAM_DEFAULT_MODEL_PROFILE"` to the `env_map` in `get_effective` for parity with `default_profile`. That recommendation is **superseded** by ROADMAP Phase 0 success criterion 5, which restricts opt-in to `--model-profile` CLI flag or config file — explicitly NOT env var. Wiring the env var in would enable the exact "silent quality promotion via exported shell" failure mode Pitfall #12 prevents.
+
 ```python
 env_map = {
     ...
     "default_profile": "CLAWTEAM_DEFAULT_PROFILE",
-    "default_model_profile": "CLAWTEAM_DEFAULT_MODEL_PROFILE",   # NEW
+    # NOTE: default_model_profile intentionally omitted — per ROADMAP criterion 5,
+    # opt-in to non-default profile is CLI flag or config file only (Pitfall #12).
+    "transport": "CLAWTEAM_TRANSPORT",
     ...
 }
 ```
-Rules: key name matches the pydantic field; env var uses `CLAWTEAM_<FIELD_UPPER>` convention (CONVENTIONS.md §Naming §Environment variables); placement next to `default_profile` for consistency.
+Rules: the `get_effective` docstring must explain why this key diverges from the pattern; Phase 0 plan 00-03 ships a regression test (`test_env_var_is_ignored_by_get_effective`) that asserts the env var has no effect, so any future re-introduction of the env_map entry breaks CI.
 
-**What NOT to add yet:** Do not add validation (literal enum of `balanced | quality | cost`). PROJECT.md defers model-profile-to-model-name mapping to Phase 3/7. Phase 0 only establishes the resolution path — any string is accepted. This mirrors how `workspace: str = "auto"` accepts any string today without a Literal type.
+**What NOT to add yet:** Do not add validation (literal enum of `balanced | quality | budget`). PROJECT.md defers model-profile-to-model-name mapping to Phase 3/7. Phase 0 only establishes the resolution path — any string is accepted. This mirrors how `workspace: str = "auto"` accepts any string today without a Literal type.
 
 **Backward-compat guarantee:** Because pydantic v2 fields with defaults are optional at deserialization, existing `~/.clawteam/config.json` files missing the `default_model_profile` key will load cleanly with the default `"balanced"`. The serialization roundtrip test at `test_config.py:38-44` should be extended to cover this.
 
