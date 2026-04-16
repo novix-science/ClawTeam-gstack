@@ -24,4 +24,4 @@ upstream discussion is still open.
 
 | # | Title | Status | Target Phase |
 |---|-------|--------|--------------|
-| [001](001-phase-registry.md) | PhaseRegistry + HarnessPlugin.contribute_phases + SprintState + InteractionGate | Draft | Phase 1 |
+| [001](001-phase-registry.md) | PhaseRegistry + three HarnessPlugin hooks (contribute_phases / contribute_phase_roles / contribute_review_routers) + SprintState + InteractionGate | Draft | Phase 1 |
