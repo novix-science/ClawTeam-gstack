@@ -1,22 +1,33 @@
 ---
 rfc: 001
-title: PhaseRegistry + HarnessPlugin.contribute_phases + SprintState + InteractionGate
+title: PhaseRegistry + three HarnessPlugin hooks (contribute_phases / contribute_phase_roles / contribute_review_routers) + SprintState + InteractionGate
 status: Draft
 authors: ClawTeam-gstack fork contributors
 created: 2026-04-15
 target-phase: Phase 1
 ---
 
-# RFC 001: Plugin-Populated Phase Registry with Sprint State and Interactive Gates
+# RFC 001: Plugin-Populated Phase Registry, Three Optional HarnessPlugin Hooks, Sprint State, and Interactive Gates
 
 ## 1. Summary
 
-This RFC proposes four additive primitives for the ClawTeam harness:
+This RFC proposes six additive primitives for the ClawTeam harness, grouped
+as one registry, three optional plugin hooks, and two new runtime types:
 
-1. `PhaseRegistry`
-2. `HarnessPlugin.contribute_phases()`
-3. `InteractionGate`
-4. `SprintState`
+1. `PhaseRegistry` — in-memory registry populated at plugin load.
+2. `HarnessPlugin.contribute_phases()` — optional hook, empty list default.
+3. `HarnessPlugin.contribute_phase_roles()` — optional hook, empty dict default.
+4. `HarnessPlugin.contribute_review_routers()` — optional hook, empty list default.
+5. `SprintState` — pydantic v2 model for sprint lifecycle persistence.
+6. `InteractionGate` — `PhaseGate` subclass that blocks on unanswered questions.
+
+Each of the three plugin hooks defaults to an empty collection, so existing
+plugins and existing templates continue to work without any edits. The three
+hooks are proposed together because they share one design invariant: plugin
+authors should be able to contribute phase vocabulary, phase-to-role
+assignments, and review routing rules through the same additive extension
+surface, not through three different mechanisms introduced in three
+different RFCs.
 
 The goal is to let plugins introduce new lifecycle phases, persist sprint-level
 state, and block phase transitions on explicit human response without changing
@@ -64,10 +75,13 @@ At a high level, the runtime model is:
 The additive compatibility contract is:
 
 1. `Phase` remains `str`.
-2. `DEFAULT_PHASES` remains the fallback for templates that do not opt in.
-3. `HarnessPlugin.contribute_phases()` defaults to an empty list.
-4. `InteractionGate` is opt-in and only runs when a phase or sprint uses it.
-5. `SprintState` is new persistence surface; existing harness state files stay
+2. `AgentRole` remains `str`.
+3. `DEFAULT_PHASES` remains the fallback for templates that do not opt in.
+4. `HarnessPlugin.contribute_phases()` defaults to an empty list.
+5. `HarnessPlugin.contribute_phase_roles()` defaults to an empty dict.
+6. `HarnessPlugin.contribute_review_routers()` defaults to an empty list.
+7. `InteractionGate` is opt-in and only runs when a phase or sprint uses it.
+8. `SprintState` is new persistence surface; existing harness state files stay
    valid.
 
 ## 2. Motivation
@@ -332,7 +346,175 @@ The intended relation to the current plugin base class is:
 └────────────────────────────┘
 ```
 
-No other plugin methods need semantic changes to support this RFC.
+Two sibling hooks follow below. They share the same additive shape: empty
+collection default, no abstract-method requirement, no side effects beyond
+populating a plugin-scoped registry at load time.
+
+
+### 4.3a. `HarnessPlugin.contribute_phase_roles()`
+
+`HarnessPlugin` gains a second new optional hook that maps each
+plugin-contributed phase to the list of agent roles expected to participate
+in that phase:
+
+```python
+def contribute_phase_roles(self) -> dict[Phase, list[AgentRole]]:
+    return {}
+```
+
+Where `AgentRole` is the existing open-string role identifier (`AgentRole =
+str`), already used by `HarnessPlugin.contribute_prompts(role: AgentRole)`.
+
+Requirements:
+
+1. The default implementation returns an empty dict.
+2. Existing plugins are not required to implement the hook.
+3. Keys are phase names that the same plugin must also declare via
+   `contribute_phases()` — phase-role entries for phases the plugin does not
+   own are rejected at registration time with `ValueError`.
+4. Values are ordered role lists. The order is the template's default
+   participant order for that phase; the harness or a later review router
+   may narrow or expand the set per sprint context.
+5. Two plugins mapping the same phase name is already blocked by
+   `PhaseRegistry`'s duplicate-name rule from §4.2, so phase-role conflicts
+   cannot arise between plugins.
+
+The empty default matters because templates that declare their role list in
+TOML continue to work unchanged. The hook only activates when a plugin owns
+phases for which the TOML has no role list to consult.
+
+The intended relation to the current plugin base class is:
+
+```text
+┌────────────────────────────────────┐
+│ HarnessPlugin                      │
+├────────────────────────────────────┤
+│ on_register(ctx)                   │
+│ on_unregister()                    │
+│ contribute_gates()                 │
+│ contribute_prompts()               │
+│ contribute_phases()           NEW  │
+│ contribute_phase_roles()      NEW  │
+└────────────────────────────────────┘
+```
+
+Plugin-use example (gstack — illustrative, not normative for Phase 1):
+
+```python
+class GstackSprintPlugin(HarnessPlugin):
+    def contribute_phases(self) -> list[Phase]:
+        return ["think", "plan", "build", "review", "test", "ship", "reflect"]
+
+    def contribute_phase_roles(self) -> dict[Phase, list[AgentRole]]:
+        return {
+            "think":   ["pm", "ceo"],
+            "plan":    ["pm", "ceo", "eng-mgr"],
+            "build":   ["engineer", "designer"],
+            "review":  ["reviewer", "designer", "security", "dx-lead"],
+            "test":    ["qa", "engineer"],
+            "ship":    ["shipper", "reviewer"],
+            "reflect": ["eng-mgr"],
+        }
+```
+
+Empty-dict default behavior: when the hook returns `{}`, the harness does
+not alter the template's TOML-declared role list for any phase.
+
+
+### 4.3b. `HarnessPlugin.contribute_review_routers()`
+
+`HarnessPlugin` gains a third new optional hook that contributes
+review-routing rules consulted at the Review phase to pick which agents
+participate given the diff under review:
+
+```python
+def contribute_review_routers(self) -> list[ReviewRouter]:
+    return []
+```
+
+Where `ReviewRouter` is a new runtime type with the forward-declared shape:
+
+```python
+from typing import Protocol
+
+
+class ReviewRouter(Protocol):
+    """Rule that picks additional reviewer roles based on the diff.
+
+    The full interface is specified by a future Phase 4 RFC. For Phase 1 the
+    only observable contract is: routers are consulted in plugin load order
+    during the Review phase and return an ordered list of `AgentRole`
+    entries to append to the Review-phase participant set.
+    """
+
+    def match(self, diff_paths: list[str], state: SprintState) -> list[AgentRole]:
+        ...
+```
+
+Requirements:
+
+1. The default implementation returns an empty list.
+2. Existing plugins are not required to implement the hook.
+3. Returned routers are evaluated in plugin load order; the harness
+   concatenates their `match()` results, deduplicates, and appends the
+   result to the Review-phase participant list established by the template
+   or by `contribute_phase_roles()`.
+4. A router that raises during `match()` is skipped with a logged warning;
+   router exceptions do not block the Review phase.
+5. The full `ReviewRouter` interface (rule-file format, SHA-pinning
+   semantics, multi-signal aggregation) is deferred to a future Phase 4 RFC;
+   Phase 1 only locks the hook point.
+
+The empty default matters because no existing template currently uses
+review routing. Templates that want to ship review rules can migrate to
+this extension surface without breaking other templates.
+
+The intended relation to the current plugin base class is:
+
+```text
+┌────────────────────────────────────────┐
+│ HarnessPlugin                          │
+├────────────────────────────────────────┤
+│ on_register(ctx)                       │
+│ on_unregister()                        │
+│ contribute_gates()                     │
+│ contribute_prompts()                   │
+│ contribute_phases()               NEW  │
+│ contribute_phase_roles()          NEW  │
+│ contribute_review_routers()       NEW  │
+└────────────────────────────────────────┘
+```
+
+Plugin-use example (gstack — illustrative, not normative for Phase 1):
+
+```python
+class UiChangeRouter:
+    """Adds designer to Review when the diff touches UI paths."""
+
+    def match(self, diff_paths, state):
+        ui_hit = any(p.startswith("src/components/") and p.endswith(".tsx")
+                     for p in diff_paths)
+        return ["designer"] if ui_hit else []
+
+
+class SecurityRouter:
+    """Adds security to Review when the diff touches auth or crypto."""
+
+    def match(self, diff_paths, state):
+        risky = any(p.startswith("src/auth/") or "/crypto/" in p
+                    for p in diff_paths)
+        return ["security"] if risky else []
+
+
+class GstackSprintPlugin(HarnessPlugin):
+    def contribute_review_routers(self) -> list[ReviewRouter]:
+        return [UiChangeRouter(), SecurityRouter()]
+```
+
+Empty-list default behavior: when the hook returns `[]`, the Review phase's
+participant list is exactly the one produced by the template or by
+`contribute_phase_roles()`, unchanged from today's behavior.
+
 
 ### 4.4. `SprintState`
 
@@ -480,11 +662,23 @@ changes.
 The proposal is additive-only under the following guarantees:
 
 1. No existing template file must change.
-2. No existing plugin must implement a new abstract method.
-3. No existing phase name must be renamed.
-4. Existing `Phase = str` remains valid.
-5. Existing default phase execution remains the fallback when the registry is
-   empty.
+2. No existing plugin must implement a new abstract method. All three new
+   hooks (`contribute_phases`, `contribute_phase_roles`,
+   `contribute_review_routers`) ship with empty-collection defaults on the
+   `HarnessPlugin` base class.
+3. No existing phase name must be renamed, and no existing role name must
+   be renamed.
+4. Existing `Phase = str` and `AgentRole = str` remain valid; the new hooks
+   reuse these open-string types without introducing enums.
+5. Existing default phase execution remains the fallback when the
+   `PhaseRegistry` is empty.
+6. Existing template role assignments (declared in TOML) remain the
+   fallback when `contribute_phase_roles()` returns an empty dict.
+7. Existing Review-phase participant selection remains unchanged when
+   `contribute_review_routers()` returns an empty list — routers are
+   consulted only to APPEND participants, never to remove them.
+8. The three hooks are independent: a plugin may implement one, two, or
+   three of them. Implementing one does not require implementing the others.
 
 These guarantees are the primary acceptance condition for upstream review.
 
@@ -515,9 +709,13 @@ After:
 
 ```text
 software-dev.toml
-  └─ no plugin phase contribution
-     └─ PhaseRegistry is empty for this template
-        └─ harness still uses DEFAULT_PHASES
+  ├─ no plugin phase contribution         → PhaseRegistry is empty
+  ├─ no plugin phase-role contribution    → contribute_phase_roles() returns {}
+  ├─ no plugin review-router contribution → contribute_review_routers() returns []
+  └─ harness fallbacks:
+       - phases         → DEFAULT_PHASES
+       - role list      → template TOML (unchanged)
+       - Review routers → none (Review participants set exactly by template)
 ```
 
 Observable behavior stays the same:
@@ -527,6 +725,13 @@ Observable behavior stays the same:
 3. It still advances through the default phase sequence.
 4. It does not require `SprintState`.
 5. It does not incur `InteractionGate` unless a future plugin opts into it.
+6. It uses its TOML-declared role assignments unchanged;
+   `contribute_phase_roles()` returns `{}` and contributes nothing.
+7. Its Review phase uses its existing participant list unchanged;
+   `contribute_review_routers()` returns `[]` and contributes no additional
+   reviewers.
+8. No plugin owned by software-dev implements any of the three new hooks,
+   so the three registration calls are no-ops at plugin load.
 
 The worked example is important because it fixes the compatibility promise in
 concrete terms: this RFC extends core without rewriting the default template
@@ -626,8 +831,12 @@ RFCs.
    `PhaseState` whenever the required question directory exists?
 4. Should question and answer files be normalized to a formal frontmatter schema
    in Phase 1, or left as presence-based artifacts initially?
-5. How should future upstream work define optional phase-role mapping without
-   overloading this initial RFC?
+5. Should `contribute_review_routers()` precedence be deterministic purely
+   by plugin load order, or should routers carry an explicit `priority:
+   int` hint so a later-loaded plugin can insert a router earlier in the
+   evaluation chain? Recommendation: start with load-order (matches
+   `PhaseRegistry`'s ordering rule from §4.2); add priority hints in a
+   future Phase 4 RFC only if a concrete conflict emerges.
 6. What is the migration story, if any, for templates that eventually want both
    default phases and additional plugin phases rather than a full replacement
    list?
