@@ -3,7 +3,6 @@ name = "harness-default"
 description = "Default plan-then-execute harness with planner, executors, and evaluator"
 command = ["claude"]
 backend = "tmux"
-harness = true
 
 [template.harness]
 phases = ["discuss", "plan", "execute", "verify", "ship"]
