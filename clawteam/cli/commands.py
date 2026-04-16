@@ -1211,17 +1211,19 @@ def doctor():
         }
 
     def _human(d):
+        from rich.markup import escape
+
         console.print(f"\nDoctor OS: [cyan]{d['os']['platform']}[/cyan]")
         for name, _, _ in _DOCTOR_TOOLS:
             info = d[name]
             if info["found"]:
                 console.print(
-                    f"  {name}: [green]OK[/green]  [dim]{info['path'] or '(available)'}[/dim]"
+                    f"  {name}: [green]OK[/green]  [dim]{escape(info['path'] or '(available)')}[/dim]"
                 )
             else:
                 console.print(f"  {name}: [yellow]missing[/yellow]")
                 if info["install_hint"]:
-                    console.print(f"    [dim]{info['install_hint']}[/dim]")
+                    console.print(f"    [dim]{escape(info['install_hint'])}[/dim]")
 
     _output(checks, _human)
 
