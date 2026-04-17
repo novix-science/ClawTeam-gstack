@@ -36,7 +36,7 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 
 **Sprint model:**
 - [ ] First-class 7-phase sprint state machine: Think → Plan → Build → Review → Test → Ship → Reflect
-- [ ] `PhaseRegistry` extension API — new phases registered as plugins, not hardcoded into core `PhaseState` enum (upstream-compatible)
+- [x] `PhaseRegistry` extension API — new phases registered as plugins, not hardcoded into core `PhaseState` enum (upstream-compatible) *(validated Phase 1)*
 - [ ] `GstackSprintPlugin` registers 7 phases + per-phase `ArtifactRequiredGate`s (design-doc, plan-doc, diff, review-report, test-report, ship-notes, retro)
 - [ ] Auto-advance between phases by default; toggleable via config to require human approval per transition
 - [ ] One team can run multiple sprints concurrently; team members juggle sprint assignments like a real team handles multiple PRs
@@ -51,7 +51,7 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 - [ ] Team-level safety rails as harness primitives: /careful (destructive-command warnings), /freeze (edit-lock to a path), /guard (both), /unfreeze, /autoplan (= the sprint phase transitions themselves)
 
 **Human interaction:**
-- [ ] `InteractionGate` — new `PhaseGate` subclass that blocks until a human answers questions written by phase agents
+- [x] `InteractionGate` — new `PhaseGate` subclass that blocks until a human answers questions written by phase agents *(validated Phase 1)*
 - [ ] `AttentionQueue` — cross-sprint pending-questions view; `clawteam attend` surfaces questions from any sprint, priority-sorted
 - [ ] Per-sprint question artifacts: `sprint/<id>/questions/<N>.md` + `answers/<N>.md` round-tripping through existing file-locked store
 
@@ -137,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-04-15 after initialization*
+*Last updated: 2026-04-17 after Phase 1 completion (PhaseRegistry + SprintState + InteractionGate + Q/A schema + orchestrator wiring)*
