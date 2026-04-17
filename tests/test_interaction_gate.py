@@ -143,7 +143,7 @@ def test_gate_rejects_symlink_escape_from_data_dir(monkeypatch, tmp_path):
     state.save(team="t1")
     d = _sprint_dir(tmp_path, "t1", "abcd1234")
 
-    target = tmp_path.parent / "etc"
+    target = tmp_path / "escape_target"
     target.mkdir(exist_ok=True)
     questions_dir = d / "questions"
     try:
