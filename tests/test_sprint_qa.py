@@ -6,10 +6,22 @@ import re
 from pathlib import Path
 
 import pytest
-from clawteam.harness.interaction_gate import InteractionGate
-from clawteam.sprint.qa import Answer, Question
-from clawteam.sprint.state import SprintState
 from pydantic import ValidationError
+
+from clawteam.sprint.qa import Answer, Question
+
+# Plans 01-02 (SprintState) and 01-03 (InteractionGate) land on sibling worktrees
+# in wave 2. The gate-compat integration test (the only place these imports are
+# used) is skipped when those modules are absent so this file stays collectable
+# in the 01-04 worktree pre-merge. After the orchestrator merges all wave-2
+# branches the integration test runs unconditionally.
+try:
+    from clawteam.harness.interaction_gate import InteractionGate  # noqa: F401
+    from clawteam.sprint.state import SprintState  # noqa: F401
+
+    _GATE_COMPAT_READY = True
+except ImportError:
+    _GATE_COMPAT_READY = False
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "qa"
 HEX8 = re.compile(r"^[0-9a-f]{8}$")
@@ -167,8 +179,17 @@ def test_answer_round_trip_equality():
         assert parsed.model_dump() == reparsed.model_dump(), f"round-trip lost info for {fx}"
 
 
+@pytest.mark.skipif(
+    not _GATE_COMPAT_READY,
+    reason="InteractionGate (Plan 01-03) + SprintState (Plan 01-02) not yet merged into this worktree",
+)
 def test_gate_detects_question_file_written_via_to_markdown(monkeypatch, tmp_path):
     """to_markdown output, written to <sprint_dir>/questions/<id>.md, triggers InteractionGate."""
+    # Re-import inside the test so the skip decorator above is the only gate
+    # (imports at module top are wrapped in try/except for wave-2 parallelism).
+    from clawteam.harness.interaction_gate import InteractionGate
+    from clawteam.sprint.state import SprintState
+
     _hermetic(monkeypatch, tmp_path)
     state = SprintState(
         goal="test gate-compat",
