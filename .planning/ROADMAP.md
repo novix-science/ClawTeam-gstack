@@ -85,10 +85,14 @@ Plans:
 
 **Research flag**: NONE. Codebase already chose "open `str`" for `Phase`/`AgentRole`; plugin-registry patterns are well-established.
 
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 01-01: TBD (outlined during `/gsd-plan-phase 1`)
+- [ ] 01-01-PLAN.md — PhaseRegistry + ReviewRouter Protocol + three optional HarnessPlugin hooks (CORE-01, CORE-02, INT-01)
+- [ ] 01-02-PLAN.md — SprintState pydantic model + file-locked atomic JSON persistence (CORE-04, INT-01)
+- [ ] 01-03-PLAN.md — InteractionGate subclass blocking on unanswered question files (CORE-04, INT-01, INT-02)
+- [ ] 01-04-PLAN.md — Question/Answer pydantic models + D-08 stdlib-only frontmatter round-trip (INT-01, INT-02)
+- [ ] 01-05-PLAN.md — HarnessOrchestrator consults PhaseRegistry + optional SprintState composition + BC regression guard (CORE-01, CORE-02)
 
 ---
 
@@ -316,7 +320,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 0. Foundation & Upstream RFC | 0/TBD | Not started | - |
-| 1. Core Harness Extensions | 0/TBD | Not started | - |
+| 1. Core Harness Extensions | 0/5 | Not started | - |
 | 2. Sprint Engine & Theater/Drift/Deadlock Prevention | 0/TBD | Not started | - |
 | 3. Gstack Team Template & Methodology Port | 0/TBD | Not started | - |
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
