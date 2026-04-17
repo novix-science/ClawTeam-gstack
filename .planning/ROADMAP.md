@@ -92,7 +92,7 @@ Plans:
 - [x] 01-02-PLAN.md — SprintState pydantic model + file-locked atomic JSON persistence (CORE-04, INT-01)
 - [x] 01-03-PLAN.md — InteractionGate subclass blocking on unanswered question files (CORE-04, INT-01, INT-02)
 - [x] 01-04-PLAN.md — Question/Answer pydantic models + D-08 stdlib-only frontmatter round-trip (INT-01, INT-02)
-- [ ] 01-05-PLAN.md — HarnessOrchestrator consults PhaseRegistry + optional SprintState composition + BC regression guard (CORE-01, CORE-02)
+- [x] 01-05-PLAN.md — HarnessOrchestrator consults PhaseRegistry + optional SprintState composition + BC regression guard (CORE-01, CORE-02)
 
 ---
 
@@ -126,10 +126,22 @@ Plans:
 
 **Research flag**: MEDIUM. EvidenceGate schemas per artifact type benefit from a quick research pass at plan time — well-documented patterns exist (Three Dots Labs replay-verification, deterministic side-channels) but the per-artifact schema detail is worth sharpening. Cycle-detector implementation has published precedent (Paperclip #390).
 
-**Plans**: TBD
+**Plans**: 13 plans
 
 Plans:
-- [ ] 02-01: TBD (outlined during `/gsd-plan-phase 2`)
+- [ ] 02-01-PLAN.md — 8 Phase 2 event dataclasses + contribute_evidence_schemas plugin hook (SPRINT-01, SAFETY-01..04, QUALITY-02, QUALITY-11)
+- [ ] 02-02-PLAN.md — TurnEnvelope pydantic + stdlib YAML frontmatter parser + TeamMessage optional envelope fields (SKILL-09, QUALITY-01)
+- [ ] 02-03-PLAN.md — SprintState additive fields: turn_counters + artifact caps + status Literal + suppressed_topics (CORE-07, INT-06, QUALITY-03, QUALITY-11)
+- [ ] 02-04-PLAN.md — EvidenceSchemaRegistry singleton + ArtifactFrontmatterBase pydantic v2 base (SPRINT-01, SPRINT-02, QUALITY-08)
+- [ ] 02-05-PLAN.md — FreezeRegistry singleton + FrozenPathError + append-only freeze_audit.jsonl (SAFETY-02, SAFETY-04, QUALITY-06)
+- [ ] 02-06-PLAN.md — ArtifactStore.write hook chain: size cap + BeforeFileWrite emit + ArtifactTooLargeError (QUALITY-03, QUALITY-06, SAFETY-02)
+- [ ] 02-07-PLAN.md — EvidenceGate 4-check protocol + test_verify_cache + deploy_url HEAD probe (SPRINT-02, QUALITY-08, QUALITY-03)
+- [ ] 02-08-PLAN.md — Cycle detector in DefaultRoutingPolicy + envelope validation hook in Transport.deliver (QUALITY-01, QUALITY-02, SKILL-09)
+- [ ] 02-09-PLAN.md — forced_progress_gate + turn_counter dedupe wiring + progressSignal field (QUALITY-11, QUALITY-02)
+- [ ] 02-10-PLAN.md — Safety-rail EventBus subscribers + MCP _tool BeforeToolCall + WorkspaceManager BeforeFileWrite + clawteam guard CLI sub-app (SAFETY-01..04)
+- [ ] 02-11-PLAN.md — SprintConductor: start/advance/pause/resume/list/resolve + three-layer cap override (CORE-05, CORE-07, INT-06)
+- [ ] 02-12-PLAN.md — clawteam sprint CLI sub-app: start/status/show/list/pause/resume with uniform --json envelope (UX-02, UX-03, UX-04, UX-05, UX-09)
+- [ ] 02-13-PLAN.md — Phase 0 regression matrix hard-green gate + Phase 2 end-to-end integration + REQ-ID traceability audit + human-verify ship checkpoint (all 21 REQs)
 
 ---
 
@@ -321,7 +333,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 |-------|----------------|--------|-----------|
 | 0. Foundation & Upstream RFC | 0/TBD | Not started | - |
 | 1. Core Harness Extensions | 0/5 | Not started | - |
-| 2. Sprint Engine & Theater/Drift/Deadlock Prevention | 0/TBD | Not started | - |
+| 2. Sprint Engine & Theater/Drift/Deadlock Prevention | 0/13 | Not started | - |
 | 3. Gstack Team Template & Methodology Port | 0/TBD | Not started | - |
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
 | 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
