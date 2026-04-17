@@ -89,9 +89,9 @@ Plans:
 
 Plans:
 - [x] 01-01-PLAN.md — PhaseRegistry + ReviewRouter Protocol + three optional HarnessPlugin hooks (CORE-01, CORE-02, INT-01)
-- [ ] 01-02-PLAN.md — SprintState pydantic model + file-locked atomic JSON persistence (CORE-04, INT-01)
-- [ ] 01-03-PLAN.md — InteractionGate subclass blocking on unanswered question files (CORE-04, INT-01, INT-02)
-- [ ] 01-04-PLAN.md — Question/Answer pydantic models + D-08 stdlib-only frontmatter round-trip (INT-01, INT-02)
+- [x] 01-02-PLAN.md — SprintState pydantic model + file-locked atomic JSON persistence (CORE-04, INT-01)
+- [x] 01-03-PLAN.md — InteractionGate subclass blocking on unanswered question files (CORE-04, INT-01, INT-02)
+- [x] 01-04-PLAN.md — Question/Answer pydantic models + D-08 stdlib-only frontmatter round-trip (INT-01, INT-02)
 - [ ] 01-05-PLAN.md — HarnessOrchestrator consults PhaseRegistry + optional SprintState composition + BC regression guard (CORE-01, CORE-02)
 
 ---
