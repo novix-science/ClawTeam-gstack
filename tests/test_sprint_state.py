@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 
 import pytest
+
 from clawteam.sprint.state import SprintState
 
 HEX8 = re.compile(r"^[0-9a-f]{8}$")
