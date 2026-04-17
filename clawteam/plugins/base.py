@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
-    from clawteam.harness.phases import PhaseGate
+    from clawteam.harness.phases import Phase, PhaseGate
+    from clawteam.harness.review_router import ReviewRouter
 
 
 class HarnessPlugin(ABC):
@@ -39,3 +40,36 @@ class HarnessPlugin(ABC):
     def contribute_prompts(self, phase: str, role: str) -> str:
         """Contribute additional prompt text for agents in the given phase/role."""
         return ""
+
+    # ── Phase 1 / RFC 001 hooks (optional; empty defaults preserve BC) ──
+
+    def contribute_phases(self) -> list[Phase]:
+        """Contribute lifecycle phase names to the PhaseRegistry.
+
+        Returns an ordered list of phase names this plugin owns. Duplicate
+        names across plugins are fatal at registration time. Empty-list
+        default means the plugin does not contribute phases; the harness
+        falls back to DEFAULT_PHASES (RFC 001 §4.3, D-03, D-04).
+        """
+        return []
+
+    def contribute_phase_roles(self) -> dict[Phase, list[str]]:
+        """Contribute phase-to-role mappings.
+
+        Keys must be phases this same plugin declared in contribute_phases();
+        the registry raises ValueError otherwise (RFC 001 §4.3a req 3).
+        Values are ordered role lists — default participant order for the
+        phase. Empty-dict default means the template's TOML-declared role
+        list is used unchanged (RFC 001 §4.3a, D-04).
+        """
+        return {}
+
+    def contribute_review_routers(self) -> list[ReviewRouter]:
+        """Contribute review-routing rules for the Review phase.
+
+        Routers are consulted in plugin load order. Full interface deferred
+        to a future Phase 4 RFC; this Phase 1 hook only locks the hook
+        point. Empty-list default means no additional reviewers are appended
+        by this plugin (RFC 001 §4.3b, D-04).
+        """
+        return []

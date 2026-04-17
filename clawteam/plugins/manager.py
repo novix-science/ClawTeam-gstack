@@ -140,6 +140,15 @@ class PluginManager:
         plugin = cls()
         ctx = self._build_context()
         plugin.on_register(ctx)
+        # Populate phase registry with plugin contributions (RFC 001 §4.6).
+        # Call after on_register so plugins can adjust state before their hooks run.
+        from clawteam.harness.phase_registry import get_registry
+        get_registry().register(
+            plugin.name,
+            plugin.contribute_phases(),
+            plugin.contribute_phase_roles(),
+            plugin.contribute_review_routers(),
+        )
         self._loaded[plugin.name] = plugin
         return plugin
 
