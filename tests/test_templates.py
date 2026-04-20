@@ -146,6 +146,122 @@ class TestLoadBuiltinTemplate:
         assert "supporting specialist outputs" not in tmpl.leader.task
 
 
+class TestPhase3AdditiveFields:
+    """Phase 3 Plan 03-02 Task 1 — strict-additive field extensions.
+
+    Verifies that the 7 new optional fields land with empty defaults and that
+    all 6 existing packaged templates continue to load unchanged.
+    """
+
+    def test_agent_def_new_fields_default_empty(self):
+        a = AgentDef(name="worker")
+        # Phase 3 (D-06) additive fields:
+        assert a.role == ""
+        assert a.prompt_file == ""
+        assert a.model_profile == ""
+
+    def test_agent_def_new_fields_populated(self):
+        a = AgentDef(
+            name="pm",
+            role="pm",
+            prompt_file="gstack/prompts/pm.md",
+            model_profile="opus",
+        )
+        assert a.role == "pm"
+        assert a.prompt_file == "gstack/prompts/pm.md"
+        assert a.model_profile == "opus"
+
+    def test_template_def_new_fields_default_empty(self):
+        leader = AgentDef(name="lead")
+        t = TemplateDef(name="my-tmpl", leader=leader)
+        # Phase 3 (D-04 / D-05) additive fields:
+        assert t.leader_role == ""
+        assert t.phases == []
+        assert t.model_profile == {}
+        assert t.memory == {}
+
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "software-dev",
+            "hedge-fund",
+            "code-review",
+            "harness-default",
+            "research-paper",
+            "strategy-room",
+        ],
+    )
+    def test_existing_template_loads_with_empty_phase3_defaults(self, template_name):
+        """Pattern 1 BC: existing 6 templates parse and carry empty Phase 3 defaults."""
+        tmpl = load_template(template_name)
+        assert tmpl.leader_role == ""
+        assert tmpl.phases == []
+        assert tmpl.model_profile == {}
+        assert tmpl.memory == {}
+        # AgentDef.role defaults to "" for every agent in existing templates:
+        for agent in [tmpl.leader, *tmpl.agents]:
+            assert agent.role == ""
+            assert agent.prompt_file == ""
+            assert agent.model_profile == ""
+
+    def test_parse_toml_reads_new_template_fields_when_present(
+        self, tmp_path, monkeypatch
+    ):
+        """_parse_toml reads leader_role, phases, model_profile, memory from [template] block."""
+        user_tpl_dir = tmp_path / ".clawteam" / "templates"
+        user_tpl_dir.mkdir(parents=True)
+
+        toml_content = """\
+[template]
+name = "phase3-additive-probe"
+description = "Probes Phase 3 additive field parsing"
+leader_role = "ceo"
+phases = ["think", "plan"]
+
+[template.model_profile]
+default = "balanced"
+pm = "opus"
+
+[template.memory]
+root = "{data_dir}/teams/{team_name}/memory"
+per_role = true
+
+[template.leader]
+name = "ceo"
+type = "strategic-leader"
+role = "ceo"
+prompt_file = "gstack/prompts/ceo.md"
+
+[[template.agents]]
+name = "pm"
+type = "yc-advisor"
+role = "pm"
+prompt_file = "gstack/prompts/pm.md"
+model_profile = "opus"
+"""
+        (user_tpl_dir / "phase3-additive-probe.toml").write_text(toml_content)
+
+        import clawteam.templates as tmod
+        monkeypatch.setattr(tmod, "_USER_DIR", user_tpl_dir)
+
+        tmpl = load_template("phase3-additive-probe")
+        assert tmpl.leader_role == "ceo"
+        assert tmpl.phases == ["think", "plan"]
+        assert tmpl.model_profile == {
+            "default": "balanced",
+            "pm": "opus",
+        }
+        assert tmpl.memory == {
+            "root": "{data_dir}/teams/{team_name}/memory",
+            "per_role": True,
+        }
+        assert tmpl.leader.role == "ceo"
+        assert tmpl.leader.prompt_file == "gstack/prompts/ceo.md"
+        assert tmpl.agents[0].role == "pm"
+        assert tmpl.agents[0].prompt_file == "gstack/prompts/pm.md"
+        assert tmpl.agents[0].model_profile == "opus"
+
+
 class TestLoadTemplateNotFound:
     def test_missing_template_raises(self):
         with pytest.raises(FileNotFoundError, match="not found"):

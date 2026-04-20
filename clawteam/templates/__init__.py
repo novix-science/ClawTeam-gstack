@@ -26,6 +26,17 @@ class AgentDef(BaseModel):
     type: str = "general-purpose"
     task: str = ""
     command: list[str] | None = None
+    # Phase 3 (Plan 03-02, D-06): semantic role identifier (e.g., "pm", "ceo").
+    # Empty string for existing templates that don't use the role-driven prompt
+    # resolution machinery; populated by gstack.toml + future role-aware templates.
+    role: str = ""
+    # Phase 3 (Plan 03-02, D-06): template-relative path to prompt .md
+    # (e.g., "gstack/prompts/pm.md"). Resolved by the plugin's
+    # contribute_prompts hook in Wave 3 (Plan 03-06).
+    prompt_file: str = ""
+    # Phase 3 (Plan 03-02): per-agent model override; "" means inherit the
+    # template-level default from [template.model_profile].default.
+    model_profile: str = ""
 
 
 class TaskDef(BaseModel):
@@ -42,6 +53,19 @@ class TemplateDef(BaseModel):
     leader: AgentDef
     agents: list[AgentDef] = []
     tasks: list[TaskDef] = []
+    # Phase 3 (Plan 03-02, D-04 / Pattern 4): role authorized to advance_phase;
+    # "" means no leader binding (Phase 2 behavior preserved for existing templates).
+    leader_role: str = ""
+    # Phase 3 (Plan 03-02, D-04): plugin-contributed phase order. Empty list
+    # means consult the global PhaseRegistry only (Phase 1 default).
+    phases: list[str] = []
+    # Phase 3 (Plan 03-02, TEAM-05): per-role model assignments keyed by role,
+    # with a reserved "default" key (Pitfall 12 prevention — never default to "quality").
+    model_profile: dict[str, str] = {}
+    # Phase 3 (Plan 03-02, D-05): memory layout declaration, e.g.
+    # {"root": "{data_dir}/teams/{team_name}/memory", "per_role": True}.
+    # TeamManager.create_team consults this to pre-create per-role dirs.
+    memory: dict[str, str | bool] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +121,12 @@ def _parse_toml(path: Path) -> TemplateDef:
         leader=leader,
         agents=agents,
         tasks=tasks,
+        # Phase 3 (Plan 03-02): strict-additive extensions. Each .get(...) uses
+        # an empty default so existing templates parse with Phase 2 semantics.
+        leader_role=tmpl.get("leader_role", ""),
+        phases=tmpl.get("phases", []),
+        model_profile=tmpl.get("model_profile", {}),
+        memory=tmpl.get("memory", {}),
     )
 
 
