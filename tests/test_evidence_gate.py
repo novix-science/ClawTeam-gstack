@@ -15,10 +15,10 @@ import subprocess
 from urllib.error import URLError
 
 import pytest
+
 from clawteam.harness.evidence_gate import (
     EvidenceGate,  # noqa: F401 — import triggers ModuleNotFound at RED
 )
-
 from clawteam.harness.evidence_schemas import (
     ArtifactFrontmatterBase,
     register_schema,
@@ -33,7 +33,7 @@ class DesignDocFixture(ArtifactFrontmatterBase):
     artifact_type: str = "design-doc"
 
 
-class TestReportFixture(ArtifactFrontmatterBase):
+class ReportTestFixture(ArtifactFrontmatterBase):
     artifact_type: str = "test-report"
     test_command: str = ""
 
@@ -77,7 +77,7 @@ def _design_doc_artifact(body: str = "ok content " * 40) -> str:
         "step_label: plan:1/1\n"
         "done: true\n"
         "artifact_type: design-doc\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         "---\n"
         f"{body}\n"
     )
@@ -108,7 +108,7 @@ def test_layer1_frontmatter_required_fields(hermetic):
         "step_label: plan:1/1\n"
         "done: true\n"
         "artifact_type: design-doc\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         "---\n"
         "body content " * 40
     )
@@ -127,7 +127,7 @@ def test_unregistered_artifact_type_error(hermetic):
         "step_label: plan:1/1\n"
         "done: true\n"
         "artifact_type: random-thing\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         "---\n"
         "body content " * 40
     )
@@ -153,7 +153,7 @@ def test_layer2_stub_section_detected(hermetic):
         "step_label: plan:1/1\n"
         "done: true\n"
         "artifact_type: design-doc\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         "---\n"
         f"{body}"
     )
@@ -182,7 +182,7 @@ def test_layer3_blacklist_hit_tbd(hermetic):
         "step_label: plan:1/1\n"
         "done: true\n"
         "artifact_type: design-doc\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         "---\n"
         f"{body}"
     )
@@ -208,7 +208,7 @@ def test_layer3_blacklist_hit_todo_placeholder_lorem(hermetic):
             "step_label: plan:1/1\n"
             "done: true\n"
             "artifact_type: design-doc\n"
-            "created_at: 2026-04-17T00:00:00Z\n"
+            'created_at: "2026-04-17T00:00:00Z"\n'
             "---\n"
             f"{body}"
         )
@@ -232,7 +232,7 @@ def _test_report_artifact(test_command: str = "pytest tests/foo.py -x") -> str:
         "step_label: test:1/1\n"
         "done: true\n"
         "artifact_type: test-report\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         f"test_command: {test_command}\n"
         "---\n"
         f"{body}"
@@ -241,7 +241,7 @@ def _test_report_artifact(test_command: str = "pytest tests/foo.py -x") -> str:
 
 def test_test_report_reruns_test_command(hermetic):
     """Gate runs subprocess with shell=False + cwd=workspace_branch + timeout=300."""
-    register_schema("test-report", TestReportFixture)
+    register_schema("test-report", ReportTestFixture)
 
     calls: list[dict] = []
 
@@ -266,7 +266,7 @@ def test_test_report_reruns_test_command(hermetic):
 
 def test_test_report_cache_hit_skips_rerun(hermetic):
     """Second invocation with identical artifact content skips subprocess."""
-    register_schema("test-report", TestReportFixture)
+    register_schema("test-report", ReportTestFixture)
     calls: list[dict] = []
 
     def fake_runner(cmd, cwd, timeout):
@@ -289,7 +289,7 @@ def test_test_report_cache_hit_skips_rerun(hermetic):
 
 def test_test_report_exit_1_fails_gate(hermetic):
     """Non-zero exit code from runner → (False, reason with exit code)."""
-    register_schema("test-report", TestReportFixture)
+    register_schema("test-report", ReportTestFixture)
 
     def fake_runner(cmd, cwd, timeout):
         return subprocess.CompletedProcess(
@@ -307,7 +307,7 @@ def test_test_report_exit_1_fails_gate(hermetic):
 
 def test_test_report_timeout_fails_gate(hermetic):
     """subprocess.TimeoutExpired from runner → (False, 'timed out after 300s')."""
-    register_schema("test-report", TestReportFixture)
+    register_schema("test-report", ReportTestFixture)
 
     def fake_runner(cmd, cwd, timeout):
         raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
@@ -332,7 +332,7 @@ def _ship_notes_artifact(deploy_url: str = "https://example.test/app") -> str:
         "step_label: ship:1/1\n"
         "done: true\n"
         "artifact_type: ship-notes\n"
-        "created_at: 2026-04-17T00:00:00Z\n"
+        'created_at: "2026-04-17T00:00:00Z"\n'
         f"deploy_url: {deploy_url}\n"
         "---\n"
         f"{body}"
