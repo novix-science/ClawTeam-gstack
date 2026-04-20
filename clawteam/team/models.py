@@ -85,6 +85,16 @@ class TeamConfig(BaseModel):
     created_at: str = Field(default_factory=_now_iso, alias="createdAt")
     members: list[TeamMember] = Field(default_factory=list)
     budget_cents: float = Field(default=0.0, alias="budgetCents")
+    # Phase 3 Wave 0 (Plan 03-01, Pattern 4 / 03-07 key_link): optional fields
+    # populated from TemplateDef at create_team time. Default "" preserves BC
+    # for all existing TeamConfig construction sites.
+    #   - leader_role: role authorized to call SprintConductor.advance_phase.
+    #     Empty = no leader binding (Phase 2 behavior).
+    #   - template: template name (e.g. "gstack"). Consumed by
+    #     GstackSprintPlugin._on_phase_transition for template-layer
+    #     isolation — non-gstack teams never trigger gstack handlers.
+    leader_role: str = Field(default="", alias="leaderRole")
+    template: str = Field(default="")
 
 
 class TeamMessage(BaseModel):

@@ -301,15 +301,46 @@ class SprintConductor:
             self._emit_phase_transition(from_phase="", to_phase=first, state=state)
             return state
 
-    def advance_phase(self, sprint_id: str) -> tuple[bool, str]:
+    def advance_phase(
+        self,
+        sprint_id: str,
+        actor: str = "",
+    ) -> tuple[bool, str]:
         """Run the gate chain; on all-pass, flip current_phase; persist.
 
         Returns ``(True, "")`` when the advance succeeds (phase moved OR sprint
         completed because no next phase exists). Returns ``(False, reason)``
         when any gate blocks; reason is the first blocking gate's message.
+
+        Phase 3 Wave 0 (Plan 03-01, D-10, Pattern 4): ``actor`` defaults to
+        ``""`` so every existing Phase 2 caller is unaffected (gate chain runs
+        as before). When the team's TeamConfig declares a non-empty
+        ``leader_role`` AND ``actor`` is non-empty, advancement is rejected
+        unless ``actor == leader_role``.
+
+        Threat T-03-03 (elevation of privilege): the conductor trusts the
+        caller-supplied ``actor``. Agent identity is asserted at spawn time
+        (CLAWTEAM_AGENT / CLAWTEAM_ROLE env vars set by the spawn registry);
+        Phase 4 SmartReviewRouter ships cross-agent verification.
         """
         with self._lock:
             state = self._load_by_id(sprint_id)
+
+            # Phase 3 Wave 0 (Pattern 4): leader-role enforcement. Lazy-import
+            # inside the method body (convention Pattern F) to avoid a
+            # module-load cycle between conductor and TeamManager.
+            if actor:
+                from clawteam.team.manager import TeamManager
+
+                tmpl = TeamManager.get_team(self.team_name)
+                leader_role = getattr(tmpl, "leader_role", "") if tmpl else ""
+                if leader_role and actor != leader_role:
+                    return (
+                        False,
+                        f"actor {actor!r} not authorized; only "
+                        f"{leader_role!r} can advance phases",
+                    )
+
             gates = self._build_gate_chain(state)
             for gate in gates:
                 ok, reason = gate.check(state)

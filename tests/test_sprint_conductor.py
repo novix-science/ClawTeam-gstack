@@ -543,3 +543,121 @@ def test_show_dict_shape(monkeypatch, tmp_path):
     dumped = json.dumps(d)
     assert "BODY-ALPHA-UNIQUE-TOKEN" not in dumped
     assert "BODY-BETA-UNIQUE-TOKEN" not in dumped
+
+
+# ─────────────── Phase 3 Wave 0 (Plan 03-01 Task 2) ───────────────
+#
+# Pattern 4 / D-10: SprintConductor.advance_phase accepts an optional `actor`
+# parameter (defaults to ""). When the team's TeamConfig declares a non-empty
+# `leader_role` AND a non-empty `actor` is passed in, advancement is rejected
+# unless `actor == leader_role`. Default empty preserves Phase 2 BC.
+#
+# Co-located: TeamConfig gains optional `leader_role: str = ""` and `template:
+# str = ""` fields (both sisters — flow from TemplateDef at create_team time).
+
+
+def _seed_team_with_leader_role(tmp_path, team_name: str, leader_role: str) -> None:
+    """Create a team whose persisted TeamConfig has leader_role set.
+
+    Uses the real persistence path (`_save_config` via TeamManager internals)
+    so SprintConductor's leader-role lookup reads it back verbatim.
+    """
+    from clawteam.team.manager import TeamManager, _save_config
+    from clawteam.team.models import TeamConfig, TeamMember
+
+    member = TeamMember(name="leader", agent_type="human")
+    config = TeamConfig(
+        name=team_name,
+        lead_agent_id=member.agent_id,
+        members=[member],
+        leader_role=leader_role,
+    )
+    _save_config(config)
+    # Sanity: get_team round-trips the new field.
+    roundtrip = TeamManager.get_team(team_name)
+    assert roundtrip is not None and roundtrip.leader_role == leader_role
+
+
+def test_advance_phase_default_actor_preserves_phase2_behavior(monkeypatch, tmp_path):
+    """D-10 BC: omitting actor (or passing actor='') runs the gate chain unchanged."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g")
+    # No actor kwarg → Phase 2 code path (gate chain runs, no leader-role check).
+    ok, reason = c.advance_phase(state.sprint_id)
+    assert ok is True, reason
+
+
+def test_advance_phase_leader_role_allows_matching_actor(monkeypatch, tmp_path):
+    """D-10: actor='ceo' on a team with leader_role='ceo' → gates run, advance succeeds."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    _seed_team_with_leader_role(tmp_path, "t", leader_role="ceo")
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g")
+    ok, reason = c.advance_phase(state.sprint_id, actor="ceo")
+    assert ok is True, reason
+
+
+def test_advance_phase_leader_role_rejects_non_matching_actor(monkeypatch, tmp_path):
+    """D-10: actor='engineer' on a team with leader_role='ceo' → rejected BEFORE gates."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    _seed_team_with_leader_role(tmp_path, "t", leader_role="ceo")
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g")
+    ok, reason = c.advance_phase(state.sprint_id, actor="engineer")
+    assert ok is False
+    assert "engineer" in reason
+    assert "ceo" in reason
+    assert "authorized" in reason or "authoriz" in reason
+
+
+def test_advance_phase_empty_leader_role_ignores_actor(monkeypatch, tmp_path):
+    """D-10: leader_role='' (no leader binding) → actor is ignored, gate chain runs.
+
+    This is the Phase 2 regression path: Phase 2 teams have no leader_role, so
+    gstack-aware callers passing actor= must still succeed.
+    """
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    # Team exists but leader_role is empty (default).
+    _seed_team_with_leader_role(tmp_path, "t", leader_role="")
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g")
+    ok, reason = c.advance_phase(state.sprint_id, actor="anyone")
+    assert ok is True, reason
+
+
+def test_team_config_leader_role_and_template_default_empty():
+    """Pattern 4 / 03-07 key_link: leader_role + template default to empty strings
+    so all existing TeamConfig construction sites keep working unchanged."""
+    from clawteam.team.models import TeamConfig, TeamMember
+
+    config = TeamConfig(
+        name="t",
+        lead_agent_id="a",
+        members=[TeamMember(name="m", agent_type="general")],
+    )
+    assert config.leader_role == ""
+    assert config.template == ""
+
+
+def test_team_config_leader_role_and_template_accept_assignment():
+    """Pattern 4: both new fields accept string assignment at construction."""
+    from clawteam.team.models import TeamConfig, TeamMember
+
+    config = TeamConfig(
+        name="t",
+        lead_agent_id="a",
+        members=[TeamMember(name="m", agent_type="general")],
+        leader_role="ceo",
+        template="gstack",
+    )
+    assert config.leader_role == "ceo"
+    assert config.template == "gstack"
