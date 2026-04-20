@@ -3,13 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 03-01-wave0-substrate-prep-PLAN.md
-last_updated: "2026-04-20T17:52:36.944Z"
+stopped_at: Completed 03-04-envelope-personas-PLAN.md
+last_updated: "2026-04-20T18:02:10.779Z"
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 26
+  completed_plans: 27
+  percent: 79
 ---
 
 # Project State
@@ -24,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 03 (gstack-team-template-methodology-port) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 
 ## Performance Metrics
 
@@ -57,6 +58,7 @@ Plan: 2 of 9
 
 *Updated after each plan completion*
 | Phase 03 P01 | 12min | 3 tasks | 19 files |
+| Phase 03 P04 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +73,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Wave 0 substrate: CONTENT-DRIFT-NOTE convention adopted for upstream-evolved fixtures (actual counts 6/7/22 vs D-13 expected 6/10/17)
 - [Phase 03]: TeamConfig.leader_role + TeamConfig.template co-landed in single atomic commit as sister fields (both flow from TemplateDef at create_team time)
 - [Phase 03]: SprintConductor.advance_phase leader-role check uses lazy TeamManager import (Pattern F) to avoid module-load cycle
+- [Phase 03]: 03-04: Ship 11 per-persona TurnEnvelope subclasses with rubric-anchored Literal/int constraints + PERSONA_ENVELOPES dispatch dict at clawteam/templates/gstack/envelope_personas.py; envelope-layer TEAM-04 companion to 03-01 conductor-layer check; 12 skipped -> 43 passing tests
 
 ### Pending Todos
 
@@ -102,8 +105,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-20T17:47:41.217Z
-Stopped at: Completed 03-01-wave0-substrate-prep-PLAN.md
+Last session: 2026-04-20T18:02:10.774Z
+Stopped at: Completed 03-04-envelope-personas-PLAN.md
 Resume files:
 
   - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md
