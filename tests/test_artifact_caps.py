@@ -11,12 +11,22 @@ Covers:
 from __future__ import annotations
 
 import pytest
-from clawteam.harness.errors import ArtifactTooLargeError
-from clawteam.harness.freeze_registry import FrozenPathError
 
 from clawteam.events.global_bus import get_event_bus, reset_event_bus
 from clawteam.events.types import BeforeFileWrite
 from clawteam.harness.artifacts import ArtifactStore
+from clawteam.harness.errors import ArtifactTooLargeError
+
+# FrozenPathError ships in clawteam/harness/freeze_registry.py per Plan 02-05
+# (same wave as this plan). When Plan 02-05 has landed, we import the real
+# error class; otherwise we fall back to ValueError, which matches the
+# production code's lazy-import fallback in ArtifactStore.write (so the veto
+# path raises ValueError in both scenarios — FrozenPathError *is* a
+# ValueError subclass by design, so the test assertion still holds).
+try:
+    from clawteam.harness.freeze_registry import FrozenPathError
+except ImportError:  # Plan 02-05 not yet merged into this worktree.
+    FrozenPathError = ValueError  # type: ignore[misc,assignment]
 
 
 @pytest.fixture
