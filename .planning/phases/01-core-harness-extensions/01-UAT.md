@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 01-core-harness-extensions
 source:
   - 01-01-SUMMARY.md
@@ -8,22 +8,12 @@ source:
   - 01-04-SUMMARY.md
   - 01-05-SUMMARY.md
 started: 2026-04-20T00:00:00Z
-updated: 2026-04-20T00:00:00Z
+updated: 2026-04-20T12:56:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: Existing template BC — software-dev still spawns
-expected: |
-  Run from repo root:
-    .venv-sys/bin/clawteam launch software-dev --team uat-bc-smoke --goal "UAT BC check" &
-    sleep 10
-    .venv-sys/bin/clawteam team status uat-bc-smoke
-  Expected: `team status` prints a table with 5 members (tech-lead, backend-dev,
-  frontend-dev, qa-engineer, devops). Cleanup with:
-    .venv-sys/bin/clawteam team cleanup uat-bc-smoke --force
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -36,7 +26,7 @@ expected: |
   Expected: `team status` prints a table with 5 members (tech-lead, backend-dev,
   frontend-dev, qa-engineer, devops). Cleanup with:
     .venv-sys/bin/clawteam team cleanup uat-bc-smoke --force
-result: [pending]
+result: pass
 
 ### 2. SprintState round-trip on disk
 expected: |
@@ -54,7 +44,7 @@ expected: |
   Expected: prints a path under ~/.clawteam/teams/uat-ss/sprints/<8hex>/state.json
   then 'round-trip OK'. No exception.
 
-result: [pending]
+result: pass
 
 ### 3. InteractionGate blocks on unanswered question, unblocks after answer
 expected: |
@@ -84,7 +74,7 @@ expected: |
     unanswered: False | Open questions: q1
     answered: True |
 
-result: [pending]
+result: pass
 
 ### 4. Question/Answer markdown round-trip
 expected: |
@@ -102,14 +92,14 @@ expected: |
     "
   Expected: prints 'ok — round-trip preserved 2 choices'. No exception.
 
-result: [pending]
+result: pass
 
 ## Summary
 
 total: 4
-passed: 0
+passed: 4
 issues: 0
-pending: 4
+pending: 0
 skipped: 0
 blocked: 0
 
