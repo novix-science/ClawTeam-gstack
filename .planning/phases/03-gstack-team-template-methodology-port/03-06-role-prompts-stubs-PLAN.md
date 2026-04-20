@@ -2,8 +2,8 @@
 phase: 03-gstack-team-template-methodology-port
 plan: 06
 type: execute
-wave: 2
-depends_on: [03-01, 03-02]
+wave: 3
+depends_on: [03-01, 03-02, 03-05]
 files_modified:
   - clawteam/templates/gstack/prompts/engineer.md
   - clawteam/templates/gstack/prompts/shipper.md

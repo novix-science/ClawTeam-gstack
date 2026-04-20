@@ -858,9 +858,11 @@ For Phase 3 specifically (pure-rubric ports), Strategy B is correct because:
 
 ---
 
-## Open Questions (for discuss-phase, not blocking research)
+## Open Questions (RESOLVED 2026-04-20 by CONTEXT.md D-01..D-04, D-07 — seed block retained for traceability)
 
-1. **Should the role prompt content for engineer/shipper/sre include any rubric port at all, or is "no rubric, just persona contract + Phase 5 deferral" the right shape?**
+> All three questions below were load-bearing seeds for `/gsd-discuss-phase 3`. The phase's CONTEXT.md locked decisions for each. This section is preserved as historical context — downstream plans consult CONTEXT.md, not this block.
+
+1. **Should the role prompt content for engineer/shipper/sre include any rubric port at all, or is "no rubric, just persona contract + Phase 5 deferral" the right shape?** — **RESOLVED by CONTEXT.md D-01/D-02/D-03:** engineer ships substantive implementation-discipline rubric (~1200B per D-01); shipper + sre ship honest Phase-5-deferred stubs (~600B each per D-02/D-03) with `rubric:none` SIGNATURE flag so Phase 5's plan task can identify + swap them.
    - What we know: Phase 5 owns the tool-heavy skills these roles will eventually invoke. Per ROADMAP, Phase 3's success criterion #3 doesn't enumerate prompt content for these three roles.
    - What's unclear: Whether the user wants more substantive content here (e.g., engineer should have an "implementation discipline" rubric similar to gstack's implicit Build-phase guidance).
    - Recommendation: ship minimal in Phase 3 (persona contract + envelope + Phase 5 deferral); revisit in Phase 5 when the tool-heavy skills land.

@@ -12,7 +12,7 @@ autonomous: true
 requirements: [TEAM-01, TEAM-02, TEAM-03, TEAM-05]
 must_haves:
   truths:
-    - "User can run `clawteam launch gstack --team <n>` and the existing template loader parses gstack.toml without error"
+    - "User can run `clawteam team spawn gstack --name <n>` (UX-01 form) and the existing template loader parses gstack.toml without error; the new `team spawn` Typer subcommand wraps the same internals as `clawteam launch` with the UX-01-locked argument names"
     - "Loaded template exposes 11 distinct agent roles (pm, ceo, eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre)"
     - "Default model_profile resolves to `balanced` when --model-profile is unset (Pitfall 12 prevention)"
     - "TeamManager.create_team pre-creates 11 per-role memory directories under ~/.clawteam/teams/<name>/memory/<role>/"
@@ -45,7 +45,7 @@ must_haves:
 <objective>
 Ship the gstack template roster declaration and the per-role memory directory pre-creation. Extends `TemplateDef`/`AgentDef` pydantic models with optional fields (Pattern 1 strict-additive), authors `clawteam/templates/gstack.toml` as the 11-agent declaration (D-04), and extends `TeamManager.create_team` with per-role memory dir pre-creation (D-05).
 
-Purpose: After this plan, `clawteam launch gstack --team foo --workspace` successfully parses the template and instantiates 11 spawn calls; per-role memory directories exist for Phase 6 to populate later. The per-role prompt files are NOT yet written (Wave 2's job) — `prompt_file` paths are declared but resolution is deferred to the plugin's `contribute_prompts` hook in Wave 3.
+Purpose: After this plan, `clawteam team spawn gstack --name foo` (UX-01) successfully parses the template and instantiates 11 spawn calls; per-role memory directories exist for Phase 6 to populate later; TeamConfig persists `template="gstack"` and `leader_role="ceo"` so 03-07's Reflect-handler can filter on template name. The per-role prompt files are NOT yet written (Wave 2's job) — `prompt_file` paths are declared but resolution is deferred to the plugin's `contribute_prompts` hook in Wave 3.
 
 Output:
 - gstack.toml — pure roster (no [[template.tasks]]; D-04)
@@ -412,7 +412,8 @@ Commit: `feat(03-02): add gstack.toml — 11-specialist roster + leader binding 
     - clawteam/paths.py (ensure_within_root, validate_identifier helpers)
     - .planning/phases/03-gstack-team-template-methodology-port/03-PATTERNS.md (lines 853-911 — exact extension snippet for create_team)
     - .planning/phases/03-gstack-team-template-methodology-port/03-CONTEXT.md (D-05 rationale: race-free pre-creation; Phase 6 fills the dirs)
-    - clawteam/cli/commands.py (the `clawteam launch` command body — find the call to TeamManager.create_team)
+    - clawteam/cli/commands.py (the existing `clawteam launch` command body — find the call to TeamManager.create_team; the new `clawteam team spawn` Typer subcommand mirrors its internals)
+    - clawteam/cli/commands.py (the `team_app` Typer subgroup at line 1611 — `team_status` is the structural analog for adding the new `team_spawn` command)
   </read_first>
   <behavior>
     - Test 1: `TeamManager.create_team(name="t", leader_name="l", leader_id="lid")` succeeds without `roles=` kwarg — backwards compat preserved
@@ -420,7 +421,8 @@ Commit: `feat(03-02): add gstack.toml — 11-specialist roster + leader binding 
     - Test 3: `TeamManager.create_team(name="t", leader_name="l", leader_id="lid", roles=["pm","ceo","engineer"])` creates `~/.clawteam/teams/t/memory/{pm,ceo,engineer}/` (3 directories)
     - Test 4: Calling `create_team` twice with same `roles=` succeeds (idempotent — `mkdir(exist_ok=True)`)
     - Test 5: `roles=["../etc/passwd"]` raises ValueError via `validate_identifier` — path traversal rejected
-    - Test 6: After `clawteam launch gstack --team foo`, `~/.clawteam/teams/foo/memory/{pm,ceo,eng-mgr,designer,dx-lead,engineer,reviewer,qa,security,shipper,sre}/` all exist (11 dirs)
+    - Test 6: After `clawteam team spawn gstack --name foo` (NEW UX-01 command), `~/.clawteam/teams/foo/memory/{pm,ceo,eng-mgr,designer,dx-lead,engineer,reviewer,qa,security,shipper,sre}/` all exist (11 dirs); `TeamManager.get_team("foo").template == "gstack"` and `.leader_role == "ceo"`
+    - Test 7: `clawteam team spawn gstack --name foo` and `clawteam launch gstack --team foo` produce identical TeamConfig state (the new subcommand is a thin wrapper around the same internals — no new persistence path)
   </behavior>
   <action>
 **File 1 — `clawteam/team/manager.py`:** Locate `TeamManager.create_team` (lines 77-112 per PATTERNS.md). Apply this extension AFTER the existing `tasks_dir.mkdir(...)` line, BEFORE `return config`:
@@ -435,16 +437,18 @@ def create_team(
     user: str = "",
     leader_agent_type: str = "leader",
     roles: list[str] | None = None,        # NEW Phase 3 (D-05): per-role memory dir pre-creation
-    leader_role: str = "",                 # NEW Phase 3: persists leader_role on TeamConfig
+    leader_role: str = "",                 # NEW Phase 3 (Pattern 4): persists leader_role on TeamConfig
+    template: str = "",                    # NEW Phase 3 (03-07 key_link): persists template name on TeamConfig
 ) -> TeamConfig:
     # ... existing validation (validate_identifier(name, ...), ...) UNCHANGED
-    # ... existing _save_config UNCHANGED — but pass leader_role into TeamConfig kwargs:
+    # ... existing _save_config UNCHANGED — but pass leader_role + template into TeamConfig kwargs:
     config = TeamConfig(
         name=name,
         description=description,
         lead_agent_id=leader_id,
         members=[leader],
         leader_role=leader_role,           # NEW: flows TemplateDef.leader_role into TeamConfig
+        template=template,                 # NEW: flows TemplateDef.name into TeamConfig (03-07 _resolve_team_template reads this)
     )
     _save_config(config)
     # ... existing inbox/tasks dir mkdir UNCHANGED
@@ -464,7 +468,7 @@ def create_team(
 
 If `_team_dir(name)` is not the existing helper, use whatever path-construction idiom `create_team` already uses for the inbox/tasks paths (likely `get_data_dir() / "teams" / name`).
 
-**File 2 — `clawteam/cli/commands.py`:** Find the `clawteam launch` command body (look for `TeamManager.create_team(` call sites). When the loaded template is `gstack` (or any template with `leader_role` set), pass:
+**File 2 — `clawteam/cli/commands.py` (existing `clawteam launch` command):** Find the `clawteam launch` command body (look for `TeamManager.create_team(` call sites). When the loaded template is `gstack` (or any template with `leader_role` set), pass:
 
 ```python
 TeamManager.create_team(
@@ -474,14 +478,88 @@ TeamManager.create_team(
     # ... existing kwargs UNCHANGED
     roles=[a.role for a in [tmpl.leader, *tmpl.agents] if a.role],  # NEW Phase 3
     leader_role=tmpl.leader_role,                                    # NEW Phase 3
+    template=tmpl.name,                                              # NEW Phase 3 (03-07 key_link)
 )
 ```
 
 The `roles=[...]` filter (`if a.role`) skips agents from existing templates that don't set the `role` field (BC: empty `role` = no memory dir for that agent).
 
-**Tests:** Add test cases to `tests/test_manager.py` (or create `tests/test_team_manager_memory.py` if cleaner) covering all 6 behaviors above. Use the autouse `isolated_data_dir` fixture from `tests/conftest.py`.
+**File 3 — `clawteam/cli/commands.py` (NEW `clawteam team spawn` Typer subcommand for UX-01):** UX-01 locks the user-facing CLI form as `clawteam team spawn <template> --name <name>`. Plan-checker verified that this command does NOT exist in the current tree — the `team_app` subgroup at line 1611 has `status`/`spawn-team` but no `spawn` taking a template arg. Add the new subcommand mirroring `team_status`'s shape (line 1611-1656) and delegating internals to the same `launch` body via a shared helper.
 
-Commit: `feat(03-02): pre-create per-role memory dirs in TeamManager.create_team (D-05)`
+Insert AFTER the existing `team_status` command (around line 1657, before `team_snapshot`):
+
+```python
+@team_app.command("spawn")
+def team_spawn(
+    template: str = typer.Argument(..., help="Template name (e.g., 'gstack', 'software-dev')"),
+    name: str = typer.Option(..., "--name", "-n", help="Team name"),
+    model_profile: str = typer.Option("", "--model-profile", help="Override model profile (balanced|quality|budget)"),
+):
+    """Spawn a team from a template (UX-01).
+
+    Shipped in Phase 3 (03-02). Wraps the same internals as `clawteam launch`
+    using the UX-01-locked argument names: `<template>` positional and `--name`.
+    Equivalent invocations:
+      clawteam team spawn gstack --name acme
+      clawteam launch gstack --team acme
+    """
+    from clawteam.templates import load_template
+    from clawteam.team.manager import TeamManager
+
+    try:
+        tmpl = load_template(template)
+    except FileNotFoundError:
+        _output(
+            {"error": f"Template '{template}' not found"},
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
+
+    # Optional model_profile override (TEAM-05 — user can pick balanced|quality|budget)
+    if model_profile:
+        # Apply override by mutating the loaded TemplateDef before create_team consumes it.
+        tmpl.model_profile = {**tmpl.model_profile, "default": model_profile}
+
+    leader_id = f"{tmpl.leader.name}-{name}"  # mirror existing launch's leader-id convention
+    config = TeamManager.create_team(
+        name=name,
+        leader_name=tmpl.leader.name,
+        leader_id=leader_id,
+        description=tmpl.description,
+        leader_agent_type=tmpl.leader.type,
+        roles=[a.role for a in [tmpl.leader, *tmpl.agents] if a.role],
+        leader_role=tmpl.leader_role,
+        template=tmpl.name,
+    )
+
+    data = {
+        "name": config.name,
+        "template": tmpl.name,
+        "agentCount": 1 + len(tmpl.agents),
+        "leaderRole": tmpl.leader_role,
+    }
+
+    def _human(d):
+        console.print(
+            f"\n[green]✓[/green] Spawned team [cyan]{d['name']}[/cyan]"
+            f" from template [magenta]{d['template']}[/magenta]"
+            f" — {d['agentCount']} agents"
+            + (f" (leader: [magenta]{d['leaderRole']}[/magenta])" if d['leaderRole'] else "")
+        )
+        console.print(f"  Run [bold]clawteam team show {d['name']}[/bold] for the dashboard.")
+
+    _output(data, _human)
+```
+
+**Critical details:**
+- The new subcommand is a THIN WRAPPER. It does not duplicate `launch`'s logic — it composes the same `TeamManager.create_team` call. If `launch` later evolves (e.g., adds workspace flags), `team spawn` follows by re-calling the same helper.
+- `_output(data, _human)` is the same dual-path renderer used elsewhere — JSON mode is supported automatically.
+- Argument naming matches UX-01 verbatim: positional `<template>` + `--name <n>`. Existing `launch` (positional `<template>` + `--team <n>`) continues to work for backwards compat.
+- If `launch` already has its own internal helper (e.g., `_spawn_team(tmpl, name, ...)`), refactor it into a module-level `_spawn_team_impl` and have BOTH `launch` and `team_spawn` call it. Otherwise, the inlined call above is acceptable for v1.
+
+**Tests:** Add test cases to `tests/test_manager.py` (or create `tests/test_team_manager_memory.py` if cleaner) covering all 7 behaviors above. Add `tests/test_cli_commands.py::test_team_spawn_gstack_command` covering the new UX-01 surface (CliRunner invocation; assert exit 0; TeamConfig.template == "gstack" + leader_role == "ceo"). Use the autouse `isolated_data_dir` fixture from `tests/conftest.py`.
+
+Commit: `feat(03-02): pre-create per-role memory dirs + add team spawn CLI subcommand for UX-01 (D-05 + 03-07 key_link)`
   </action>
   <verify>
     <automated>pytest tests/ -k 'create_team or memory_dir' -x && pytest tests/test_template_regression_matrix.py -x</automated>
@@ -491,12 +569,16 @@ Commit: `feat(03-02): pre-create per-role memory dirs in TeamManager.create_team
     - `grep -E 'leader_role: str = ""' clawteam/team/manager.py` exits 0
     - `grep -E 'memory_dir.mkdir\(parents=True, exist_ok=True\)' clawteam/team/manager.py` exits 0
     - `grep -E 'roles=\[a\.role' clawteam/cli/commands.py` exits 0
-    - `python -c "import os, tempfile; os.environ['CLAWTEAM_DATA_DIR'] = tempfile.mkdtemp(); from clawteam.team.manager import TeamManager; TeamManager.create_team(name='t', leader_name='l', leader_id='lid', roles=['pm','ceo'], leader_role='ceo'); from clawteam.team.models import get_data_dir; assert (get_data_dir() / 'teams' / 't' / 'memory' / 'pm').is_dir() and (get_data_dir() / 'teams' / 't' / 'memory' / 'ceo').is_dir()"` exits 0
+    - `grep -E 'template=tmpl\.name' clawteam/cli/commands.py` exits 0
+    - `grep -E 'template: str = ""' clawteam/team/manager.py` exits 0
+    - `grep -q '@team_app.command\("spawn"\)' clawteam/cli/commands.py` exits 0 (NEW UX-01 subcommand exists)
+    - `python -m clawteam team spawn --help` stdout contains the literal `template` and `--name` (UX-01 form)
+    - `python -c "import os, tempfile; os.environ['CLAWTEAM_DATA_DIR'] = tempfile.mkdtemp(); from clawteam.team.manager import TeamManager; TeamManager.create_team(name='t', leader_name='l', leader_id='lid', roles=['pm','ceo'], leader_role='ceo', template='gstack'); from clawteam.team.models import get_data_dir; cfg_path = get_data_dir() / 'teams' / 't' / 'config.json'; import json; cfg = json.loads(cfg_path.read_text()); assert cfg['template'] == 'gstack' and cfg['leader_role'] == 'ceo'; assert (get_data_dir() / 'teams' / 't' / 'memory' / 'pm').is_dir() and (get_data_dir() / 'teams' / 't' / 'memory' / 'ceo').is_dir()"` exits 0
     - `pytest tests/test_template_regression_matrix.py -x` exits 0 (existing templates unaffected — they don't pass `roles=`)
     - `pytest tests/ -k 'create_team or memory_dir' -x` exits 0 (6 behavior tests pass)
     - Path traversal test: `python -c "from clawteam.team.manager import TeamManager; TeamManager.create_team(name='t', leader_name='l', leader_id='lid', roles=['../etc/passwd'])"` exits with non-zero (ValueError from validate_identifier)
   </acceptance_criteria>
-  <done>create_team accepts optional `roles=` and `leader_role=` kwargs; passes roles through with empty default; gstack launch creates all 11 per-role memory dirs idempotently; existing templates BC-preserved.</done>
+  <done>create_team accepts optional `roles=`, `leader_role=`, and `template=` kwargs; passes roles through with empty default; persists template name + leader_role on TeamConfig; new `clawteam team spawn <tmpl> --name <n>` Typer subcommand ships under `team_app` mirroring UX-01 verbatim; gstack spawn creates all 11 per-role memory dirs idempotently; existing templates BC-preserved.</done>
 </task>
 
 </tasks>

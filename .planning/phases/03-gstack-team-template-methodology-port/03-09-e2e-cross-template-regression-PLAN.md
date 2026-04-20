@@ -166,14 +166,24 @@ def test_eleven_worktrees_created(tmp_path, monkeypatch):
 
     gstack_template = load_template("gstack")
     assert gstack_template.name == "gstack"
-    assert len(gstack_template.agents) == 11, (
-        f"gstack.toml must declare 11 agents, got {len(gstack_template.agents)}"
+    # gstack.toml declares 11 total (1 leader + 10 under [[template.agents]]).
+    # Counting `agents` alone = 10; include leader to get 11.
+    assert 1 + len(gstack_template.agents) == 11, (
+        f"gstack.toml must declare 11 total agents (1 leader + 10), got {1 + len(gstack_template.agents)}"
     )
 
-    # Create the team — this drives WorkspaceManager.create_workspace per agent
+    # Create the team via create_team with full kwargs (03-02 extended signature).
+    # Drives WorkspaceManager.create_workspace per agent.
+    roles = [a.role for a in [gstack_template.leader, *gstack_template.agents] if a.role]
     team_config = TeamManager.create_team(
         name="spawn-test",
-        template=gstack_template,
+        leader_name=gstack_template.leader.name,
+        leader_id=f"{gstack_template.leader.name}-spawn-test",
+        description=gstack_template.description,
+        leader_agent_type=gstack_template.leader.type,
+        roles=roles,
+        leader_role=gstack_template.leader_role,
+        template=gstack_template.name,
     )
 
     # Verify 11 worktree dirs exist, one per canonical role.
@@ -402,7 +412,20 @@ def test_existing_template_spawns_unaffected_by_gstack_plugin(
     tmpl = load_template(template)
     assert tmpl.name == template
 
-    team_config = TeamManager.create_team(name=f"test-{template}", template=tmpl)
+    # Call create_team with full kwargs matching 03-02's extended signature.
+    # Existing templates don't set `role` per agent; the `if a.role` filter means
+    # `roles=[]` for them — no gstack-style per-role memory dirs get created (BC).
+    roles = [a.role for a in [tmpl.leader, *tmpl.agents] if a.role]
+    team_config = TeamManager.create_team(
+        name=f"test-{template}",
+        leader_name=tmpl.leader.name,
+        leader_id=f"{tmpl.leader.name}-test-{template}",
+        description=tmpl.description,
+        leader_agent_type=tmpl.leader.type,
+        roles=roles,
+        leader_role=tmpl.leader_role,
+        template=tmpl.name,
+    )
 
     # 1. Template field round-trips as <template>, NOT "gstack".
     assert getattr(team_config, "template", template) == template, (

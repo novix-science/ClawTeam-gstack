@@ -29,7 +29,7 @@ must_haves:
   truths:
     - "All 11 upstream gstack skill markdown files are committed under tests/fixtures/gstack_skills/ for reproducible golden tests"
     - "SprintConductor.advance_phase accepts an optional actor parameter without breaking Phase 2 callers"
-    - "TeamConfig pydantic model carries an optional leader_role field readable by SprintConductor"
+    - "TeamConfig pydantic model carries optional leader_role + template fields readable by SprintConductor and GstackSprintPlugin"
     - "All five new test files exist with skipped/xfail stubs so subsequent waves have automated verification per Nyquist"
   artifacts:
     - path: "tests/fixtures/gstack_skills/office-hours.md"
@@ -42,8 +42,9 @@ must_haves:
       provides: "advance_phase(self, sprint_id: str, actor: str = '') with leader-role enforcement"
       contains: "actor: str = \"\""
     - path: "clawteam/team/models.py"
-      provides: "TeamConfig.leader_role optional field"
+      provides: "TeamConfig.leader_role + TeamConfig.template optional fields"
       contains: "leader_role"
+      contains_template: "template: str = \"\""
     - path: "tests/test_gstack_template.py"
       provides: "Test scaffold for TEAM-01/02/05 (xfail until Wave 1 ships)"
       contains: "test_parses_via_existing_loader"
@@ -78,7 +79,7 @@ Purpose: Eliminate the five A1-A8 unverified assumptions before any implementati
 Output:
 - 11 upstream markdown fixtures committed (Strategy B per D-08)
 - SprintConductor signature additively extended (D-10)
-- TeamConfig extended with optional leader_role (Pattern 4 prerequisite)
+- TeamConfig extended with optional leader_role (Pattern 4 prerequisite) AND optional template field (03-07 Reflect-handler key_link prerequisite)
 - 5 test files scaffolded with imports + skipped tests so green suite stays green
 </objective>
 
@@ -217,7 +218,7 @@ If any of these counts differs from the expected (6 / 10 / 17), record the actua
     - Test 6: `TeamConfig(name="x", lead_agent_id="y", members=[], leader_role="ceo").leader_role == "ceo"` — field accepts assignment.
   </behavior>
   <action>
-**File 1 — `clawteam/team/models.py`:** Locate the `TeamConfig(BaseModel)` declaration. Add an optional field after `members`:
+**File 1 — `clawteam/team/models.py`:** Locate the `TeamConfig(BaseModel)` declaration. Add TWO optional fields after `members`:
 
 ```python
 class TeamConfig(BaseModel):
@@ -226,8 +227,11 @@ class TeamConfig(BaseModel):
     lead_agent_id: str
     members: list[TeamMember] = []
     leader_role: str = ""  # NEW Phase 3 (Pattern 4): role authorized to advance_phase; "" = no leader binding
+    template: str = ""     # NEW Phase 3 (03-07 key_link): template name (e.g. "gstack"); enables consumption-layer isolation in plugin event handlers
     # ... preserve all other existing fields verbatim
 ```
+
+**Why both fields land in 03-01 Wave 0:** They are sister fields — both flow from `TemplateDef` into `TeamConfig` at `create_team` time, and both are read by Phase 3 substrate (conductor consults `leader_role`; `GstackSprintPlugin._on_phase_transition` consults `template`). Adding them together preserves the atomic-commit discipline and lets 03-02 wire both in one CLI patch (`leader_role=tmpl.leader_role, template=tmpl.name`).
 
 **File 2 — `clawteam/sprint/conductor.py`:** Locate the `advance_phase(self, sprint_id: str)` method (currently at line 304 per PATTERNS.md verification). Apply this exact extension:
 
@@ -269,7 +273,8 @@ The lazy import inside the method body is intentional (Pattern F — lazy-import
   <acceptance_criteria>
     - `grep -E 'def advance_phase\(\s*self,\s*sprint_id: str,\s*actor: str = ""' clawteam/sprint/conductor.py` exits 0
     - `grep -E '^\s*leader_role: str = ""' clawteam/team/models.py` exits 0
-    - `python -c "from clawteam.team.models import TeamConfig; c = TeamConfig(name='t', lead_agent_id='a', members=[]); assert c.leader_role == ''; c2 = TeamConfig(name='t', lead_agent_id='a', members=[], leader_role='ceo'); assert c2.leader_role == 'ceo'"` exits 0
+    - `grep -E '^\s*template: str = ""' clawteam/team/models.py` exits 0
+    - `python -c "from clawteam.team.models import TeamConfig; c = TeamConfig(name='t', lead_agent_id='a', members=[]); assert c.leader_role == '' and c.template == ''; c2 = TeamConfig(name='t', lead_agent_id='a', members=[], leader_role='ceo', template='gstack'); assert c2.leader_role == 'ceo' and c2.template == 'gstack'"` exits 0
     - `pytest tests/ -k 'advance_phase' -x` exits 0 (all 6 behavior tests pass)
     - `pytest tests/test_phase2_integration.py -x` exits 0 (Phase 2 regression preserved — actor="" default doesn't break callers)
   </acceptance_criteria>
@@ -482,7 +487,7 @@ def test_eleven_worktrees_created(tmp_path, monkeypatch):
 
 @pytest.mark.skip(reason="Wave 4: UX-01 end-to-end")
 def test_team_spawn_gstack(tmp_path, monkeypatch):
-    """UX-01: clawteam launch gstack --team <name> spawns 11 agents."""
+    """UX-01: clawteam team spawn gstack --name <name> spawns 11 agents."""
     pass
 
 @pytest.mark.skip(reason="Wave 4: D-05 per-role memory dir pre-creation")
