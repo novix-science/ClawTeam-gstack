@@ -10,5 +10,7 @@ and the pytest collection phase does not fail on un-created modules.
 
 from clawteam.templates.gstack.schemas.design_doc import DesignDoc
 from clawteam.templates.gstack.schemas.plan_doc import PlanDoc
+from clawteam.templates.gstack.schemas.review_report import ReviewReport
+from clawteam.templates.gstack.schemas.test_report import TestReport
 
-__all__ = ["DesignDoc", "PlanDoc"]
+__all__ = ["DesignDoc", "PlanDoc", "TestReport", "ReviewReport"]

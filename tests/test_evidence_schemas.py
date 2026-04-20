@@ -262,3 +262,116 @@ class TestGstackBarrelExports:
         with pytest.raises(ValueError, match="Unsafe fixture name"):
             _load_fixture_meta("/etc/passwd")
 
+
+# ---------------------------------------------------------------------------
+# Phase 3 Plan 03-03 Task 2 — TestReport + ReviewReport schemas
+# ---------------------------------------------------------------------------
+
+
+class TestTestReportSchema:
+    def test_valid_fixture_round_trips(self) -> None:
+        from clawteam.templates.gstack.schemas import TestReport
+
+        doc = TestReport(**_load_fixture_meta("test-report-valid.md"))
+        assert doc.artifact_type == "test-report"
+        assert doc.test_command.startswith("pytest")
+        assert doc.passed >= 0
+        assert doc.qa_mode == "qa"
+
+    def test_stub_fixture_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import TestReport
+
+        with pytest.raises(ValidationError):
+            TestReport(**_load_fixture_meta("test-report-stub-tbd.md"))
+
+    def test_empty_test_command_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import TestReport
+
+        meta = _load_fixture_meta("test-report-valid.md")
+        meta["test_command"] = ""
+        with pytest.raises(ValidationError):
+            TestReport(**meta)
+
+    def test_short_output_excerpt_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import TestReport
+
+        meta = _load_fixture_meta("test-report-valid.md")
+        meta["output_excerpt"] = "too short"
+        with pytest.raises(ValidationError):
+            TestReport(**meta)
+
+    def test_negative_passed_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import TestReport
+
+        meta = _load_fixture_meta("test-report-valid.md")
+        meta["passed"] = -1
+        with pytest.raises(ValidationError):
+            TestReport(**meta)
+
+
+class TestReviewReportSchema:
+    def test_valid_fixture_round_trips(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport
+
+        doc = ReviewReport(**_load_fixture_meta("review-report-valid.md"))
+        assert doc.artifact_type == "review-report"
+        assert len(doc.review_sha) >= 7
+        assert doc.verdict in ("approved", "rejected", "needs-revision", "superseded")
+        assert len(doc.findings) >= 1
+
+    def test_stub_fixture_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport
+
+        with pytest.raises(ValidationError):
+            ReviewReport(**_load_fixture_meta("review-report-stub-tbd.md"))
+
+    def test_short_review_sha_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport
+
+        meta = _load_fixture_meta("review-report-valid.md")
+        meta["review_sha"] = "abc"
+        with pytest.raises(ValidationError):
+            ReviewReport(**meta)
+
+    def test_non_hex_review_sha_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport
+
+        meta = _load_fixture_meta("review-report-valid.md")
+        meta["review_sha"] = "notahexsha!"
+        with pytest.raises(ValidationError):
+            ReviewReport(**meta)
+
+    def test_invalid_verdict_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport
+
+        meta = _load_fixture_meta("review-report-valid.md")
+        meta["verdict"] = "ship-it-anyway"
+        with pytest.raises(ValidationError):
+            ReviewReport(**meta)
+
+    def test_empty_findings_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport
+
+        meta = _load_fixture_meta("review-report-valid.md")
+        meta["findings"] = []
+        with pytest.raises(ValidationError):
+            ReviewReport(**meta)
+
+
+class TestGstackBarrelExportsTask2:
+    def test_test_report_importable_from_barrel(self) -> None:
+        from clawteam.templates.gstack.schemas import TestReport as BarrelTestReport
+        from clawteam.templates.gstack.schemas.test_report import (
+            TestReport as ModuleTestReport,
+        )
+
+        assert BarrelTestReport is ModuleTestReport
+
+    def test_review_report_importable_from_barrel(self) -> None:
+        from clawteam.templates.gstack.schemas import ReviewReport as BarrelReviewReport
+        from clawteam.templates.gstack.schemas.review_report import (
+            ReviewReport as ModuleReviewReport,
+        )
+
+        assert BarrelReviewReport is ModuleReviewReport
+
