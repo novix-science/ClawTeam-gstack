@@ -192,3 +192,89 @@ class BoardAttach(HarnessEvent):
     """Fired when a user attaches to the board."""
 
     pass
+
+
+# ── Phase 2: Safety-rail Before* events (veto-shape; §02-CONTEXT D-10) ─────────
+
+
+@dataclass
+class BeforeToolCall(HarnessEvent):
+    """Fired before an MCP tool or intercepted CLI command runs. Set veto=True to cancel."""
+
+    agent_name: str = ""
+    tool_name: str = ""
+    args: dict = field(default_factory=dict)
+    veto: bool = False
+    veto_reason: str = ""
+
+
+@dataclass
+class BeforeFileWrite(HarnessEvent):
+    """Fired before ArtifactStore.write or WorkspaceManager git-write. Set veto=True to cancel."""
+
+    agent_name: str = ""
+    path: str = ""
+    size_bytes: int = 0
+    veto: bool = False
+    veto_reason: str = ""
+
+
+# ── Phase 2: Freeze audit + envelope + theater + cycle + cap notifications ────
+
+
+@dataclass
+class FreezeChange(HarnessEvent):
+    """Emitted on every /freeze, /unfreeze, /guard action (§02-CONTEXT D-13)."""
+
+    action: str = ""  # "freeze" | "unfreeze"
+    path: str = ""
+    agent: str = ""
+    reason: str = ""
+    actor: str = ""
+
+
+@dataclass
+class MalformedEnvelope(HarnessEvent):
+    """Emitted on first malformed TurnEnvelope per agent (§02-CONTEXT D-09 warn-mode)."""
+
+    agent: str = ""
+    violation: str = ""
+    turn_id: str = ""
+
+
+@dataclass
+class DriftRegression(HarnessEvent):
+    """Emitted after 8+ consecutive malformed envelopes per agent (§02-CONTEXT D-09)."""
+
+    agent: str = ""
+    consecutive_count: int = 0
+    last_violation: str = ""
+
+
+@dataclass
+class CycleDetected(HarnessEvent):
+    """Transport cycle detected via DefaultRoutingPolicy (§02-CONTEXT D-21)."""
+
+    pair: tuple = ("", "")
+    topic_hash: str = ""
+    route_keys: list = field(default_factory=list)
+    window_size: int = 20
+
+
+@dataclass
+class ForcedProgressTriggered(HarnessEvent):
+    """Theater/no-progress gate fired (§02-CONTEXT D-17)."""
+
+    agent: str = ""
+    consecutive_no_progress: int = 0
+    question_id: str = ""
+
+
+@dataclass
+class ArtifactCapExceeded(HarnessEvent):
+    """Per-file or per-phase artifact cap hit (§02-CONTEXT D-27, D-28)."""
+
+    artifact_name: str = ""
+    size_bytes: int = 0
+    cap_bytes: int = 0
+    scope: str = ""  # "file" or "phase"

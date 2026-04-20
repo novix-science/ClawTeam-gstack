@@ -149,6 +149,21 @@ class PluginManager:
             plugin.contribute_phase_roles(),
             plugin.contribute_review_routers(),
         )
+        # Phase 2 / Plan 02-01: funnel contribute_evidence_schemas into
+        # EvidenceSchemaRegistry. Use a lazy import to tolerate wave-parallel
+        # execution where Plan 02-04's clawteam.harness.evidence_schemas has
+        # not yet merged (Plan 01-03 cross-wave parallelism pattern).
+        schemas = plugin.contribute_evidence_schemas() or {}
+        if schemas:
+            try:
+                from clawteam.harness import evidence_schemas as _es  # noqa: PLC0415
+            except (ModuleNotFoundError, ImportError):
+                # Plan 02-04 lands the registry module; absence is expected
+                # during Wave 1 parallel execution — silently skip.
+                _es = None  # type: ignore[assignment]
+            if _es is not None:
+                for schema_name, schema_cls in schemas.items():
+                    _es.register_schema(schema_name, schema_cls)
         self._loaded[plugin.name] = plugin
         return plugin
 

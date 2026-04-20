@@ -73,3 +73,21 @@ class HarnessPlugin(ABC):
         by this plugin (RFC 001 §4.3b, D-04).
         """
         return []
+
+    # ── Phase 2 / Plan 02-01 hook ────────────────────────────────────
+
+    def contribute_evidence_schemas(self) -> dict[str, type]:
+        """Contribute artifact-frontmatter schemas to EvidenceSchemaRegistry.
+
+        Keys are artifact_type strings (e.g., "design-doc", "plan-doc"); values
+        are pydantic subclasses of ArtifactFrontmatterBase (Plan 02-04).
+        Duplicate keys across plugins are fatal at registration time (mirrors
+        PhaseRegistry D-03 namespace rule). Empty-dict default means the
+        plugin registers no schemas.
+
+        Phase 2 ships the hook with this empty default; Phase 3's
+        GstackSprintPlugin.contribute_evidence_schemas() returns the six
+        gstack artifact schemas (DesignDoc, PlanDoc, TestReport, ReviewReport,
+        ShipNotes, Retro).
+        """
+        return {}
