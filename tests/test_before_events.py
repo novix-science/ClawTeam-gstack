@@ -18,7 +18,6 @@ from clawteam.events.types import BeforeFileWrite, BeforeToolCall
 from clawteam.harness.freeze_registry import FrozenPathError
 from clawteam.mcp.helpers import MCPToolError, translate_error
 
-
 # ── Shared isolation fixtures ──────────────────────────────────────────
 
 
@@ -39,10 +38,29 @@ def isolated_bus(monkeypatch):
     return bus
 
 
+@pytest.fixture
+def cleanup_mcp_tools():
+    """Snapshot the MCP tool registry and restore it on teardown.
+
+    Task 2a tests wrap dummy functions through ``_tool(...)`` which registers
+    them on the shared FastMCP singleton. Other test files (e.g.
+    ``test_mcp_server.py``) assert on the exact set of registered tools, so
+    the dummy tools must be removed after each test to preserve cross-file
+    isolation.
+    """
+    from clawteam.mcp.server import mcp
+
+    before = set(mcp._tool_manager._tools.keys())
+    yield
+    after = set(mcp._tool_manager._tools.keys())
+    for name in after - before:
+        mcp._tool_manager.remove_tool(name)
+
+
 # ── Task 2a Test 1: MCP _tool emits BeforeToolCall ─────────────────────
 
 
-def test_mcp_tool_emits_before_tool_call(isolated_bus, monkeypatch):
+def test_mcp_tool_emits_before_tool_call(isolated_bus, cleanup_mcp_tools, monkeypatch):
     """_tool wrapper emits BeforeToolCall before fn(*args, **kwargs) runs."""
     from clawteam.mcp import server as server_mod
 
@@ -67,7 +85,7 @@ def test_mcp_tool_emits_before_tool_call(isolated_bus, monkeypatch):
 # ── Task 2a Test 2: veto raises FrozenPathError without running fn ─────
 
 
-def test_mcp_tool_vetoed_call_raises_frozen_path_error(isolated_bus):
+def test_mcp_tool_vetoed_call_raises_frozen_path_error(isolated_bus, cleanup_mcp_tools):
     """When a subscriber sets event.veto=True, _tool raises FrozenPathError and skips fn."""
     from clawteam.mcp import server as server_mod
 

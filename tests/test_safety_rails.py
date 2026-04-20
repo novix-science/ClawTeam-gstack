@@ -11,7 +11,6 @@ call this function, so their EventBus has zero safety subscribers
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -30,13 +29,11 @@ from clawteam.harness.freeze_registry import (
     _on_before_file_write,
     _on_before_tool_call,
     _on_careful,
-    get_freeze_registry,
     register_safety_subscribers,
     reset_freeze_registry,
     reset_safety_subscribers,
     set_careful_veto_mode,
 )
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -208,9 +205,14 @@ runner = CliRunner()
 
 @pytest.fixture
 def guard_env(tmp_path, monkeypatch):
-    """Isolated env for guard CLI tests."""
-    data = tmp_path / ".clawteam"
-    data.mkdir()
+    """Isolated env for guard CLI tests.
+
+    Uses a dedicated ``data/`` subdir (not ``.clawteam``) to avoid colliding
+    with the autouse ``isolated_data_dir`` fixture in conftest.py which
+    already created ``tmp_path/.clawteam``.
+    """
+    data = tmp_path / "data"
+    data.mkdir(exist_ok=True)
     monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(data))
     monkeypatch.setenv("HOME", str(tmp_path))
     reset_freeze_registry()

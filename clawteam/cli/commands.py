@@ -4652,5 +4652,203 @@ def run_command(
     console.print(f"[bold]Attach:[/bold] tmux attach -t clawteam-{team}")
 
 
+# ──────────────────── Sprint safety rails (/freeze, /unfreeze, /guard, /unguard) ────────────────────
+#
+# Plan 02-10 Task 3 — guard sub-app exposing the safety-rail primitives as CLI
+# commands. Every invocation writes to FreezeRegistry (which appends a
+# FreezeChange entry to freeze_audit.jsonl under the sprint dir).
+#
+# Envelope shape follows §02-CONTEXT D-26:
+#     {"ok": <bool>, "data": <dict|null>, "warnings": [...], "error": {...}|null}
+#
+# When load_sprint_state / save_sprint_state helpers land in Plan 02-11, the
+# guard/unguard commands below will additionally persist careful_enabled onto
+# SprintState so the mode survives sprint pause/resume. Until then, the in-
+# memory ``_careful_veto_mode`` flag in freeze_registry is the sole source of
+# truth (documented in the composite test).
+
+guard_app = typer.Typer(
+    help="Sprint safety-rail primitives: freeze/unfreeze/guard/unguard.",
+    no_args_is_help=True,
+)
+app.add_typer(guard_app, name="guard")
+
+
+def _guard_emit_ok(data: dict, warnings: list[str] | None = None) -> None:
+    payload = {
+        "ok": True,
+        "data": data,
+        "warnings": warnings or [],
+        "error": None,
+    }
+    if _json_output:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        _render_guard_human(data)
+
+
+def _guard_emit_err(code: str, message: str) -> None:
+    payload = {
+        "ok": False,
+        "data": None,
+        "warnings": [],
+        "error": {"code": code, "message": message},
+    }
+    # Always emit the JSON envelope on error — CLI consumers (including scripts)
+    # need the structured error regardless of the --json flag state.
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    raise typer.Exit(1)
+
+
+def _render_guard_human(data: dict) -> None:
+    action = data.get("action", "ok")
+    path = data.get("path", "")
+    reason = data.get("reason", "")
+    console.print(f"[green]{action}[/green] {path} {reason}".rstrip())
+
+
+@guard_app.command("freeze")
+def guard_freeze(
+    path: str = typer.Argument(..., help="Filesystem path to freeze."),
+    team: str = typer.Option(..., "--team", envvar="CLAWTEAM_TEAM"),
+    sprint: str = typer.Option(..., "--sprint", envvar="CLAWTEAM_SPRINT"),
+    reason: str = typer.Option("", "--reason", help="Why this path is being frozen."),
+    actor: str = typer.Option("user", "--actor", help="Who is issuing the freeze."),
+):
+    """Add ``path`` to the sprint-scoped freeze list and audit the action."""
+    try:
+        from clawteam.harness.freeze_registry import FreezeRegistry
+
+        reg = FreezeRegistry(team_name=team, sprint_id=sprint)
+        reg.freeze(path, agent="*", reason=reason, actor=actor)
+        _guard_emit_ok({"action": "freeze", "path": path, "reason": reason})
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _guard_emit_err("FREEZE_FAILED", str(exc))
+
+
+@guard_app.command("unfreeze")
+def guard_unfreeze(
+    path: str = typer.Argument(..., help="Filesystem path to unfreeze."),
+    team: str = typer.Option(..., "--team", envvar="CLAWTEAM_TEAM"),
+    sprint: str = typer.Option(..., "--sprint", envvar="CLAWTEAM_SPRINT"),
+    reason: str = typer.Option("", "--reason"),
+    actor: str = typer.Option("user", "--actor"),
+):
+    """Remove ``path`` from the sprint-scoped freeze list and audit the action."""
+    try:
+        from clawteam.harness.freeze_registry import FreezeRegistry
+
+        reg = FreezeRegistry(team_name=team, sprint_id=sprint)
+        reg.unfreeze(path, agent="*", reason=reason, actor=actor)
+        _guard_emit_ok({"action": "unfreeze", "path": path, "reason": reason})
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _guard_emit_err("UNFREEZE_FAILED", str(exc))
+
+
+@guard_app.command("guard")
+def guard_guard(
+    path: str = typer.Argument(..., help="Filesystem path to guard."),
+    team: str = typer.Option(..., "--team", envvar="CLAWTEAM_TEAM"),
+    sprint: str = typer.Option(..., "--sprint", envvar="CLAWTEAM_SPRINT"),
+    reason: str = typer.Option("", "--reason"),
+    actor: str = typer.Option("user", "--actor"),
+):
+    """Composite: /freeze the path AND enable /careful veto mode (SAFETY-03).
+
+    Persisting ``careful_enabled`` onto SprintState requires the
+    ``load_sprint_state`` / ``save_sprint_state`` helpers landing in Plan 02-11.
+    Until then the module-level ``_careful_veto_mode`` flag is the in-memory
+    source of truth; SprintConductor will re-apply it on resume once it
+    reads the persisted flag.
+    """
+    try:
+        from clawteam.harness.freeze_registry import (
+            FreezeRegistry,
+            set_careful_veto_mode,
+        )
+
+        reg = FreezeRegistry(team_name=team, sprint_id=sprint)
+        reg.freeze(path, agent="*", reason=reason, actor=actor)
+        set_careful_veto_mode(True)
+
+        # Best-effort persistence: attempt to flip careful_enabled on SprintState
+        # via Plan 02-11 helpers, but swallow ImportError because those helpers
+        # have not yet been shipped when this plan lands.
+        try:
+            from clawteam.sprint.state import (  # type: ignore[attr-defined]
+                load_sprint_state,
+                save_sprint_state,
+            )
+
+            state = load_sprint_state(team, sprint)
+            state.careful_enabled = True  # type: ignore[attr-defined]
+            save_sprint_state(state)
+        except Exception:
+            # Helpers / field land in Plan 02-11; ignore until then.
+            pass
+
+        _guard_emit_ok(
+            {
+                "action": "guard",
+                "path": path,
+                "reason": reason,
+                "careful_enabled": True,
+            }
+        )
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _guard_emit_err("GUARD_FAILED", str(exc))
+
+
+@guard_app.command("unguard")
+def guard_unguard(
+    path: str = typer.Argument(..., help="Filesystem path to unguard."),
+    team: str = typer.Option(..., "--team", envvar="CLAWTEAM_TEAM"),
+    sprint: str = typer.Option(..., "--sprint", envvar="CLAWTEAM_SPRINT"),
+    reason: str = typer.Option("", "--reason"),
+    actor: str = typer.Option("user", "--actor"),
+):
+    """Inverse of /guard: unfreeze + disable /careful veto mode."""
+    try:
+        from clawteam.harness.freeze_registry import (
+            FreezeRegistry,
+            set_careful_veto_mode,
+        )
+
+        reg = FreezeRegistry(team_name=team, sprint_id=sprint)
+        reg.unfreeze(path, agent="*", reason=reason, actor=actor)
+        set_careful_veto_mode(False)
+
+        try:
+            from clawteam.sprint.state import (  # type: ignore[attr-defined]
+                load_sprint_state,
+                save_sprint_state,
+            )
+
+            state = load_sprint_state(team, sprint)
+            state.careful_enabled = False  # type: ignore[attr-defined]
+            save_sprint_state(state)
+        except Exception:
+            pass
+
+        _guard_emit_ok(
+            {
+                "action": "unguard",
+                "path": path,
+                "reason": reason,
+                "careful_enabled": False,
+            }
+        )
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _guard_emit_err("UNGUARD_FAILED", str(exc))
+
+
 if __name__ == "__main__":
     app()

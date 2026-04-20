@@ -42,18 +42,20 @@ def translate_error(exc: Exception) -> MCPToolError:
 
     # Phase 2 explicit branches (Plan 02-10, D-12). Guarded imports let this
     # function work even before Plans 02-07 / 02-11 / 02-12 land their errors.
+    # The N806 suppressions below apply because the fallback names are class
+    # aliases (intentionally CapitalCamelCase), not local variables.
     try:
         from clawteam.harness.freeze_registry import FrozenPathError
     except ImportError:  # pragma: no cover — registry always present in Phase 2
-        FrozenPathError = None  # type: ignore[assignment]
+        FrozenPathError = None  # type: ignore[assignment]  # noqa: N806
     try:
         from clawteam.team.envelope import MalformedEnvelopeError
     except ImportError:  # pragma: no cover
-        MalformedEnvelopeError = None  # type: ignore[assignment]
+        MalformedEnvelopeError = None  # type: ignore[assignment]  # noqa: N806
     try:
         from clawteam.harness.errors import ArtifactTooLargeError
     except ImportError:  # pragma: no cover
-        ArtifactTooLargeError = None  # type: ignore[assignment]
+        ArtifactTooLargeError = None  # type: ignore[assignment]  # noqa: N806
     try:
         from clawteam.sprint.conductor import (  # type: ignore[attr-defined]
             AmbiguousSprintError,
@@ -61,7 +63,7 @@ def translate_error(exc: Exception) -> MCPToolError:
             SprintNotFoundError,
         )
     except ImportError:
-        AmbiguousSprintError = SprintNotFoundError = MissingTeamError = None  # type: ignore[assignment]
+        AmbiguousSprintError = SprintNotFoundError = MissingTeamError = None  # type: ignore[assignment]  # noqa: N806
 
     for cls in (
         FrozenPathError,
