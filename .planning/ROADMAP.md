@@ -129,9 +129,9 @@ Plans:
 **Plans**: 13 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — 8 Phase 2 event dataclasses + contribute_evidence_schemas plugin hook (SPRINT-01, SAFETY-01..04, QUALITY-02, QUALITY-11)
-- [ ] 02-02-PLAN.md — TurnEnvelope pydantic + stdlib YAML frontmatter parser + TeamMessage optional envelope fields (SKILL-09, QUALITY-01)
-- [ ] 02-03-PLAN.md — SprintState additive fields: turn_counters + artifact caps + status Literal + suppressed_topics (CORE-07, INT-06, QUALITY-03, QUALITY-11)
+- [x] 02-01-PLAN.md — 8 Phase 2 event dataclasses + contribute_evidence_schemas plugin hook (SPRINT-01, SAFETY-01..04, QUALITY-02, QUALITY-11)
+- [x] 02-02-PLAN.md — TurnEnvelope pydantic + stdlib YAML frontmatter parser + TeamMessage optional envelope fields (SKILL-09, QUALITY-01)
+- [x] 02-03-PLAN.md — SprintState additive fields: turn_counters + artifact caps + status Literal + suppressed_topics (CORE-07, INT-06, QUALITY-03, QUALITY-11)
 - [ ] 02-04-PLAN.md — EvidenceSchemaRegistry singleton + ArtifactFrontmatterBase pydantic v2 base (SPRINT-01, SPRINT-02, QUALITY-08)
 - [ ] 02-05-PLAN.md — FreezeRegistry singleton + FrozenPathError + append-only freeze_audit.jsonl (SAFETY-02, SAFETY-04, QUALITY-06)
 - [ ] 02-06-PLAN.md — ArtifactStore.write hook chain: size cap + BeforeFileWrite emit + ArtifactTooLargeError (QUALITY-03, QUALITY-06, SAFETY-02)
