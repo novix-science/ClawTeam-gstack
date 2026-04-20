@@ -31,12 +31,17 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
+from typing import TYPE_CHECKING
 
 from clawteam.fileutil import atomic_write_text, file_locked
 from clawteam.team.models import get_data_dir
+
+if TYPE_CHECKING:  # pragma: no cover — type-check only import
+    from clawteam.events.bus import EventBus
 
 
 class FrozenPathError(ValueError):
@@ -223,3 +228,178 @@ def reset_freeze_registry() -> None:
     """
     global _registry
     _registry = None
+
+
+# ── Phase 2 safety-rail subscribers (Plan 02-10) ────────────────────────────
+#
+# These subscribers hook BeforeFileWrite + BeforeToolCall emitted from
+# ArtifactStore.write (Plan 02-06), MCP _tool (Plan 02-10 Task 2a),
+# WorkspaceManager write paths (Plan 02-10 Task 2b), and consult the
+# FreezeRegistry + /careful regex blacklist.
+#
+# Registration is OPT-IN via ``register_safety_subscribers(bus)``, called by
+# SprintConductor.__init__ (Plan 02-11). Phase 0 regression templates never
+# instantiate SprintConductor, so their EventBus has zero safety subscribers
+# and Before* events are no-ops for them (Pitfall #8 BC hinge).
+
+
+# D-13 /careful destructive-command regex blacklist — warn-only by default.
+#
+# Matches the 5 patterns documented in 02-CONTEXT D-13:
+#   * ``rm -rf`` / ``rm -Rf``  — recursive filesystem wipe
+#   * ``git reset --hard``      — discards uncommitted work
+#   * ``git push --force``      — overwrites remote history
+#   * ``DROP TABLE ...``        — schema destruction
+#   * ``DELETE FROM ... WHERE`` — row destruction (WHERE-less DELETE is even worse
+#                                 but still caught by the generic pattern).
+#
+# Defense-in-depth ONLY (T-02-07 disposition): agents can trivially bypass via
+# base64, subshell, or writing a script. The primary defense is path-level
+# /freeze; /careful is a friction hint that surfaces obvious mistakes.
+CAREFUL_BLACKLIST: re.Pattern[str] = re.compile(
+    r"(?i)(rm\s+-[rR]f"
+    r"|git\s+reset\s+--hard"
+    r"|git\s+push\s+--force"
+    r"|DROP\s+TABLE"
+    r"|DELETE\s+FROM\s+.*\s+WHERE)"
+)
+
+
+# Module-level flag flipped by ``clawteam guard guard`` (Task 3) and by
+# SprintConductor when SprintState.careful_enabled=True on resume (Plan 02-11).
+# Warn mode (False) is the default to match gstack-native /careful behavior.
+_careful_veto_mode: bool = False
+
+
+def set_careful_veto_mode(enabled: bool) -> None:
+    """Set the /careful veto-mode flag consulted by ``_on_careful``.
+
+    Called by ``clawteam guard guard`` (SAFETY-03 composite) and by
+    SprintConductor on sprint resume if SprintState.careful_enabled is True.
+    """
+    global _careful_veto_mode
+    _careful_veto_mode = enabled
+
+
+def _on_before_file_write(event) -> None:
+    """EventBus subscriber: veto write when FreezeRegistry.is_frozen matches.
+
+    Called synchronously by ``EventBus.emit(BeforeFileWrite)`` from
+    ArtifactStore.write and WorkspaceManager's four write paths. Sets
+    ``event.veto = True`` + ``event.veto_reason`` when the registry reports
+    the path is frozen; is_frozen already applies the Pitfall #5 data-dir
+    exemption, so paths under ``get_data_dir()`` pass through unchanged.
+    """
+    reg = get_freeze_registry()
+    if reg is None:
+        return  # no sprint context = no subscribers matter = no veto
+    frozen, reason = reg.is_frozen(event.path)
+    if frozen:
+        event.veto = True
+        event.veto_reason = reason or f"{event.path} is /freeze-locked"
+
+
+def _on_before_tool_call(event) -> None:
+    """EventBus subscriber: veto tool-call when args contain a frozen path.
+
+    Shallow scan of ``event.args.values()`` looking for string values that
+    look like filesystem paths (start with '/'). On match, ``FreezeRegistry.is_frozen``
+    decides. Deep recursion into nested dicts/lists is documented as out of scope
+    (T-02-09 disposition: agents that bury frozen paths in nested structures
+    bypass this tier; defense is structural at the BeforeFileWrite layer).
+    """
+    reg = get_freeze_registry()
+    if reg is None:
+        return
+    for _k, v in (event.args or {}).items():
+        if isinstance(v, str) and v.startswith("/"):
+            frozen, reason = reg.is_frozen(v)
+            if frozen:
+                event.veto = True
+                event.veto_reason = (
+                    f"tool {event.tool_name}: {reason or f'{v} path frozen'}"
+                )
+                return
+
+
+def _on_careful(event) -> None:
+    """EventBus subscriber: /careful blacklist regex on tool-call args.
+
+    Warn-only by default (emit ``FreezeChange(action='careful-warn')`` and let
+    the call proceed). When ``_careful_veto_mode`` is True (set by
+    ``clawteam guard guard`` or by SprintConductor on SprintState.careful_enabled),
+    also sets ``event.veto = True`` so the caller raises ``FrozenPathError``.
+    """
+    combined = " ".join(
+        str(v) for v in (event.args or {}).values() if isinstance(v, str)
+    )
+    m = CAREFUL_BLACKLIST.search(combined)
+    if not m:
+        return
+
+    # Emit a FreezeChange(action="careful-warn") notification regardless of
+    # veto mode so audit/dashboard consumers see every blacklist hit.
+    try:
+        from clawteam.events.global_bus import get_event_bus
+        from clawteam.events.types import FreezeChange
+
+        get_event_bus().emit(
+            FreezeChange(
+                team_name=getattr(event, "team_name", ""),
+                action="careful-warn",
+                path="",
+                agent=event.agent_name,
+                reason=f"destructive pattern: {m.group(0)}",
+                actor="careful-subscriber",
+            )
+        )
+    except Exception:  # pragma: no cover — event-emit must never crash subscriber
+        pass
+
+    if _careful_veto_mode:
+        event.veto = True
+        event.veto_reason = f"blocked by /careful: pattern {m.group(0)}"
+
+
+# Idempotency tracker: EventBus instances that already have our 3 handlers.
+# Using id(bus) keeps the tracker weak-ish (no reference retention beyond the
+# int) without needing WeakSet. A fresh EventBus() always gets a fresh id().
+_subscribers_registered: set[int] = set()
+
+
+def register_safety_subscribers(bus: "EventBus") -> None:
+    """Idempotently register the 3 safety-rail handlers on ``bus``.
+
+    Called by ``SprintConductor.__init__`` — only for gstack sprints. Existing
+    Phase 0 templates never call this so their EventBus has zero safety
+    subscribers and Before* events remain no-ops (Pitfall #8 BC hinge, SC#10).
+
+    Registers:
+      - ``_on_before_file_write``  @ BeforeFileWrite  priority=10
+      - ``_on_before_tool_call``   @ BeforeToolCall   priority=10
+      - ``_on_careful``            @ BeforeToolCall   priority=20 (after freeze check)
+    """
+    if id(bus) in _subscribers_registered:
+        return
+
+    # Local import avoids a circular init edge: events.types imports nothing
+    # from harness, but keeping the import inside the function matches the
+    # pattern used elsewhere in this module (see FreezeRegistry._audit).
+    from clawteam.events.types import BeforeFileWrite, BeforeToolCall
+
+    bus.subscribe(BeforeFileWrite, _on_before_file_write, priority=10)
+    bus.subscribe(BeforeToolCall, _on_before_tool_call, priority=10)
+    bus.subscribe(BeforeToolCall, _on_careful, priority=20)
+    _subscribers_registered.add(id(bus))
+
+
+def reset_safety_subscribers() -> None:
+    """Test helper — clear the idempotency tracker and warn/veto flag.
+
+    Call in setUp / tearDown of any test that instantiates an EventBus and
+    registers safety subscribers, so the next test gets a clean registration
+    slate. Never call in production code.
+    """
+    global _subscribers_registered, _careful_veto_mode
+    _subscribers_registered = set()
+    _careful_veto_mode = False
