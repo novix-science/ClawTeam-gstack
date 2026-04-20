@@ -4850,5 +4850,309 @@ def guard_unguard(
         _guard_emit_err("UNGUARD_FAILED", str(exc))
 
 
+# ──────────────────── Sprint lifecycle sub-app (Plan 02-12) ────────────────────
+#
+# Ships the `clawteam sprint` user-facing surface: start, status, show, list,
+# pause, resume. Every sub-command honors the global --json flag and emits the
+# uniform {ok, data, warnings, error} envelope per §02-CONTEXT D-26 so MCP
+# tools and scripts can parse any output without per-command logic.
+#
+# UX requirements closed here: UX-02 (start), UX-03 (status), UX-04 (list),
+# UX-05 (show), UX-09 (uniform JSON envelope).
+#
+# Error-code table (D-26):
+#   MISSING_TEAM        — MissingTeamError — --team or CLAWTEAM_TEAM required
+#   AMBIGUOUS_SPRINT    — AmbiguousSprintError — prefix matches >1 sprint
+#   SPRINT_NOT_FOUND    — SprintNotFoundError — prefix matches no sprint
+#   START_FAILED        — unhandled exception from start_sprint
+#   PAUSE_FAILED        — unhandled exception from pause
+#   RESUME_FAILED       — unhandled exception from resume
+#
+# BC invariant (Pitfall #8): this is additive — zero edits to existing sub-apps.
+# Phase 0 regression matrix 12/12 stays green because no existing command
+# semantics change.
+
+sprint_app = typer.Typer(
+    help="Sprint lifecycle commands (start/status/show/list/pause/resume).",
+    no_args_is_help=True,
+)
+app.add_typer(sprint_app, name="sprint")
+
+
+def _sprint_emit_ok(data: dict, warnings: list[str] | None = None) -> None:
+    """Uniform {ok, data, warnings, error} success envelope (D-26)."""
+    payload = {
+        "ok": True,
+        "data": data,
+        "warnings": warnings or [],
+        "error": None,
+    }
+    if _json_output:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        _render_sprint_human(data)
+
+
+def _sprint_emit_err(code: str, message: str) -> None:
+    """Uniform error envelope; always prints JSON even in human mode.
+
+    CLI consumers (including MCP tools) depend on the structured error
+    regardless of the --json flag state — structured failures must be
+    machine-readable.
+    """
+    payload = {
+        "ok": False,
+        "data": None,
+        "warnings": [],
+        "error": {"code": code, "message": message},
+    }
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    raise typer.Exit(1)
+
+
+def _render_sprint_human(data: dict) -> None:
+    """Human-friendly rendering via rich; falls back to JSON dump on error."""
+    try:
+        if "sprints" in data:  # list
+            for s in data["sprints"]:
+                console.print(
+                    f"[cyan]{s['sprint_id']}[/] {s['current_phase']} "
+                    f"({s['status']})"
+                )
+        elif "phase_history" in data:  # show
+            console.print(f"[bold cyan]{data['sprint_id']}[/] — {data['goal']}")
+            console.print(f"  team: {data['team']}")
+            console.print(
+                f"  phase: {data['current_phase']} ({data['status']})"
+            )
+            artifacts = ", ".join(data["artifacts_list"]) or "(none)"
+            console.print(f"  artifacts: {artifacts}")
+            console.print(
+                f"  history: {len(data['phase_history'])} transitions"
+            )
+        elif "pending_questions_count" in data:  # status
+            console.print(
+                f"[cyan]{data['sprint_id']}[/] phase={data['current_phase']} "
+                f"status={data['status']}"
+            )
+            console.print(
+                f"  pending questions: {data['pending_questions_count']}"
+            )
+            recent = data["most_recent_artifact"] or "(none)"
+            console.print(f"  most-recent artifact: {recent}")
+        else:  # start / pause / resume — simple field dump
+            for k, v in data.items():
+                console.print(f"  {k}: {v}")
+    except Exception:
+        # Defensive fallback — never fail the command for rendering reasons.
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def _resolve_team_arg(team_flag: str) -> str:
+    """Resolve --team / CLAWTEAM_TEAM env; emit MISSING_TEAM on both absent.
+
+    Pitfall #9: no default cross-team scan. If the user has not named a
+    team explicitly (flag) or implicitly (env), we refuse rather than
+    silently operate on whatever sprints happen to live under the first
+    team on disk.
+    """
+    if team_flag:
+        return team_flag
+    from clawteam.identity import _env
+
+    env_team = _env(
+        "CLAWTEAM_TEAM", "OH_TEAM", "CLAUDE_CODE_TEAM", default=""
+    )
+    if env_team:
+        return env_team
+    _sprint_emit_err(
+        "MISSING_TEAM",
+        "Team name is required (--team or CLAWTEAM_TEAM env).",
+    )
+    return ""  # unreachable — _sprint_emit_err raises typer.Exit
+
+
+def _resolve_sprint_or_err(team: str, id_or_prefix: str):
+    """Resolve a sprint by id or prefix; translate errors to CLI envelopes.
+
+    Returns a ``(conductor, state)`` tuple on success. On failure, emits the
+    error envelope via ``_sprint_emit_err`` which raises ``typer.Exit(1)``;
+    callers never observe the ``(None, None)`` fallback in practice.
+    """
+    try:
+        from clawteam.sprint.conductor import (
+            AmbiguousSprintError,
+            SprintConductor,
+            SprintNotFoundError,
+        )
+    except ImportError as exc:  # pragma: no cover — defensive
+        _sprint_emit_err("IMPORT_FAILED", str(exc))
+        return None, None
+
+    c = SprintConductor(team_name=team)
+    try:
+        state = c.resolve_sprint(id_or_prefix)
+        return c, state
+    except AmbiguousSprintError as exc:
+        _sprint_emit_err(
+            "AMBIGUOUS_SPRINT",
+            f"Ambiguous sprint prefix '{exc.prefix}'; "
+            f"candidates: {exc.candidates}",
+        )
+    except SprintNotFoundError:
+        _sprint_emit_err(
+            "SPRINT_NOT_FOUND", f"Sprint not found: {id_or_prefix}"
+        )
+    return None, None  # unreachable
+
+
+@sprint_app.command("start")
+def sprint_start(
+    team: str = typer.Option(
+        "", "--team", envvar="CLAWTEAM_TEAM",
+        help="Team name (required — falls back to CLAWTEAM_TEAM env).",
+    ),
+    goal: str = typer.Option(..., "--goal", help="Sprint goal (required)."),
+    auto_advance: bool = typer.Option(
+        True,
+        "--auto-advance/--no-auto-advance",
+        help="Auto-advance phases when gates pass (D-23).",
+    ),
+    artifact_cap: int = typer.Option(
+        0, "--artifact-cap",
+        help="Per-file artifact cap in KB (D-29; 0 = use SprintState default).",
+    ),
+    phase_artifact_cap: int = typer.Option(
+        0, "--phase-artifact-cap",
+        help="Per-phase sum-of-artifacts cap in KB (D-29; 0 = default).",
+    ),
+) -> None:
+    """Start a new sprint for a team (UX-02, §02-CONTEXT D-24)."""
+    resolved_team = _resolve_team_arg(team)
+    try:
+        from clawteam.sprint.conductor import SprintConductor
+
+        c = SprintConductor(
+            team_name=resolved_team,
+            artifact_cap_bytes=artifact_cap if artifact_cap else None,
+            phase_artifact_cap_bytes=(
+                phase_artifact_cap if phase_artifact_cap else None
+            ),
+        )
+        state = c.start_sprint(goal=goal, auto_advance=auto_advance)
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("START_FAILED", str(exc))
+        return
+    _sprint_emit_ok(
+        {
+            "id": state.sprint_id,
+            "team": state.team,
+            "goal": state.goal,
+            "current_phase": state.current_phase,
+            "status": state.status,
+            "auto_advance": state.auto_advance,
+        }
+    )
+
+
+@sprint_app.command("status")
+def sprint_status(
+    sprint_id: str = typer.Argument(
+        ..., help="Sprint id or unambiguous prefix (D-25)."
+    ),
+    team: str = typer.Option("", "--team", envvar="CLAWTEAM_TEAM"),
+) -> None:
+    """Show sprint status (UX-03, §02-CONTEXT D-24)."""
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return  # err already emitted
+    _sprint_emit_ok(c.status_dict(state))
+
+
+@sprint_app.command("show")
+def sprint_show(
+    sprint_id: str = typer.Argument(
+        ..., help="Sprint id or unambiguous prefix."
+    ),
+    team: str = typer.Option("", "--team", envvar="CLAWTEAM_TEAM"),
+) -> None:
+    """Show full sprint detail (UX-05, §02-CONTEXT D-24)."""
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return
+    _sprint_emit_ok(c.show_dict(state))
+
+
+@sprint_app.command("list")
+def sprint_list(
+    team: str = typer.Option(
+        "", "--team", envvar="CLAWTEAM_TEAM",
+        help=(
+            "Team name (required — Pitfall #9: no cross-team default scan)."
+        ),
+    ),
+) -> None:
+    """List all sprints for a team (UX-04, §02-CONTEXT D-24)."""
+    resolved_team = _resolve_team_arg(team)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name=resolved_team)
+    states = c.list_sprints()
+    _sprint_emit_ok(
+        {
+            "team": resolved_team,
+            "sprints": [c.status_dict(s) for s in states],
+        }
+    )
+
+
+@sprint_app.command("pause")
+def sprint_pause(
+    sprint_id: str = typer.Argument(
+        ..., help="Sprint id or unambiguous prefix."
+    ),
+    team: str = typer.Option("", "--team", envvar="CLAWTEAM_TEAM"),
+) -> None:
+    """Pause a sprint; checkpoint persists across process boundary (CORE-07)."""
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return
+    try:
+        new_state = c.pause(state.sprint_id)
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("PAUSE_FAILED", str(exc))
+        return
+    _sprint_emit_ok(c.status_dict(new_state))
+
+
+@sprint_app.command("resume")
+def sprint_resume(
+    sprint_id: str = typer.Argument(
+        ..., help="Sprint id or unambiguous prefix."
+    ),
+    team: str = typer.Option("", "--team", envvar="CLAWTEAM_TEAM"),
+) -> None:
+    """Resume a paused sprint; rehydrates + re-emits last PhaseTransition (CORE-07)."""
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return
+    try:
+        new_state = c.resume(state.sprint_id)
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("RESUME_FAILED", str(exc))
+        return
+    _sprint_emit_ok(c.status_dict(new_state))
+
+
 if __name__ == "__main__":
     app()
