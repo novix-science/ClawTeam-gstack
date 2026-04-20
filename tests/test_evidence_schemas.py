@@ -8,6 +8,8 @@ FreezeRegistry / EvidenceSchemaRegistry both mirror PhaseRegistry shape).
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+from typing import Any
 
 import pytest
 from clawteam.harness.evidence_schemas import (
@@ -17,6 +19,7 @@ from clawteam.harness.evidence_schemas import (
     register_schema,
     reset_registry,
 )
+from clawteam.team.envelope import parse_frontmatter
 from pydantic import Field, ValidationError
 
 
@@ -146,4 +149,116 @@ def test_plugin_manager_integration_end_to_end(monkeypatch: pytest.MonkeyPatch) 
     finally:
         real_es.reset_registry()
         reset_phase_registry()
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 Plan 03-03 — gstack evidence schemas (DesignDoc, PlanDoc, ...)
+# ---------------------------------------------------------------------------
+#
+# The test classes below exercise the six concrete gstack pydantic schemas
+# that Phase 3 adds under ``clawteam/templates/gstack/schemas/``. Each class
+# owns two things:
+#   1. A round-trip test against a ``*-valid.md`` fixture (schema instantiates).
+#   2. A rejection test against a ``*-stub-tbd.md`` fixture (ValidationError
+#      raised — Pitfall 8 defeat).
+#
+# Additional per-schema tests cover specific stub-defeating constraints
+# (min_length on prose, Literal enums, list arity, hex SHA shape, etc.).
+#
+# Task 1 (this commit) ships DesignDoc + PlanDoc classes + barrel tests.
+# Tasks 2-3 append TestReport / ReviewReport / ShipNotes / Retro classes.
+
+GSTACK_FIXTURES = Path(__file__).parent / "fixtures" / "gstack_artifacts"
+
+
+def _load_fixture_meta(name: str) -> dict[str, Any]:
+    """Read a gstack fixture markdown file and return its parsed frontmatter.
+
+    Guards against path traversal (T-03-12): the ``name`` argument MUST be a
+    plain filename — no ``..`` segments, no absolute paths. Raises ValueError
+    on violation. Callers pass fixture basenames like ``"design-doc-valid.md"``.
+    """
+    if ".." in name or "/" in name or name.startswith("."):
+        raise ValueError(f"Unsafe fixture name: {name!r} (path traversal guard)")
+    raw = (GSTACK_FIXTURES / name).read_text(encoding="utf-8")
+    meta, _body = parse_frontmatter(raw)
+    return meta
+
+
+class TestDesignDocSchema:
+    def test_valid_fixture_round_trips(self) -> None:
+        from clawteam.templates.gstack.schemas import DesignDoc
+
+        doc = DesignDoc(**_load_fixture_meta("design-doc-valid.md"))
+        assert doc.artifact_type == "design-doc"
+        assert doc.pm_verdict == "proceed"
+        assert len(doc.forcing_questions_addressed) == 6
+
+    def test_stub_fixture_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import DesignDoc
+
+        with pytest.raises(ValidationError):
+            DesignDoc(**_load_fixture_meta("design-doc-stub-tbd.md"))
+
+    def test_short_problem_statement_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import DesignDoc
+
+        meta = _load_fixture_meta("design-doc-valid.md")
+        meta["problem_statement"] = "too short"
+        with pytest.raises(ValidationError) as exc_info:
+            DesignDoc(**meta)
+        assert "problem_statement" in str(exc_info.value)
+
+    def test_invalid_pm_verdict_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import DesignDoc
+
+        meta = _load_fixture_meta("design-doc-valid.md")
+        meta["pm_verdict"] = "maybe"
+        with pytest.raises(ValidationError):
+            DesignDoc(**meta)
+
+    def test_short_forcing_questions_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import DesignDoc
+
+        meta = _load_fixture_meta("design-doc-valid.md")
+        meta["forcing_questions_addressed"] = [1, 2, 3]
+        with pytest.raises(ValidationError):
+            DesignDoc(**meta)
+
+
+class TestPlanDocSchema:
+    def test_valid_fixture_round_trips(self) -> None:
+        from clawteam.templates.gstack.schemas import PlanDoc
+
+        doc = PlanDoc(**_load_fixture_meta("plan-doc-valid.md"))
+        assert doc.artifact_type == "plan-doc"
+        assert len(doc.tasks) >= 1
+        assert doc.plan_owner == "eng-mgr"
+
+    def test_stub_fixture_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import PlanDoc
+
+        with pytest.raises(ValidationError):
+            PlanDoc(**_load_fixture_meta("plan-doc-stub-tbd.md"))
+
+
+class TestGstackBarrelExports:
+    def test_design_doc_importable_from_barrel(self) -> None:
+        from clawteam.templates.gstack.schemas import DesignDoc as BarrelDesignDoc
+        from clawteam.templates.gstack.schemas.design_doc import DesignDoc as ModuleDesignDoc
+
+        assert BarrelDesignDoc is ModuleDesignDoc
+
+    def test_plan_doc_importable_from_barrel(self) -> None:
+        from clawteam.templates.gstack.schemas import PlanDoc as BarrelPlanDoc
+        from clawteam.templates.gstack.schemas.plan_doc import PlanDoc as ModulePlanDoc
+
+        assert BarrelPlanDoc is ModulePlanDoc
+
+    def test_fixture_path_traversal_guarded(self) -> None:
+        """T-03-12: _load_fixture_meta must reject ``..`` and absolute paths."""
+        with pytest.raises(ValueError, match="Unsafe fixture name"):
+            _load_fixture_meta("../../../etc/passwd")
+        with pytest.raises(ValueError, match="Unsafe fixture name"):
+            _load_fixture_meta("/etc/passwd")
 
