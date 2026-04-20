@@ -16,7 +16,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -50,6 +50,51 @@ class SprintState(BaseModel):
     auto_advance: bool = True
     workspace_branch: str = ""
     created_at: str = Field(default_factory=_now_iso)
+
+    # ── Phase 2 additive fields (§02-CONTEXT D-14/D-15/D-16/D-21/D-27/D-28) ──
+    # Every field has a default so Phase 1 state.json files rehydrate cleanly
+    # (pydantic v2 BC guarantee — 02-RESEARCH §Runtime State Inventory).
+    turn_counters: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Per-agent turn count for theater detection (D-14); increments at "
+            "Transport.deliver() and ArtifactStore.write() hook sites."
+        ),
+    )
+    artifact_cap_bytes: int = Field(
+        default=50 * 1024,
+        description=(
+            "Per-file hard cap (D-27); 50 KB default. Overridden by CLI flag "
+            "(Plan 02-12) or CLAWTEAM_ARTIFACT_CAP_KB env (Plan 02-11). "
+            "Highest layer wins."
+        ),
+    )
+    phase_artifact_cap_bytes: int = Field(
+        default=500 * 1024,
+        description=(
+            "Per-phase sum-of-artifacts cap (D-28); 500 KB default. Overflow "
+            "triggers EvidenceGate compaction prompt (Plan 02-07)."
+        ),
+    )
+    status: Literal["running", "paused", "completed"] = Field(
+        default="running",
+        description=(
+            "Sprint lifecycle state (D-22 pause/resume idempotency). "
+            "SprintConductor.pause() writes 'paused'; resume() restores 'running'; "
+            "advance past Reflect writes 'completed'. Closed state machine — this is "
+            "the one Literal field in SprintState (RESEARCH §Pattern 1 approves the "
+            "exception to the open-str convention for pause/resume safety)."
+        ),
+    )
+    suppressed_topics: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description=(
+            "Per-route-key suppressed topic-hashes (D-21 cycle-detector persistence). "
+            "Key format: 'source->target' route key; value: list of topic hashes. "
+            "Populated by DefaultRoutingPolicy.decide (Plan 02-08); cleared on "
+            "human answer via InteractionGate."
+        ),
+    )
 
     # ── Persistence ─────────────────────────────────────────────────
 
