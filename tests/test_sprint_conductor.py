@@ -454,3 +454,92 @@ def test_resume_restores_careful_enabled(monkeypatch, tmp_path):
     freeze_reg_mod._careful_veto_mode = False
     c.resume(state.sprint_id)
     assert freeze_reg_mod._careful_veto_mode is True
+
+
+# ─────────────────────────────── Plan 02-12 Task 1 tests ─────────────────────
+# Serialization helpers consumed by the Sprint CLI sub-app (Plan 02-12):
+# most_recent_artifact(state), status_dict(state), show_dict(state).
+
+
+def test_most_recent_artifact_returns_name_when_artifacts_nonempty(monkeypatch, tmp_path):
+    """most_recent_artifact returns the last-inserted artifact name."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g")
+    state.artifacts["first.md"] = "content"
+    state.artifacts["second.md"] = "content"
+    assert c.most_recent_artifact(state) == "second.md"
+
+
+def test_most_recent_artifact_returns_empty_when_no_artifacts(monkeypatch, tmp_path):
+    """most_recent_artifact returns empty string when artifacts dict is empty."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g")
+    assert c.most_recent_artifact(state) == ""
+
+
+def test_status_dict_shape(monkeypatch, tmp_path):
+    """status_dict produces the exact key set consumed by `clawteam sprint status`."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="ship dark mode")
+    state.participants = ["engineer", "reviewer"]
+    state.pending_question_ids = ["q1"]
+    state.artifacts["design-doc.md"] = "body"
+    d = c.status_dict(state)
+    assert set(d.keys()) == {
+        "sprint_id",
+        "current_phase",
+        "status",
+        "participants",
+        "pending_questions_count",
+        "most_recent_artifact",
+        "auto_advance",
+        "team",
+    }
+    assert d["pending_questions_count"] == 1
+    assert d["most_recent_artifact"] == "design-doc.md"
+    assert d["team"] == "t"
+
+
+def test_show_dict_shape(monkeypatch, tmp_path):
+    """show_dict produces the exact key set consumed by `clawteam sprint show`.
+
+    artifacts_list returns NAMES only (sorted) — bodies are excluded to keep
+    JSON payload bounded (UX-05).
+    """
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="ship dark mode")
+    state.artifacts["a.md"] = "BODY-ALPHA-UNIQUE-TOKEN"
+    state.artifacts["b.md"] = "BODY-BETA-UNIQUE-TOKEN"
+    d = c.show_dict(state)
+    expected_keys = {
+        "sprint_id",
+        "goal",
+        "current_phase",
+        "status",
+        "participants",
+        "phase_history",
+        "artifacts_list",
+        "pending_question_ids",
+        "auto_advance",
+        "team",
+        "created_at",
+        "workspace_branch",
+    }
+    assert set(d.keys()) == expected_keys
+    assert d["artifacts_list"] == sorted(["a.md", "b.md"])
+    # Bodies must NOT appear in the dict — artifacts_list holds names only.
+    dumped = json.dumps(d)
+    assert "BODY-ALPHA-UNIQUE-TOKEN" not in dumped
+    assert "BODY-BETA-UNIQUE-TOKEN" not in dumped

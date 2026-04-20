@@ -413,6 +413,62 @@ class SprintConductor:
             raise AmbiguousSprintError(id_or_prefix, candidates)
         return load_sprint_state(self.team_name, candidates[0])
 
+    # ─────────────────── CLI serialization helpers (Plan 02-12) ───────────────────
+
+    def most_recent_artifact(self, state: SprintState) -> str:
+        """Return the most-recently-added artifact name (empty string when none).
+
+        Insertion order is preserved by Python dict (3.7+), so the last key
+        is the most recent artifact. Phase 2 ships bounded artifact counts
+        (per-file + per-phase caps in D-27/D-28), so the O(n) key-list walk
+        is acceptable.
+        """
+        if not state.artifacts:
+            return ""
+        return list(state.artifacts.keys())[-1]
+
+    def status_dict(self, state: SprintState) -> dict:
+        """Shape consumed by ``clawteam sprint status`` (UX-03, §02-CONTEXT D-24).
+
+        Excludes the full artifacts map to keep status payloads small — the
+        ``most_recent_artifact`` field surfaces the only per-status artifact
+        signal needed for the compact status view.
+        """
+        return {
+            "sprint_id": state.sprint_id,
+            "team": state.team,
+            "current_phase": state.current_phase,
+            "status": state.status,
+            "participants": list(state.participants),
+            "pending_questions_count": len(state.pending_question_ids),
+            "most_recent_artifact": self.most_recent_artifact(state),
+            "auto_advance": state.auto_advance,
+        }
+
+    def show_dict(self, state: SprintState) -> dict:
+        """Shape consumed by ``clawteam sprint show`` (UX-05, §02-CONTEXT D-24).
+
+        ``artifacts_list`` contains artifact NAMES only (sorted alphabetically)
+        — bodies are intentionally excluded to keep the JSON payload bounded
+        for UX-05 readability. Per-artifact body fetch is out of scope for
+        Phase 2 CLI; a future phase may add ``clawteam sprint artifact <id>
+        <name>`` to stream individual bodies.
+        """
+        return {
+            "sprint_id": state.sprint_id,
+            "team": state.team,
+            "goal": state.goal,
+            "current_phase": state.current_phase,
+            "status": state.status,
+            "participants": list(state.participants),
+            "phase_history": list(state.phase_history),
+            "artifacts_list": sorted(state.artifacts.keys()),
+            "pending_question_ids": list(state.pending_question_ids),
+            "auto_advance": state.auto_advance,
+            "created_at": state.created_at,
+            "workspace_branch": state.workspace_branch,
+        }
+
     # ─────────────────── internals ───────────────────
 
     def _load_by_id(self, sprint_id: str) -> SprintState:
