@@ -18,6 +18,7 @@ import threading
 from pathlib import Path
 
 import pytest
+
 from clawteam.harness.freeze_registry import (
     FreezeRegistry,
     FrozenPathError,
@@ -28,17 +29,39 @@ from clawteam.harness.freeze_registry import (
 
 @pytest.fixture
 def hermetic(tmp_path, monkeypatch):
-    """Per-test hermetic filesystem layered on top of conftest's isolated_data_dir.
+    """Per-test hermetic filesystem with a dedicated sub-root for the data dir.
 
-    The autouse conftest fixture sets CLAWTEAM_DATA_DIR to tmp_path/.clawteam.
-    We override it to tmp_path directly so assertions on sprint paths can use
-    `hermetic / "teams" / ...` without the nested .clawteam segment.
+    Two sibling subdirs inside ``tmp_path``:
+
+    * ``data/``  — ``CLAWTEAM_DATA_DIR``; sprint state (``teams/<t>/sprints/<s>/``)
+      lives here. Pitfall #5 exemption covers any path inside this dir.
+    * ``work/``  — attacker-controlled area used for creating symlinks and
+      fake frozen targets. Lives outside the data dir so ``is_frozen`` does
+      NOT apply the sprint-internal exemption to these paths.
+
+    Yields the ``data`` root so path assertions can compose under it directly.
     """
-    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    data_root = tmp_path / "data"
+    work_root = tmp_path / "work"
+    data_root.mkdir()
+    work_root.mkdir()
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(data_root))
     monkeypatch.setenv("HOME", str(tmp_path))
     reset_freeze_registry()
-    yield tmp_path
+    yield data_root
     reset_freeze_registry()
+
+
+@pytest.fixture
+def work_root(tmp_path):
+    """Attacker-controlled scratch space outside the data dir.
+
+    Paths created here are eligible for /freeze veto (Pitfall #5 exempts only
+    paths under get_data_dir(), not paths under tmp_path itself).
+    """
+    root = tmp_path / "work"
+    root.mkdir(exist_ok=True)
+    return root
 
 
 def _sprint_dir(base: Path, team: str, sprint: str) -> Path:
@@ -113,13 +136,16 @@ def test_is_frozen_returns_false_for_paths_under_data_dir(hermetic):
     sys.platform == "win32",
     reason="symlink creation requires admin on Windows CI runners",
 )
-def test_is_frozen_canonicalizes_relative_paths_and_symlinks(hermetic, tmp_path):
+def test_is_frozen_canonicalizes_relative_paths_and_symlinks(hermetic, work_root):
     """T-02-02 mitigation: symlink pointing into frozen dir is resolved and vetoed.
 
     Also exercises canonicalization: a relative form like `real/../real/file`
     must hash to the same canonical path as `real/file`.
+
+    Uses ``work_root`` (outside the data dir) so the Pitfall #5 exemption does
+    not mask the symlink-bypass check.
     """
-    real_dir = tmp_path / "real"
+    real_dir = work_root / "real"
     real_dir.mkdir()
     real_file = real_dir / "locked.txt"
     real_file.write_text("x", encoding="utf-8")
@@ -128,7 +154,7 @@ def test_is_frozen_canonicalizes_relative_paths_and_symlinks(hermetic, tmp_path)
     reg.freeze(str(real_dir), agent="engineer", reason="lock real dir", actor="reviewer")
 
     # Symlink inside an otherwise-unfrozen dir points INTO the frozen dir.
-    outside_dir = tmp_path / "outside"
+    outside_dir = work_root / "outside"
     outside_dir.mkdir()
     symlink = outside_dir / "link"
     symlink.symlink_to(real_file)
