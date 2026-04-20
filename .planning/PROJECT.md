@@ -24,6 +24,11 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 - ✓ Team templates (TOML): software-dev, hedge-fund, code-review, harness-default, research-paper, strategy-room — existing
 - ✓ File-locked atomic JSON/TOML persistence under `~/.clawteam/` (or `$CLAWTEAM_DATA_DIR`) — existing
 - ✓ Docker/nanobot runtime bundling; keepalive recovery; identity propagation with `CLAWTEAM_* / OH_* / CLAUDE_CODE_*` multi-generation envs — existing
+- ✓ `SprintConductor` + `clawteam sprint` CLI sub-app (start/status/show/list/pause/resume with `--json`); pause/resume survives process restart — Phase 2
+- ✓ `EvidenceGate` 4-check protocol + `EvidenceSchemaRegistry` (plugin-populated pydantic schemas dispatched by `artifact_type`) — Phase 2
+- ✓ `FreezeRegistry` + `/careful`, `/freeze`, `/guard`, `/unfreeze` safety-rail primitives wired via EventBus `BeforeToolCall` / `BeforeFileWrite` subscribers — Phase 2
+- ✓ Transport-level cycle detector + `TurnEnvelope` structured-response protocol + `forced_progress_gate` (theater/no-progress detector) + artifact size caps (50 KB/file, 500 KB/phase) — Phase 2
+- ✓ Phase 0 BC regression matrix (12/12 green) — Phase 2 primitives are opt-in; existing templates (software-dev, hedge-fund, code-review, harness-default, research-paper, strategy-room) unchanged
 
 ### Active
 
@@ -35,8 +40,11 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 - [ ] Team-shared `/learn` memory under `~/.clawteam/teams/<team>/memory/` accumulated across sprints
 
 **Sprint model:**
-- [ ] First-class 7-phase sprint state machine: Think → Plan → Build → Review → Test → Ship → Reflect
+- [ ] First-class 7-phase sprint state machine: Think → Plan → Build → Review → Test → Ship → Reflect *(engine + gate infrastructure shipped Phase 2; 7 gstack-specific phase instances ship Phase 3)*
 - [x] `PhaseRegistry` extension API — new phases registered as plugins, not hardcoded into core `PhaseState` enum (upstream-compatible) *(validated Phase 1)*
+- [x] `SprintConductor` — sprint-level loop owner composing router/eventbus/phase_registry/artifact_store + gates; pause/resume survives process restart *(validated Phase 2, CORE-05/CORE-07)*
+- [x] `EvidenceGate` 4-check protocol (presence → frontmatter+schema → stub detection → post-check cap); replaces `ArtifactRequiredGate` via subclass — opt-in per template *(validated Phase 2, SPRINT-01/SPRINT-02)*
+- [x] `EvidenceSchemaRegistry` — plugin-populated pydantic schema registry dispatched by `artifact_type` *(validated Phase 2, QUALITY-08)*
 - [ ] `GstackSprintPlugin` registers 7 phases + per-phase `ArtifactRequiredGate`s (design-doc, plan-doc, diff, review-report, test-report, ship-notes, retro)
 - [ ] Auto-advance between phases by default; toggleable via config to require human approval per transition
 - [ ] One team can run multiple sprints concurrently; team members juggle sprint assignments like a real team handles multiple PRs
@@ -48,7 +56,7 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 **Gstack skill port (full port, no runtime dependency on gstack installation):**
 - [ ] Methodology/rubrics baked into role prompts: /office-hours (pm), /plan-ceo-review (ceo), /plan-eng-review + /retro (eng-mgr), /plan-design-review + /design-review + /design-consultation (designer), /plan-devex-review + /devex-review (dx-lead), /review + /investigate (reviewer), /qa + /qa-only (qa), /cso (security)
 - [ ] Tool-heavy skills ported as ClawTeam skills owned by specific agents: /browse + /pair-agent + /open-gstack-browser + /setup-browser-cookies (engineer/qa/dx-lead), /design-shotgun + /design-html (designer), /codex (engineer/reviewer), /ship + /land-and-deploy + /document-release (shipper), /canary + /benchmark + /setup-deploy (sre), /learn (team-shared)
-- [ ] Team-level safety rails as harness primitives: /careful (destructive-command warnings), /freeze (edit-lock to a path), /guard (both), /unfreeze, /autoplan (= the sprint phase transitions themselves)
+- [x] Team-level safety rails as harness primitives: /careful (destructive-command warnings), /freeze (edit-lock to a path), /guard (both), /unfreeze *(validated Phase 2, SAFETY-01..04; /autoplan = sprint phase transitions shipped via `SprintConductor`)*
 
 **Human interaction:**
 - [x] `InteractionGate` — new `PhaseGate` subclass that blocks until a human answers questions written by phase agents *(validated Phase 1)*
@@ -57,8 +65,8 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 
 **Launch UX:**
 - [ ] `clawteam team spawn gstack --name <team-name>` — one-time hire
-- [ ] `clawteam sprint start --team <name> --goal "..."` — dispatch work
-- [ ] `clawteam sprint status / show / list` — per-team sprint visibility
+- [x] `clawteam sprint start --team <name> --goal "..."` — dispatch work *(validated Phase 2, UX-02)*
+- [x] `clawteam sprint status / show / list / pause / resume` — per-team sprint visibility, all with `--json` envelope *(validated Phase 2, UX-03/UX-04/UX-05/UX-09)*
 - [ ] `clawteam attend` — human attention loop (answer pending questions)
 - [ ] `clawteam team show <name>` — team dashboard (agents, active sprints, memory highlights)
 
@@ -118,6 +126,9 @@ gstack's author runs 10-15 parallel sprints (one Claude Code session each). Our 
 | Helper workspaces: per-helper sub-worktree merged back by engineer | Aligns with existing `WorkspaceManager` + `workspace.merge` patterns; clean isolation and conflict detection | — Pending |
 | Fork strategy: build upstream-compatible, land eventually | The swarm-harness is a reusable substrate; keeping it generic serves future templates, not just gstack | — Pending |
 | Human interaction via `InteractionGate` + cross-sprint `AttentionQueue` | Scales from 1 sprint (feels like pair-programming) to 10 parallel sprints (feels like triaging a ticket queue) with one mental model | — Pending |
+| `EvidenceGate` as subclass (not replacement) of `ArtifactRequiredGate` | Existing 6 templates keep their gate semantics unchanged; gstack opts into the 4-check protocol via plugin | ✓ Shipped Phase 2 |
+| `FreezeRegistry` mirrors `PhaseRegistry` shape (module-level singleton + append-only JSONL audit) | Consistency over abstraction; same reset/isolation pattern works for tests | ✓ Shipped Phase 2 |
+| `TurnEnvelope` as one pydantic model + two serialization surfaces (stdlib YAML frontmatter parser + JSON) | Integrity boundary at `Transport.deliver()`; `yaml.safe_load` only; `TeamMessage` envelope fields optional for BC with 15+ existing construction sites | ✓ Shipped Phase 2 |
 
 ## Evolution
 
@@ -137,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-04-17 after Phase 1 completion (PhaseRegistry + SprintState + InteractionGate + Q/A schema + orchestrator wiring)*
+*Last updated: 2026-04-20 after Phase 2 completion (SprintConductor + EvidenceGate + FreezeRegistry + safety-rail CLI + TurnEnvelope + cycle detector + forced_progress_gate + artifact caps + `clawteam sprint` sub-app; 21 REQ-IDs validated; Phase 0 BC matrix 12/12 green; 813/813 tests pass)*
