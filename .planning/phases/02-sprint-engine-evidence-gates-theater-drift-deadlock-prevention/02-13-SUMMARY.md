@@ -1,7 +1,7 @@
 ---
 phase: 02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention
 plan: 13
-status: partial
+status: passed
 subsystem: testing
 tags: [phase-2-regression, phase-0-bc-gate, end-to-end, integration, sc-10, ship-gate, human-verify]
 
@@ -15,7 +15,7 @@ provides:
   - Phase 0 regression-matrix 12/12 green assertion (gate only — no edits)
   - 21/21 Phase 2 REQ-ID traceability audit (zero orphans)
   - Full pytest suite 813/813 green (Phase 0 + Phase 1 + Phase 2)
-  - Human-verify ship checkpoint (AWAITING USER APPROVAL — plan status=partial)
+  - Human-verify ship checkpoint APPROVED by user 2026-04-20 — SC#1-6, 8-10 verified by tests; SC#7 accepted as partial (metrics primitives ship; dashboard surfacing deferred to Phase 7 per plan)
 affects: [phase-03-gstack-team-template-methodology-port, upstream-rfc-bundle]
 
 tech-stack:
@@ -38,15 +38,15 @@ key-decisions:
 patterns-established:
   - "Phase 2 integration-suite shape: one happy-path lifecycle test + N primitive-isolation tests (freeze, gate chain, prefix resolution) keeps the file under 300 LOC and debuggable."
 
-requirements-completed: []  # FINAL completion deferred to checkpoint approval; the 21 REQs are end-to-end exercised but marked complete only after user confirms ROADMAP §Phase 2 Success Criteria 1-10.
+requirements-completed: [CORE-05, CORE-07, INT-06, SPRINT-01, SPRINT-02, SKILL-09, SAFETY-01, SAFETY-02, SAFETY-03, SAFETY-04, QUALITY-01, QUALITY-02, QUALITY-03, QUALITY-06, QUALITY-08, QUALITY-11, UX-02, UX-03, UX-04, UX-05, UX-09]
 
 duration: 4m
 completed: 2026-04-20
 ---
 
-# Phase 2 Plan 13: Phase 2 Ship-Gate Summary (PARTIAL — awaiting user verification)
+# Phase 2 Plan 13: Phase 2 Ship-Gate Summary (APPROVED)
 
-**Three gates (Phase 0 regression 12/12 green, Phase 2 end-to-end 4/4 green, full suite 813/813 green) + 21/21 REQ-ID traceability pass — ship decision pending user confirmation of ROADMAP §Phase 2 Success Criteria 1-10.**
+**Three gates (Phase 0 regression 12/12 green, Phase 2 end-to-end 4/4 green, full suite 813/813 green) + 21/21 REQ-ID traceability pass. User approved ship on 2026-04-20; SC#7 accepted as partial (metrics primitives shipped; dashboard surfacing deferred to Phase 7 per plan).**
 
 ## Status
 
