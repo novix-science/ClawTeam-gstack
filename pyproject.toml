@@ -31,6 +31,15 @@ dependencies = [
 dev = [
     "pytest>=9.0.0,<10.0.0",
     "ruff>=0.1.0",
+    # PyYAML is consumed ONLY by clawteam.team.envelope.parse_frontmatter which is
+    # scoped to sprint-scope envelope validation (Plan 02-02 / Plan 02-07 /
+    # Plan 02-08). Kept in dev deps so Phase 2 holds the PROJECT.md constraint
+    # "no new required runtime deps for core harness extensions": production
+    # deployments that do not exercise gstack-sprint envelope validation do not
+    # need PyYAML at import time (the envelope module itself imports yaml at
+    # top level, so any callsite of parse_frontmatter/validate_envelope must
+    # have dev deps installed; non-sprint-scope code never imports envelope).
+    "pyyaml>=6.0,<7.0",
 ]
 p2p = [
     "pyzmq>=25.0.0,<27.0.0",
