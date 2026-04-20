@@ -57,6 +57,45 @@ class WorkspaceManager:
         cwd = repo_path or Path.cwd()
         self.repo_root = git.repo_root(cwd)
         self.base_branch = git.current_branch(self.repo_root)
+        self._team_name: str = ""  # populated by each write-path method before emit
+
+    # ------------------------------------------------------------------
+    # Safety-rail pre-write hook (Plan 02-10, D-10)
+    # ------------------------------------------------------------------
+
+    def _emit_before_file_write(
+        self,
+        agent_name: str,
+        target_path: Path,
+        size_bytes: int = 0,
+    ) -> None:
+        """Emit BeforeFileWrite before any git-path mutation.
+
+        Consulted by the /freeze subscriber (Plan 02-10 Task 1) which sets
+        ``event.veto = True`` when the path is frozen. On veto we raise
+        ``FrozenPathError`` — the caller's write operation must not run.
+
+        Under Phase 0 templates (which never instantiate SprintConductor and
+        therefore never call ``register_safety_subscribers(bus)``), this emit
+        reaches zero handlers and returns instantly (Pitfall #8 BC hinge).
+        """
+        from clawteam.events.global_bus import get_event_bus
+        from clawteam.events.types import BeforeFileWrite
+
+        event = BeforeFileWrite(
+            team_name=self._team_name,
+            agent_name=agent_name,
+            path=str(target_path),
+            size_bytes=size_bytes,
+        )
+        get_event_bus().emit(event)
+        if event.veto:
+            # Late import keeps freeze_registry off the cold-start path.
+            from clawteam.harness.freeze_registry import FrozenPathError
+
+            raise FrozenPathError(
+                event.veto_reason or f"{target_path} is /freeze-locked"
+            )
 
     # ------------------------------------------------------------------
     # Create
@@ -72,6 +111,10 @@ class WorkspaceManager:
         validate_identifier(agent_name, "agent name")
         branch = f"clawteam/{team_name}/{agent_name}"
         wt_path = ensure_within_root(_workspaces_root(), team_name, agent_name)
+
+        # D-10: emit BeforeFileWrite before any filesystem / git mutation.
+        self._team_name = team_name
+        self._emit_before_file_write(agent_name, wt_path)
 
         # Crash recovery: stale branch metadata can survive after the physical
         # worktree directory is deleted, so clear both path and branch state.
@@ -188,6 +231,9 @@ class WorkspaceManager:
         info = self._find(team_name, agent_name)
         if info is None:
             return False
+        # D-10: emit BeforeFileWrite before committing to the worktree.
+        self._team_name = team_name
+        self._emit_before_file_write(agent_name, Path(info.worktree_path))
         ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         msg = message or f"[clawteam] checkpoint: {agent_name} @ {ts}"
         return git.commit_all(Path(info.worktree_path), msg)
@@ -205,6 +251,11 @@ class WorkspaceManager:
         info = self._find(team_name, agent_name)
         if info is None:
             return False
+
+        # D-10: emit BeforeFileWrite before removing the worktree (destructive
+        # write). The auto-checkpoint below emits again from checkpoint().
+        self._team_name = team_name
+        self._emit_before_file_write(agent_name, Path(info.worktree_path))
 
         if auto_checkpoint:
             try:
@@ -259,6 +310,12 @@ class WorkspaceManager:
         info = self._find(team_name, agent_name)
         if info is None:
             return False, f"No workspace found for {agent_name}"
+
+        # D-10: emit BeforeFileWrite before the merge (write to base branch).
+        # This is the sync safety-rail check; BeforeWorkspaceMerge below is
+        # the async lifecycle notification (unchanged, separate concern).
+        self._team_name = team_name
+        self._emit_before_file_write(agent_name, Path(info.worktree_path))
 
         try:
             from clawteam.events.global_bus import get_event_bus
