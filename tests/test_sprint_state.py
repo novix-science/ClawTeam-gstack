@@ -324,3 +324,121 @@ def test_sprint_state_load_of_legacy_phase1_file_rehydrates_defaults(monkeypatch
     assert loaded.phase_artifact_cap_bytes == 500 * 1024
     assert loaded.status == "running"
     assert loaded.suppressed_topics == {}
+
+
+# ── Plan 02-11 Task 1: careful_enabled + load/save module helpers ────────────
+
+
+def test_careful_enabled_default_false(monkeypatch, tmp_path):
+    """careful_enabled defaults to False (Plan 02-11 D-22 — restored on resume)."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    state = SprintState(
+        goal="g",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    assert state.careful_enabled is False
+
+
+def test_save_load_round_trip_with_careful_enabled_true(monkeypatch, tmp_path):
+    """Module-level save_sprint_state / load_sprint_state preserve careful_enabled=True."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.state import load_sprint_state, save_sprint_state
+
+    state = SprintState(
+        sprint_id="abc12345",
+        goal="g",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+        careful_enabled=True,
+    )
+    path = save_sprint_state(state)
+    assert path.exists()
+    assert path.name == "state.json"
+    loaded = load_sprint_state("t", "abc12345")
+    assert loaded.careful_enabled is True
+    assert loaded.sprint_id == "abc12345"
+
+
+def test_load_missing_sprint_raises_file_not_found(monkeypatch, tmp_path):
+    """load_sprint_state raises FileNotFoundError when path missing."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.state import load_sprint_state
+
+    with pytest.raises(FileNotFoundError):
+        load_sprint_state("t", "nosuch12")
+
+
+def test_phase1_state_json_rehydrates_without_careful_enabled(monkeypatch, tmp_path):
+    """Legacy Phase 1 state.json (no careful_enabled key) → loads with careful_enabled=False."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    sprint_dir = tmp_path / "teams" / "t" / "sprints" / "abc12345"
+    sprint_dir.mkdir(parents=True)
+    (sprint_dir / "state.json").write_text(
+        json.dumps(
+            {
+                "sprint_id": "abc12345",
+                "team": "t",
+                "goal": "g",
+                "current_phase": "think",
+                "workspace_branch": "main",
+                "auto_advance": True,
+                "phase_history": [],
+                "artifacts": {},
+                "participants": [],
+                "pending_question_ids": [],
+                "created_at": "2026-04-17T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    from clawteam.sprint.state import load_sprint_state
+
+    loaded = load_sprint_state("t", "abc12345")
+    assert loaded.careful_enabled is False
+    # Phase 1 fields still round-trip.
+    assert loaded.team == "t"
+    assert loaded.sprint_id == "abc12345"
+
+
+def test_save_sprint_state_uses_file_locked(monkeypatch, tmp_path):
+    """Two concurrent save_sprint_state calls on same state serialize via file_locked.
+
+    Proves the module helper wraps the write in the same lock primitive as .save().
+    """
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.state import load_sprint_state, save_sprint_state
+
+    base = SprintState(
+        sprint_id="abcdef12",
+        goal="g",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    save_sprint_state(base)
+
+    errors: list[BaseException] = []
+
+    def writer(marker: str):
+        try:
+            s = load_sprint_state("t", "abcdef12")
+            s.goal = marker
+            save_sprint_state(s)
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer, args=(f"m{i}",)) for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"module-helper concurrent writers raised: {errors}"
+    final = load_sprint_state("t", "abcdef12")
+    assert final.goal.startswith("m")
+    sprint_dir = tmp_path / "teams" / "t" / "sprints" / "abcdef12"
+    stray = list(sprint_dir.glob("*.tmp"))
+    assert not stray, f"stray tempfiles: {stray}"
