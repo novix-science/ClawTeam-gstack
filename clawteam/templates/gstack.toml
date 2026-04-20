@@ -1,0 +1,114 @@
+# clawteam/templates/gstack.toml
+# Phase 3 Plan 03-02 - 11-specialist persistent engineering team running
+# 7-phase sprints (Think/Plan/Build/Review/Test/Ship/Reflect).
+#
+# D-04: pure roster declaration. No [[template.tasks]] rows - the team waits
+# for `clawteam sprint start` to dispatch work dynamically via SprintConductor.
+# D-05: per-role memory layout. TeamManager.create_team pre-creates
+# `memory/<role>/` subdirs at spawn time for race-free Phase 6 /learn writes.
+# Pattern 4: leader_role = "ceo" - only ceo can call advance_phase.
+# Pitfall 12 prevention: model_profile.default = "balanced" (never "quality").
+
+[template]
+name = "gstack"
+description = "11-specialist persistent engineering team running 7-phase sprints (Think/Plan/Build/Review/Test/Ship/Reflect)"
+command = ["claude"]
+backend = "tmux"
+leader_role = "ceo"
+phases = ["think", "plan", "build", "review", "test", "ship", "reflect"]
+
+[template.model_profile]
+# TEAM-05: balanced default; user overrides via
+#   clawteam team spawn gstack --model-profile quality|budget
+default = "balanced"
+# Per-role assignments under balanced mode. Hyphenated role names must be
+# quoted per TOML spec (bare keys reject `-`).
+pm = "opus"
+ceo = "opus"
+"eng-mgr" = "sonnet"
+designer = "sonnet"
+"dx-lead" = "sonnet"
+engineer = "sonnet"
+reviewer = "sonnet"
+qa = "sonnet"
+security = "sonnet"
+shipper = "haiku"
+sre = "haiku"
+
+[template.memory]
+# D-05: per-role memory dir layout. TeamManager.create_team pre-creates
+# `~/.clawteam/teams/<team>/memory/<role>/` for each role at spawn time.
+# Phase 6 fills these dirs with /learn entries; this plan only creates the dirs.
+root = "{data_dir}/teams/{team_name}/memory"
+per_role = true
+
+[template.leader]
+name = "ceo"
+type = "strategic-leader"
+role = "ceo"
+prompt_file = "gstack/prompts/ceo.md"
+
+[[template.agents]]
+name = "pm"
+type = "yc-advisor"
+role = "pm"
+prompt_file = "gstack/prompts/pm.md"
+
+[[template.agents]]
+name = "eng-mgr"
+type = "engineering-manager"
+role = "eng-mgr"
+prompt_file = "gstack/prompts/eng-mgr.md"
+
+[[template.agents]]
+name = "designer"
+type = "designer"
+role = "designer"
+prompt_file = "gstack/prompts/designer.md"
+
+[[template.agents]]
+name = "dx-lead"
+type = "developer-experience-lead"
+role = "dx-lead"
+prompt_file = "gstack/prompts/dx-lead.md"
+
+[[template.agents]]
+name = "engineer"
+type = "engineer"
+role = "engineer"
+prompt_file = "gstack/prompts/engineer.md"
+
+[[template.agents]]
+name = "reviewer"
+type = "staff-engineer-reviewer"
+role = "reviewer"
+prompt_file = "gstack/prompts/reviewer.md"
+
+[[template.agents]]
+name = "qa"
+type = "qa"
+role = "qa"
+prompt_file = "gstack/prompts/qa.md"
+
+[[template.agents]]
+name = "security"
+type = "security-officer"
+role = "security"
+prompt_file = "gstack/prompts/security.md"
+
+[[template.agents]]
+name = "shipper"
+type = "shipper"
+role = "shipper"
+prompt_file = "gstack/prompts/shipper.md"
+
+[[template.agents]]
+name = "sre"
+type = "site-reliability-engineer"
+role = "sre"
+prompt_file = "gstack/prompts/sre.md"
+
+# NOTE: no [[template.tasks]] rows. Per D-04 the team waits for
+# `clawteam sprint start` to dispatch work via SprintConductor. Starter
+# tasks would break the product narrative ("team is dormant until you
+# give it work").
