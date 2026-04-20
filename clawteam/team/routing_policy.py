@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -15,6 +16,8 @@ from clawteam.team.models import get_data_dir
 
 _RECENT_EVENT_LIMIT = 50
 _PENDING_SUMMARY_LIMIT = 5
+_CYCLE_WINDOW = 20  # D-20: last 20 recentEvents form the cycle-detection window
+_CYCLE_THRESHOLD = 3  # D-20: >=3 A->B AND >=3 B->A with matching topic hash
 _PRIORITY_ORDER = {"low": 0, "medium": 1, "high": 2, "urgent": 3}
 
 
@@ -101,6 +104,87 @@ class DefaultRoutingPolicy(RoutingPolicy):
         now_dt = _ensure_datetime(now)
         state = self.read_state()
         route_key = self._route_key(envelope.source, envelope.target)
+
+        # ── Phase 2: cycle detection BEFORE existing throttle (§02-CONTEXT D-18) ──
+        # Reuses the existing `recentEvents` 50-entry bounded window (specifics lesson #1).
+        topic_hash = self._topic_hash(envelope)
+
+        # Honor existing suppression first — if this topic is already suppressed on this
+        # route, short-circuit WITHOUT re-emitting CycleDetected (dedupe: D-21).
+        existing_route = state["routes"].get(route_key) or {}
+        suppressed_existing = set(existing_route.get("suppressedTopics", []))
+        if topic_hash in suppressed_existing:
+            # Write a recentEvents entry tagged with topicHash so downstream
+            # observers can see the suppression was honored.
+            route = state["routes"].setdefault(route_key, self._empty_route(envelope))
+            self._refresh_route(route, envelope)
+            route["lastDispatchStatus"] = "suppressed"
+            route["lastDispatchAt"] = now_dt.isoformat()
+            route["lastDecisionReason"] = "cycle_suppressed_existing"
+            self._append_event(
+                state,
+                route_key,
+                route,
+                action="cycle_suppressed",
+                reason="cycle_suppressed_existing",
+                summary=envelope.summary,
+                timestamp=now_dt,
+                topic_hash=topic_hash,
+            )
+            self._save_state(state)
+            return RouteDecision(
+                action="suppress",
+                reason="cycle_suppressed_existing",
+                envelope=envelope,
+                route_key=route_key,
+            )
+
+        cycle_hit = self._detect_cycle(state, envelope, topic_hash)
+        if cycle_hit is not None:
+            route = state["routes"].setdefault(route_key, self._empty_route(envelope))
+            self._refresh_route(route, envelope)
+            suppressed_list = route.setdefault("suppressedTopics", [])
+            if topic_hash not in suppressed_list:
+                suppressed_list.append(topic_hash)
+            route["lastDispatchStatus"] = "suppressed"
+            route["lastDispatchAt"] = now_dt.isoformat()
+            route["lastDecisionReason"] = "cycle_detected"
+            self._append_event(
+                state,
+                route_key,
+                route,
+                action="cycle_suppressed",
+                reason="cycle_detected",
+                summary=envelope.summary,
+                timestamp=now_dt,
+                topic_hash=topic_hash,
+            )
+            # Persist state BEFORE emitting so handlers observe the on-disk suppression
+            # (Pitfall #7 — sync emit after state save).
+            self._save_state(state)
+            try:
+                from clawteam.events.global_bus import get_event_bus
+                from clawteam.events.types import CycleDetected
+
+                get_event_bus().emit(
+                    CycleDetected(
+                        team_name=self.team_name,
+                        pair=(envelope.source, envelope.target),
+                        topic_hash=topic_hash,
+                        route_keys=cycle_hit["route_keys"],
+                        window_size=_CYCLE_WINDOW,
+                    )
+                )
+            except Exception:
+                pass
+            return RouteDecision(
+                action="suppress",
+                reason="cycle_detected",
+                envelope=envelope,
+                route_key=route_key,
+            )
+
+        # ── Existing throttle / inject flow (unchanged below this point) ──
         route = state["routes"].setdefault(route_key, self._empty_route(envelope))
         self._refresh_route(route, envelope)
 
@@ -123,6 +207,7 @@ class DefaultRoutingPolicy(RoutingPolicy):
                 reason="throttled",
                 summary=envelope.summary,
                 timestamp=now_dt,
+                topic_hash=topic_hash,
             )
             self._save_state(state)
             return RouteDecision(
@@ -146,6 +231,7 @@ class DefaultRoutingPolicy(RoutingPolicy):
             reason="inject_now",
             summary=envelope.summary,
             timestamp=now_dt,
+            topic_hash=topic_hash,
         )
         self._save_state(state)
         return RouteDecision(
@@ -392,6 +478,7 @@ class DefaultRoutingPolicy(RoutingPolicy):
         summary: str,
         timestamp: datetime,
         error: str = "",
+        topic_hash: str = "",
     ) -> None:
         event = {
             "timestamp": timestamp.isoformat(),
@@ -405,7 +492,80 @@ class DefaultRoutingPolicy(RoutingPolicy):
         }
         if error:
             event["error"] = error
+        # D-19/D-20: topicHash lets _detect_cycle match round-trips in the tail-20 window.
+        # Always written (empty string allowed) so downstream consumers can rely on the key.
+        event["topicHash"] = topic_hash
+        # Plan 02-09 theater-detector populates `progressSignal` on entries where the
+        # agent shipped artifact bytes; cycle detector reads this flag to avoid false
+        # positives on legitimate iteration (Pitfall #3). Not written here — Plan 02-09
+        # extends this helper or mutates the entry post-write. Documented so readers
+        # of `recentEvents` know the field is part of the contract.
         state["recentEvents"] = (state.get("recentEvents", []) + [event])[-_RECENT_EVENT_LIMIT:]
+
+    # ── Phase 2: cycle detector helpers (§02-CONTEXT D-18..D-21) ─────────────────
+
+    def _topic_hash(self, envelope: RuntimeEnvelope) -> str:
+        """Priority chain for the cycle-detection topic hash (D-19).
+
+        1. envelope.dedupe_key (strongest signal — deliberately set by router)
+        2. envelope.payload['request_id'] or 'requestId' (TeamMessage round-trip)
+        3. sha1(content[:128])[:16] (content-similarity fallback)
+        """
+        if envelope.dedupe_key:
+            return envelope.dedupe_key
+        payload = getattr(envelope, "payload", None) or {}
+        req_id: Any = None
+        if isinstance(payload, dict):
+            req_id = payload.get("request_id") or payload.get("requestId")
+        if req_id:
+            return str(req_id)
+        content = ""
+        if isinstance(payload, dict):
+            content = payload.get("content") or ""
+        content = content or (envelope.summary or "")
+        return hashlib.sha1(content[:128].encode("utf-8")).hexdigest()[:16]
+
+    def _detect_cycle(
+        self,
+        state: dict[str, Any],
+        envelope: RuntimeEnvelope,
+        topic_hash: str,
+    ) -> dict[str, Any] | None:
+        """Return cycle-hit dict when >=3 round-trips share topic_hash in the last-20 window.
+
+        Pitfall #3 mitigation: if any entry in the window carries
+        ``progressSignal: True`` (populated by Plan 02-09 theater detector on
+        TaskCompleted), the streak is broken and we return None so legitimate
+        iteration does not false-positive.
+        """
+        window = state.get("recentEvents", [])[-_CYCLE_WINDOW:]
+        route_a_b = self._route_key(envelope.source, envelope.target)
+        route_b_a = self._route_key(envelope.target, envelope.source)
+        count_ab = 0
+        count_ba = 0
+        progress_signal = False
+        for entry in window:
+            entry_topic = entry.get("topicHash", "")
+            if entry_topic != topic_hash:
+                continue
+            if entry.get("progressSignal"):
+                progress_signal = True
+            if entry.get("routeKey") == route_a_b:
+                count_ab += 1
+            elif entry.get("routeKey") == route_b_a:
+                count_ba += 1
+        if progress_signal:
+            return None  # Pitfall #3: legitimate iteration — skip cycle trip.
+        if count_ab >= _CYCLE_THRESHOLD and count_ba >= _CYCLE_THRESHOLD:
+            return {
+                "topic_hash": topic_hash,
+                "route_keys": [route_a_b, route_b_a],
+                "reason": (
+                    f"{_CYCLE_THRESHOLD}+ round-trips in {_CYCLE_WINDOW}-msg window "
+                    f"(A->B={count_ab}, B->A={count_ba})"
+                ),
+            }
+        return None
 
     @staticmethod
     def _max_priority(left: str, right: str) -> str:

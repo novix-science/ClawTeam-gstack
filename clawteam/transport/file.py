@@ -16,8 +16,9 @@ else:
     LOCK_NB = fcntl.LOCK_NB
 
 from clawteam.paths import ensure_within_root, validate_identifier
+from clawteam.team.envelope import MalformedEnvelopeError
 from clawteam.team.models import get_data_dir
-from clawteam.transport.base import Transport
+from clawteam.transport.base import Transport, _pre_deliver_hooks
 from clawteam.transport.claimed import ClaimedMessage
 
 
@@ -136,6 +137,15 @@ class FileTransport(Transport):
         return ClaimedMessage(data=data, ack=_ack, quarantine=_quarantine)
 
     def deliver(self, recipient: str, data: bytes) -> None:
+        # Phase 2 (Plan 02-08): envelope validation + per-agent drift accounting.
+        # Pitfall #8 BC invariant — messages without any envelope fields pass
+        # through unchanged. MalformedEnvelopeError bubbles to the caller so
+        # MailboxManager can route to dead-letter or surface to the agent.
+        try:
+            _pre_deliver_hooks(data)
+        except MalformedEnvelopeError:
+            raise
+
         inbox = _inbox_dir(self.team_name, recipient)
         ts = int(time.time() * 1000)
         uid = uuid.uuid4().hex[:8]
