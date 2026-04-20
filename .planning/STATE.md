@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 3 context gathered (Phase 2 execution still in flight)
-last_updated: "2026-04-20T14:48:44.222Z"
-last_activity: 2026-04-20 -- Phase 03 execution started
+status: Ready to execute
+stopped_at: Completed 03-01-wave0-substrate-prep-PLAN.md
+last_updated: "2026-04-20T17:52:36.944Z"
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 25
-  percent: 74
+  completed_plans: 26
 ---
 
 # Project State
@@ -26,11 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 03 (gstack-team-template-methodology-port) — EXECUTING
-Plan: 1 of 9
-Status: Executing Phase 03
-Last activity: 2026-04-20 -- Phase 03 execution started
-
-Progress: [░░░░░░░░░░] 0%
+Plan: 2 of 9
 
 ## Performance Metrics
 
@@ -62,6 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: N/A (first session)
 
 *Updated after each plan completion*
+| Phase 03 P01 | 12min | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -73,6 +68,9 @@ Recent decisions affecting current work:
 - Roadmap split Phase 3 (research-flagged) into three distinct phases (3: plugin + rubric prompts; 4: interactive state machines + routing + verification; 5: tool-heavy skills) to isolate the HIGH-research-flag work from pure porting work and keep plans tractable.
 - Phase 6 bundles browser + design + memory because `/design-shotgun` writes to designer's per-agent memory, which couples the pipeline naturally.
 - Phase 7 defers helper-spawning (v1.x per research/FEATURES.md P2) — solo Build phase ships in Phase 2/5 without parallel sub-workers.
+- [Phase 03]: Wave 0 substrate: CONTENT-DRIFT-NOTE convention adopted for upstream-evolved fixtures (actual counts 6/7/22 vs D-13 expected 6/10/17)
+- [Phase 03]: TeamConfig.leader_role + TeamConfig.template co-landed in single atomic commit as sister fields (both flow from TemplateDef at create_team time)
+- [Phase 03]: SprintConductor.advance_phase leader-role check uses lazy TeamManager import (Pattern F) to avoid module-load cycle
 
 ### Pending Todos
 
@@ -104,8 +102,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-20T19:30:00.000Z
-Stopped at: Phase 3 context gathered (Phase 2 execution still in flight)
+Last session: 2026-04-20T17:47:41.217Z
+Stopped at: Completed 03-01-wave0-substrate-prep-PLAN.md
 Resume files:
 
   - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md

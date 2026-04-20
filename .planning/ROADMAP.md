@@ -175,7 +175,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01: TBD (outlined during `/gsd-plan-phase 3`)
+- [x] 03-01: TBD (outlined during `/gsd-plan-phase 3`)
 
 ---
 

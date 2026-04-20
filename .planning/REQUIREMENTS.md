@@ -49,7 +49,7 @@ The 11-persona team that ships as `gstack.toml`.
 - [ ] **TEAM-01**: `clawteam/templates/gstack.toml` ships and loads through existing template machinery.
 - [ ] **TEAM-02**: Template defines 11 persistent agents with distinct role prompts: pm (YC Office Hours advisor), ceo (scope owner + team leader), eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre.
 - [ ] **TEAM-03**: Each agent is spawned with its own worktree ("desk") reused across sprints; per-role memory scope.
-- [ ] **TEAM-04**: ceo is the team leader responsible for: advancing sprint phases, routing sprint work, consulting human via `InteractionGate` on scope decisions.
+- [x] **TEAM-04**: ceo is the team leader responsible for: advancing sprint phases, routing sprint work, consulting human via `InteractionGate` on scope decisions.
 - [ ] **TEAM-05**: Template supports model_profile selection via `clawteam team spawn gstack --model-profile balanced|quality|budget`; default is `balanced` (Pitfall #12 cost-blowup prevention — never default to `quality`).
 - [ ] **TEAM-06**: Template is additive: existing templates unchanged; `gstack.toml` is an opt-in choice.
 
@@ -62,21 +62,21 @@ The `GstackSprintPlugin` registering the 7-phase sprint.
 - [ ] **SPRINT-03**: `SmartReviewRouter` selects Review-phase participants by diff content via rule config in `gstack.toml`: UI touched → designer; public API → dx-lead; crypto/auth → security; always → reviewer.
 - [ ] **SPRINT-04**: Review phase agents run in parallel; `reviewer` agent runs last, synthesizes parallel reports into a single `review-report.md` aggregation. Gate passes on aggregation, not individual reports.
 - [ ] **SPRINT-05**: Ship phase always requires human approval via `InteractionGate` (ignores `auto_advance: true`). Reason: production blast radius.
-- [ ] **SPRINT-06**: Reflect phase writes retro.md AND invokes `/learn` to capture sprint-level patterns to team-shared memory.
+- [x] **SPRINT-06**: Reflect phase writes retro.md AND invokes `/learn` to capture sprint-level patterns to team-shared memory.
 
 ### Gstack Skill Ports (SKILL)
 
 Methodology as role prompts (baked-in) + tool-heavy skills as invokable ClawTeam skills.
 
 **Baked into role prompts (14 skills):**
-- [ ] **SKILL-01**: pm role prompt implements /office-hours — 6 forcing questions with challenge-framing instruction.
-- [ ] **SKILL-02**: ceo role prompt implements /plan-ceo-review — 4 modes (Expansion, Selective, Hold, Reduction) with decision output schema.
-- [ ] **SKILL-03**: eng-mgr role prompt implements /plan-eng-review + /retro — architecture lock, data-flow diagrams, edge-case matrix, test plan; retro has per-person breakdowns.
-- [ ] **SKILL-04**: designer role prompt implements /plan-design-review + /design-review + /design-consultation — 0-10 rubric, AI-slop detection, interactive-per-dimension feedback, design-system research.
-- [ ] **SKILL-05**: dx-lead role prompt implements /plan-devex-review + /devex-review — persona exploration, TTHW benchmarking, friction tracing.
-- [ ] **SKILL-06**: reviewer role prompt implements /review + /investigate — production-bug detection + iron-law root-cause methodology (no fix without investigation; halt after 3 failed hypotheses).
-- [ ] **SKILL-07**: qa role prompt implements /qa + /qa-only — browser-backed testing, bug-fix + regression-test loop; `/qa-only` variant suppresses code changes.
-- [ ] **SKILL-08**: security role prompt implements /cso — OWASP Top 10 + STRIDE checklist, 17 false-positive exclusions, 8/10+ confidence gate.
+- [x] **SKILL-01**: pm role prompt implements /office-hours — 6 forcing questions with challenge-framing instruction.
+- [x] **SKILL-02**: ceo role prompt implements /plan-ceo-review — 4 modes (Expansion, Selective, Hold, Reduction) with decision output schema.
+- [x] **SKILL-03**: eng-mgr role prompt implements /plan-eng-review + /retro — architecture lock, data-flow diagrams, edge-case matrix, test plan; retro has per-person breakdowns.
+- [x] **SKILL-04**: designer role prompt implements /plan-design-review + /design-review + /design-consultation — 0-10 rubric, AI-slop detection, interactive-per-dimension feedback, design-system research.
+- [x] **SKILL-05**: dx-lead role prompt implements /plan-devex-review + /devex-review — persona exploration, TTHW benchmarking, friction tracing.
+- [x] **SKILL-06**: reviewer role prompt implements /review + /investigate — production-bug detection + iron-law root-cause methodology (no fix without investigation; halt after 3 failed hypotheses).
+- [x] **SKILL-07**: qa role prompt implements /qa + /qa-only — browser-backed testing, bug-fix + regression-test loop; `/qa-only` variant suppresses code changes.
+- [x] **SKILL-08**: security role prompt implements /cso — OWASP Top 10 + STRIDE checklist, 17 false-positive exclusions, 8/10+ confidence gate.
 - [ ] **SKILL-09**: All role prompts use a structured response envelope (per PITFALLS #1 persona-drift prevention): persona-identity header, step label, output schema, no-freelance rule.
 
 **Invokable ClawTeam skills (tool-heavy):**
@@ -218,7 +218,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | TEAM-01 | Phase 3 | Pending |
 | TEAM-02 | Phase 3 | Pending |
 | TEAM-03 | Phase 3 | Pending |
-| TEAM-04 | Phase 3 | Pending |
+| TEAM-04 | Phase 3 | Complete |
 | TEAM-05 | Phase 3 | Pending |
 | TEAM-06 | Phase 0 | Pending |
 | SPRINT-01 | Phase 2 | Pending |
@@ -226,15 +226,15 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SPRINT-03 | Phase 4 | Pending |
 | SPRINT-04 | Phase 4 | Pending |
 | SPRINT-05 | Phase 4 | Pending |
-| SPRINT-06 | Phase 3 | Pending |
-| SKILL-01 | Phase 3 | Pending |
-| SKILL-02 | Phase 3 | Pending |
-| SKILL-03 | Phase 3 | Pending |
-| SKILL-04 | Phase 3 | Pending |
-| SKILL-05 | Phase 3 | Pending |
-| SKILL-06 | Phase 3 | Pending |
-| SKILL-07 | Phase 3 | Pending |
-| SKILL-08 | Phase 3 | Pending |
+| SPRINT-06 | Phase 3 | Complete |
+| SKILL-01 | Phase 3 | Complete |
+| SKILL-02 | Phase 3 | Complete |
+| SKILL-03 | Phase 3 | Complete |
+| SKILL-04 | Phase 3 | Complete |
+| SKILL-05 | Phase 3 | Complete |
+| SKILL-06 | Phase 3 | Complete |
+| SKILL-07 | Phase 3 | Complete |
+| SKILL-08 | Phase 3 | Complete |
 | SKILL-09 | Phase 2 | Pending |
 | SKILL-10 | Phase 6 | Pending |
 | SKILL-11 | Phase 6 | Pending |
