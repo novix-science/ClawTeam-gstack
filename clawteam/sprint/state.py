@@ -95,6 +95,15 @@ class SprintState(BaseModel):
             "human answer via InteractionGate."
         ),
     )
+    careful_enabled: bool = Field(
+        default=False,
+        description=(
+            "Whether /careful veto-mode is enabled for this sprint (Plan 02-11 D-22). "
+            "SprintConductor.resume() calls set_careful_veto_mode(state.careful_enabled) "
+            "so the careful blacklist re-arms after a process restart. Default False "
+            "matches gstack-native /careful (warn-only) behavior."
+        ),
+    )
 
     # ── Persistence ─────────────────────────────────────────────────
 
@@ -138,3 +147,33 @@ class SprintState(BaseModel):
             raw = path.read_text(encoding="utf-8")
         data: Any = json.loads(raw)
         return cls.model_validate(data)
+
+
+# ── Module-level convenience helpers (Plan 02-11 D-22) ───────────────────────
+# Thin wrappers over SprintState.save / SprintState.load so SprintConductor and
+# the CLI can import function-shaped helpers without importing the class
+# directly. Both acquire the same file_locked lock the instance methods use, so
+# concurrent writers between the two surfaces serialize through one lock file.
+
+
+def save_sprint_state(state: SprintState) -> Path:
+    """Write ``state`` atomically to ``state._state_path(state.team, state.sprint_id)``.
+
+    Delegates to :meth:`SprintState.save` so the file_locked + atomic_write_text
+    persistence path stays single-sourced. Returns the written path.
+    """
+    return state.save(team=state.team)
+
+
+def load_sprint_state(team: str, sprint_id: str) -> SprintState:
+    """Load the SprintState at ``team/sprint_id``.
+
+    Raises :class:`FileNotFoundError` when the state.json does not exist (Plan
+    02-11 D-22 contract — conductor distinguishes missing-sprint from prefix-
+    ambiguous via the exception type). Delegates the happy-path read to
+    :meth:`SprintState.load` so the file_locked primitive is shared.
+    """
+    path = SprintState._state_path(team, sprint_id)
+    if not path.exists():
+        raise FileNotFoundError(f"Sprint state not found: {path}")
+    return SprintState.load(team=team, sprint_id=sprint_id)
