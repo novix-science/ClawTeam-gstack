@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 03-04-envelope-personas-PLAN.md
-last_updated: "2026-04-20T18:02:10.779Z"
+stopped_at: Completed 03-02-template-roster-memory-PLAN.md
+last_updated: "2026-04-20T18:06:42.990Z"
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 27
-  percent: 79
+  completed_plans: 28
+  percent: 82
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 03 (gstack-team-template-methodology-port) — EXECUTING
-Plan: 3 of 9
+Plan: 4 of 9
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Plan: 3 of 9
 *Updated after each plan completion*
 | Phase 03 P01 | 12min | 3 tasks | 19 files |
 | Phase 03 P04 | 6min | 2 tasks | 2 files |
+| Phase 03 P02 | 30min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - [Phase 03]: TeamConfig.leader_role + TeamConfig.template co-landed in single atomic commit as sister fields (both flow from TemplateDef at create_team time)
 - [Phase 03]: SprintConductor.advance_phase leader-role check uses lazy TeamManager import (Pattern F) to avoid module-load cycle
 - [Phase 03]: 03-04: Ship 11 per-persona TurnEnvelope subclasses with rubric-anchored Literal/int constraints + PERSONA_ENVELOPES dispatch dict at clawteam/templates/gstack/envelope_personas.py; envelope-layer TEAM-04 companion to 03-01 conductor-layer check; 12 skipped -> 43 passing tests
+- [Phase 03]: Pattern 1 strict-additive extension used for TemplateDef + AgentDef — all 7 new fields default to empty so 6 existing templates parse unchanged; regression matrix 12/12 green.
+- [Phase 03]: TeamManager.create_team gains roles/leader_role/template kwargs in one atomic commit — all three flow from TemplateDef into TeamConfig and downstream consumers (SprintConductor actor check + 03-07 Reflect handler) together.
+- [Phase 03]: New clawteam team spawn <template> --name <n> Typer subcommand ships UX-01 verbatim; thin wrapper over TeamManager.create_team + add_member — does NOT spawn agent processes (launch remains the spawn path).
 
 ### Pending Todos
 
@@ -105,8 +109,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-20T18:02:10.774Z
-Stopped at: Completed 03-04-envelope-personas-PLAN.md
+Last session: 2026-04-20T18:06:42.985Z
+Stopped at: Completed 03-02-template-roster-memory-PLAN.md
 Resume files:
 
   - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md

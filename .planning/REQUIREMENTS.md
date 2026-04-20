@@ -46,11 +46,11 @@ Team-scoped, layered, grep-first; provenance + decay to prevent memory poisoning
 
 The 11-persona team that ships as `gstack.toml`.
 
-- [ ] **TEAM-01**: `clawteam/templates/gstack.toml` ships and loads through existing template machinery.
-- [ ] **TEAM-02**: Template defines 11 persistent agents with distinct role prompts: pm (YC Office Hours advisor), ceo (scope owner + team leader), eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre.
-- [ ] **TEAM-03**: Each agent is spawned with its own worktree ("desk") reused across sprints; per-role memory scope.
+- [x] **TEAM-01**: `clawteam/templates/gstack.toml` ships and loads through existing template machinery.
+- [x] **TEAM-02**: Template defines 11 persistent agents with distinct role prompts: pm (YC Office Hours advisor), ceo (scope owner + team leader), eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre.
+- [x] **TEAM-03**: Each agent is spawned with its own worktree ("desk") reused across sprints; per-role memory scope.
 - [x] **TEAM-04**: ceo is the team leader responsible for: advancing sprint phases, routing sprint work, consulting human via `InteractionGate` on scope decisions.
-- [ ] **TEAM-05**: Template supports model_profile selection via `clawteam team spawn gstack --model-profile balanced|quality|budget`; default is `balanced` (Pitfall #12 cost-blowup prevention — never default to `quality`).
+- [x] **TEAM-05**: Template supports model_profile selection via `clawteam team spawn gstack --model-profile balanced|quality|budget`; default is `balanced` (Pitfall #12 cost-blowup prevention — never default to `quality`).
 - [ ] **TEAM-06**: Template is additive: existing templates unchanged; `gstack.toml` is an opt-in choice.
 
 ### Sprint Plugin (SPRINT)
@@ -215,11 +215,11 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | MEM-05 | Phase 6 | Pending |
 | MEM-06 | Phase 6 | Pending |
 | MEM-07 | Phase 6 | Pending |
-| TEAM-01 | Phase 3 | Pending |
-| TEAM-02 | Phase 3 | Pending |
-| TEAM-03 | Phase 3 | Pending |
+| TEAM-01 | Phase 3 | Complete |
+| TEAM-02 | Phase 3 | Complete |
+| TEAM-03 | Phase 3 | Complete |
 | TEAM-04 | Phase 3 | Complete |
-| TEAM-05 | Phase 3 | Pending |
+| TEAM-05 | Phase 3 | Complete |
 | TEAM-06 | Phase 0 | Pending |
 | SPRINT-01 | Phase 2 | Pending |
 | SPRINT-02 | Phase 2 | Pending |
