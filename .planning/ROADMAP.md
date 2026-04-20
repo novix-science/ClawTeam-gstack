@@ -140,7 +140,7 @@ Plans:
 - [x] 02-09-PLAN.md — forced_progress_gate + turn_counter dedupe wiring + progressSignal field (QUALITY-11, QUALITY-02)
 - [x] 02-10-PLAN.md — Safety-rail EventBus subscribers + MCP _tool BeforeToolCall + WorkspaceManager BeforeFileWrite + clawteam guard CLI sub-app (SAFETY-01..04)
 - [x] 02-11-PLAN.md — SprintConductor: start/advance/pause/resume/list/resolve + three-layer cap override (CORE-05, CORE-07, INT-06)
-- [ ] 02-12-PLAN.md — clawteam sprint CLI sub-app: start/status/show/list/pause/resume with uniform --json envelope (UX-02, UX-03, UX-04, UX-05, UX-09)
+- [x] 02-12-PLAN.md — clawteam sprint CLI sub-app: start/status/show/list/pause/resume with uniform --json envelope (UX-02, UX-03, UX-04, UX-05, UX-09)
 - [ ] 02-13-PLAN.md — Phase 0 regression matrix hard-green gate + Phase 2 end-to-end integration + REQ-ID traceability audit + human-verify ship checkpoint (all 21 REQs)
 
 ---
