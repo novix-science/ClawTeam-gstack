@@ -3,14 +3,24 @@
 Registered into Phase 2's EvidenceSchemaRegistry by GstackSprintPlugin.contribute_evidence_schemas
 (03-07-PLAN). Each schema's ``artifact_type: Literal[...]`` becomes the discriminator key.
 
-Task-1 ships DesignDoc + PlanDoc; Tasks 2-3 extend the barrel with TestReport, ReviewReport,
-ShipNotes, Retro. The barrel is authored incrementally so each task's commit is self-consistent
-and the pytest collection phase does not fail on un-created modules.
+One-statement import contract (for 03-07 plugin wiring):
+    from clawteam.templates.gstack.schemas import (
+        DesignDoc, PlanDoc, TestReport, ReviewReport, ShipNotes, Retro,
+    )
 """
 
 from clawteam.templates.gstack.schemas.design_doc import DesignDoc
 from clawteam.templates.gstack.schemas.plan_doc import PlanDoc
+from clawteam.templates.gstack.schemas.retro import Retro
 from clawteam.templates.gstack.schemas.review_report import ReviewReport
+from clawteam.templates.gstack.schemas.ship_notes import ShipNotes
 from clawteam.templates.gstack.schemas.test_report import TestReport
 
-__all__ = ["DesignDoc", "PlanDoc", "TestReport", "ReviewReport"]
+__all__ = [
+    "DesignDoc",
+    "PlanDoc",
+    "TestReport",
+    "ReviewReport",
+    "ShipNotes",
+    "Retro",
+]

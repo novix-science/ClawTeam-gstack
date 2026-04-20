@@ -375,3 +375,155 @@ class TestGstackBarrelExportsTask2:
 
         assert BarrelReviewReport is ModuleReviewReport
 
+
+# ---------------------------------------------------------------------------
+# Phase 3 Plan 03-03 Task 3 — ShipNotes + Retro schemas + barrel completion
+# ---------------------------------------------------------------------------
+
+
+class TestShipNotesSchema:
+    def test_valid_fixture_round_trips(self) -> None:
+        from clawteam.templates.gstack.schemas import ShipNotes
+
+        doc = ShipNotes(**_load_fixture_meta("ship-notes-valid.md"))
+        assert doc.artifact_type == "ship-notes"
+        assert doc.ship_step == "deploy"
+        assert doc.deploy_url.startswith("https://")
+
+    def test_stub_fixture_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ShipNotes
+
+        with pytest.raises(ValidationError):
+            ShipNotes(**_load_fixture_meta("ship-notes-stub-tbd.md"))
+
+    def test_pending_deploy_url_accepted(self) -> None:
+        """D-02: Phase 3 shipper may emit literal '<pending>' per tool-availability stub."""
+        from clawteam.templates.gstack.schemas import ShipNotes
+
+        meta = _load_fixture_meta("ship-notes-valid.md")
+        meta["deploy_url"] = "<pending>"
+        doc = ShipNotes(**meta)
+        assert doc.deploy_url == "<pending>"
+
+    def test_empty_deploy_url_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ShipNotes
+
+        meta = _load_fixture_meta("ship-notes-valid.md")
+        meta["deploy_url"] = ""
+        with pytest.raises(ValidationError):
+            ShipNotes(**meta)
+
+    def test_invalid_ship_step_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ShipNotes
+
+        meta = _load_fixture_meta("ship-notes-valid.md")
+        meta["ship_step"] = "random"
+        with pytest.raises(ValidationError):
+            ShipNotes(**meta)
+
+    def test_short_notes_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import ShipNotes
+
+        meta = _load_fixture_meta("ship-notes-valid.md")
+        meta["notes"] = "short"
+        with pytest.raises(ValidationError):
+            ShipNotes(**meta)
+
+
+class TestRetroSchema:
+    def test_valid_fixture_round_trips(self) -> None:
+        from clawteam.templates.gstack.schemas import Retro
+
+        doc = Retro(**_load_fixture_meta("retro-valid.md"))
+        assert doc.artifact_type == "retro"
+        assert len(doc.personas) >= 2
+        assert len(doc.what_worked) >= 1
+        assert len(doc.key_lessons) >= 1
+
+    def test_stub_fixture_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import Retro
+
+        with pytest.raises(ValidationError):
+            Retro(**_load_fixture_meta("retro-stub-tbd.md"))
+
+    def test_empty_personas_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import Retro
+
+        meta = _load_fixture_meta("retro-valid.md")
+        meta["personas"] = []
+        with pytest.raises(ValidationError):
+            Retro(**meta)
+
+    def test_single_persona_rejected(self) -> None:
+        """D-09: retros require >=2 personas (leader + one other); defeats solo post-mortem."""
+        from clawteam.templates.gstack.schemas import Retro
+
+        meta = _load_fixture_meta("retro-valid.md")
+        meta["personas"] = ["ceo"]
+        with pytest.raises(ValidationError):
+            Retro(**meta)
+
+    def test_empty_key_lessons_rejected(self) -> None:
+        from clawteam.templates.gstack.schemas import Retro
+
+        meta = _load_fixture_meta("retro-valid.md")
+        meta["key_lessons"] = []
+        with pytest.raises(ValidationError):
+            Retro(**meta)
+
+
+class TestGstackBarrelComplete:
+    """Task 3 acceptance: all 6 schemas reachable from the single-import barrel."""
+
+    def test_one_statement_import_all_six(self) -> None:
+        """03-07 plugin-wiring contract — one import statement pulls all six schemas."""
+        from clawteam.templates.gstack.schemas import (
+            DesignDoc,
+            PlanDoc,
+            Retro,
+            ReviewReport,
+            ShipNotes,
+            TestReport,
+        )
+
+        from pydantic import BaseModel
+
+        for cls, expected_type in [
+            (DesignDoc, "design-doc"),
+            (PlanDoc, "plan-doc"),
+            (TestReport, "test-report"),
+            (ReviewReport, "review-report"),
+            (ShipNotes, "ship-notes"),
+            (Retro, "retro"),
+        ]:
+            assert issubclass(cls, BaseModel)
+            assert cls.model_fields["artifact_type"].annotation.__args__ == (
+                expected_type,
+            )
+
+    def test_all_six_in___all__(self) -> None:
+        from clawteam.templates.gstack import schemas as s
+
+        assert set(s.__all__) == {
+            "DesignDoc",
+            "PlanDoc",
+            "TestReport",
+            "ReviewReport",
+            "ShipNotes",
+            "Retro",
+        }
+
+    def test_ship_notes_importable_from_barrel(self) -> None:
+        from clawteam.templates.gstack.schemas import ShipNotes as BarrelShipNotes
+        from clawteam.templates.gstack.schemas.ship_notes import (
+            ShipNotes as ModuleShipNotes,
+        )
+
+        assert BarrelShipNotes is ModuleShipNotes
+
+    def test_retro_importable_from_barrel(self) -> None:
+        from clawteam.templates.gstack.schemas import Retro as BarrelRetro
+        from clawteam.templates.gstack.schemas.retro import Retro as ModuleRetro
+
+        assert BarrelRetro is ModuleRetro
+
