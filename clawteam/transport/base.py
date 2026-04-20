@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from threading import Lock
 from typing import Any
 
@@ -24,6 +25,31 @@ from clawteam.team.models import TeamMessage
 _MALFORMED_COUNTERS: dict[str, int] = {}
 _COUNTER_LOCK = Lock()
 _DRIFT_THRESHOLD = 8  # §02-CONTEXT D-09
+
+# ── Phase 2 Plan 02-09: turn-counter hook slot (§02-CONTEXT D-14) ────────────────
+#
+# Module-level callback slot so :func:`_pre_deliver_hooks` can notify
+# SprintState.turn_counters on every successful envelope validation. The slot
+# is set by :class:`SprintConductor` (Plan 02-11) on sprint start via
+# :func:`set_turn_counter_callback` and cleared on sprint teardown. When unset,
+# the deliver path is turn-counter-free (BC preserved for non-sprint traffic).
+#
+# Pitfall #2 dedup: the callback is expected to dedupe by ``(agent, turn_id)``
+# so the same turn_id reaching both deliver + ArtifactStore.write counts once.
+_TURN_COUNTER_CALLBACK: Callable[[str, str], None] | None = None
+
+
+def set_turn_counter_callback(cb: Callable[[str, str], None] | None) -> None:
+    """Install or clear the turn-counter callback. SprintConductor calls this on
+    sprint start/stop so counters reset across sprint boundaries.
+    """
+    global _TURN_COUNTER_CALLBACK
+    _TURN_COUNTER_CALLBACK = cb
+
+
+def get_turn_counter_callback() -> Callable[[str, str], None] | None:
+    """Test helper — inspect the currently-installed callback."""
+    return _TURN_COUNTER_CALLBACK
 
 
 def _pre_deliver_hooks(data: bytes | str) -> TeamMessage:
@@ -128,6 +154,26 @@ def _pre_deliver_hooks(data: bytes | str) -> TeamMessage:
     # on success").
     with _COUNTER_LOCK:
         _MALFORMED_COUNTERS.pop(agent, None)
+
+    # ── Plan 02-09 Hook: turn-counter increment on success (§02-CONTEXT D-14) ──
+    # Invoked only for agent-authored turns (any_envelope == True here — we
+    # already branched out for BC pass-through above). Turn-id dedup is the
+    # callback's responsibility; we hand over best-effort (agent, turn_id)
+    # extracted from the validated envelope fields.
+    if _TURN_COUNTER_CALLBACK is not None and agent:
+        turn_id = ""
+        # TurnEnvelope.turn_id is optional; extract directly from the validated
+        # payload dict when present. Fall back to TeamMessage.request_id (Plan
+        # 02-08 round-trip dedupe anchor) when the envelope omits turn_id.
+        if isinstance(payload, dict):
+            turn_id = str(payload.get("turn_id") or payload.get("turnId") or "")
+        if not turn_id:
+            turn_id = str(getattr(msg, "request_id", "") or "")
+        try:
+            _TURN_COUNTER_CALLBACK(agent, turn_id)
+        except Exception:
+            # Observation-only hook — never propagate callback errors.
+            pass
     return msg
 
 
@@ -135,10 +181,14 @@ def _reset_drift_counters() -> None:
     """Test + SprintConductor-teardown helper: clear the per-agent malformed counter.
 
     SprintConductor (Plan 02-11) calls this on sprint start/resume so a previous
-    sprint's drift state does not leak across sprint boundaries.
+    sprint's drift state does not leak across sprint boundaries. Also clears
+    the Plan 02-09 turn-counter callback so a subsequent test / sprint does
+    NOT observe a stale hook.
     """
+    global _TURN_COUNTER_CALLBACK
     with _COUNTER_LOCK:
         _MALFORMED_COUNTERS.clear()
+    _TURN_COUNTER_CALLBACK = None
 
 
 class Transport(ABC):
