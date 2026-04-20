@@ -82,7 +82,25 @@ class TeamManager:
         description: str = "",
         user: str = "",
         leader_agent_type: str = "leader",
+        # Phase 3 (Plan 03-02) additive kwargs. All default to no-op values so
+        # every existing call site (test_manager.py, test_cli_commands.py, the
+        # existing `clawteam launch` path) keeps working unchanged.
+        roles: list[str] | None = None,
+        leader_role: str = "",
+        template: str = "",
     ) -> TeamConfig:
+        """Create a new team on disk.
+
+        Phase 3 additions:
+          - ``roles``: per-role names; when non-empty, memory subdirs are
+            pre-created under ``~/.clawteam/teams/<team>/memory/<role>/``
+            (D-05 race-free pre-creation for Phase 6 /learn writes).
+          - ``leader_role``: flows TemplateDef.leader_role onto TeamConfig so
+            SprintConductor.advance_phase can enforce actor == leader_role.
+          - ``template``: flows TemplateDef.name onto TeamConfig so the
+            GstackSprintPlugin's Reflect handler (03-07) can scope its writes
+            to gstack teams only.
+        """
         validate_identifier(name, "team name")
         validate_identifier(leader_name, "leader name")
         validate_identifier(user, "user name", allow_empty=True)
@@ -100,6 +118,8 @@ class TeamManager:
             description=description,
             lead_agent_id=leader_id,
             members=[leader],
+            leader_role=leader_role,
+            template=template,
         )
         _save_config(config)
         # Create inboxes dir and leader inbox
@@ -109,6 +129,18 @@ class TeamManager:
         # Create tasks dir
         tasks_dir = ensure_within_root(get_data_dir() / "tasks", name)
         tasks_dir.mkdir(parents=True, exist_ok=True)
+
+        # Phase 3 (Plan 03-02, D-05): pre-create per-role memory dirs idempotently.
+        # Race-free: 11 mkdir calls during one-time spawn beats lazy-init under
+        # N parallel sprints x 11 agents writing concurrently in Phase 6.
+        # Empty/None roles is a no-op (BC for existing call sites).
+        if roles:
+            memory_root = _team_dir(name) / "memory"
+            for role in roles:
+                role_id = validate_identifier(role, "role name")
+                memory_dir = ensure_within_root(memory_root, role_id)
+                memory_dir.mkdir(parents=True, exist_ok=True)
+
         return config
 
     @staticmethod

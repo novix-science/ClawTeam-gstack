@@ -1656,6 +1656,102 @@ def team_status(
     _output(data, _human)
 
 
+@team_app.command("spawn")
+def team_spawn(
+    template: str = typer.Argument(..., help="Template name (e.g., 'gstack', 'software-dev')"),
+    name: str = typer.Option(..., "--name", "-n", help="Team name"),
+    model_profile: str = typer.Option(
+        "", "--model-profile",
+        help="Override template model profile (balanced|quality|budget)",
+    ),
+):
+    """Spawn a team from a template (UX-01).
+
+    Phase 3 Plan 03-02 ships this thin wrapper around TeamManager.create_team
+    using the UX-01-locked argument form (`<template>` positional + `--name`).
+    Equivalent to `clawteam launch <template> --team <name>` for team/config
+    setup; this command does not spawn backend processes. Follow up with
+    `clawteam launch` or `clawteam spawn` to run agents.
+    """
+    from clawteam.team.manager import TeamManager
+    from clawteam.templates import load_template
+
+    try:
+        tmpl = load_template(template)
+    except FileNotFoundError:
+        _output(
+            {"error": f"Template '{template}' not found"},
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
+
+    # TEAM-05: optional --model-profile override (balanced|quality|budget)
+    if model_profile:
+        tmpl.model_profile = {**tmpl.model_profile, "default": model_profile}
+
+    roles = [a.role for a in [tmpl.leader, *tmpl.agents] if a.role]
+    leader_id = uuid.uuid4().hex[:12]
+
+    try:
+        config = TeamManager.create_team(
+            name=name,
+            leader_name=tmpl.leader.name,
+            leader_id=leader_id,
+            description=tmpl.description,
+            leader_agent_type=tmpl.leader.type,
+            roles=roles,
+            leader_role=tmpl.leader_role,
+            template=tmpl.name if roles else "",
+        )
+    except ValueError as e:
+        _output(
+            {"error": str(e)},
+            lambda d: console.print(f"[red]Error: {d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
+
+    # Add specialists as members so `team status` reflects the full roster.
+    for agent in tmpl.agents:
+        aid = uuid.uuid4().hex[:12]
+        try:
+            TeamManager.add_member(
+                team_name=name,
+                member_name=agent.name,
+                agent_id=aid,
+                agent_type=agent.type,
+            )
+        except ValueError:
+            # Duplicate member names inside a template are a template-author
+            # bug, not a CLI error; surface via the existing validator and
+            # keep going so the user sees the partial team.
+            continue
+
+    data = {
+        "name": config.name,
+        "template": tmpl.name,
+        "agentCount": 1 + len(tmpl.agents),
+        "leaderRole": tmpl.leader_role,
+        "modelProfile": tmpl.model_profile.get("default", ""),
+    }
+
+    def _human(d):
+        console.print(
+            f"\n[green]OK[/green] Spawned team [cyan]{d['name']}[/cyan]"
+            f" from template [magenta]{d['template']}[/magenta]"
+            f" ({d['agentCount']} agents"
+            + (f", leader: [magenta]{d['leaderRole']}[/magenta]" if d["leaderRole"] else "")
+            + (f", profile: {d['modelProfile']}" if d["modelProfile"] else "")
+            + ")"
+        )
+        console.print(
+            f"  Run [bold]clawteam team status {d['name']}[/bold] to view the roster,"
+            f" or [bold]clawteam launch {d['template']} --team {d['name']}[/bold]"
+            f" to spawn agents."
+        )
+
+    _output(data, _human)
+
+
 @team_app.command("snapshot")
 def team_snapshot(
     team: str = typer.Argument(..., help="Team name"),
@@ -4054,6 +4150,11 @@ def launch_team(
 
     # 3. Create team
     leader_id = uuid.uuid4().hex[:12]
+    # Phase 3 (Plan 03-02, D-05): collect per-role identifiers from the template
+    # so create_team can pre-create the memory dir tree. For existing templates
+    # (software-dev, hedge-fund, etc.) `a.role` is "" for every agent, so the
+    # filter yields [] and the memory-dir loop is a no-op (BC preserved).
+    _gstack_roles = [a.role for a in [tmpl.leader, *tmpl.agents] if a.role]
     try:
         TeamManager.create_team(
             name=t_name,
@@ -4061,6 +4162,9 @@ def launch_team(
             leader_id=leader_id,
             description=tmpl.description,
             user=_os.environ.get("CLAWTEAM_USER", ""),
+            roles=_gstack_roles,
+            leader_role=tmpl.leader_role,
+            template=tmpl.name if _gstack_roles else "",
         )
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")
