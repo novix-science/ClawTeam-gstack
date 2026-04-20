@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-04-20T09:53:49.942Z"
-last_activity: 2026-04-20 -- Phase 02 execution started
+stopped_at: Phase 3 context gathered (Phase 2 execution still in flight)
+last_updated: "2026-04-20T19:30:00.000Z"
+last_activity: 2026-04-20 -- Phase 03 research + context captured (in parallel with Phase 02 execution)
 progress:
   total_phases: 8
   completed_phases: 2
@@ -83,7 +83,7 @@ None yet.
 
 [Issues that affect future work]
 
-- **Phase 3 research pass recommended** (`/gsd-research-phase 3`): per-persona role-reassertion field schema + native-gstack golden-trace sourcing strategy + per-role prompt length budget. Flagged HIGH in research/SUMMARY.md; resolve before `/gsd-plan-phase 3`.
+- ~~**Phase 3 research pass recommended**~~ — RESOLVED 2026-04-20. RESEARCH.md (commit c2e28e1) + CONTEXT.md (commit 74f55b2) settled all three open questions: per-persona role-reassertion = single namespaced field per persona via 11 pydantic subclasses; golden-trace sourcing = Strategy B (markdown-derived fixtures); per-role prompt budget = ≤3 KB target / 4 KB hard cap.
 - **Phase 6 memory write-path research pass optional** (`/gsd-research-phase 6`): concrete provenance schema + decay algorithm + conflict-detection retrieval pattern. Flagged MEDIUM; only if Pitfall 10 preventions feel under-specified at plan time.
 - **Windows support scope undecided** (Gaps to Address #1 in research/SUMMARY.md): affects Phase 0 CI matrix scope. Default: Linux + macOS; Windows best-effort with documented graceful-downgrade.
 - **Default model_profile decision** (Gaps to Address #4): roadmap assumes `balanced` per TEAM-05 and Phase 0 criterion #5. Confirmed.
@@ -103,6 +103,13 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-17T10:29:48.075Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md
+Last session: 2026-04-20T19:30:00.000Z
+Stopped at: Phase 3 context gathered (Phase 2 execution still in flight)
+Resume files:
+  - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md
+  - Phase 3 (planning next): .planning/phases/03-gstack-team-template-methodology-port/03-CONTEXT.md
+
+## Recent Activity
+
+- 2026-04-20 -- Phase 3 RESEARCH.md written (1010 lines, commit c2e28e1) — pure-rubric vs interactive split locked, 3 open research questions resolved, 8 assumptions logged
+- 2026-04-20 -- Phase 3 CONTEXT.md written (commit 74f55b2) — 14 decisions across 4 gray areas (methodology depth, gstack.toml shape, file format + envelope location, verification stringency); 5 plan-prep verification tasks queued for Wave 0 of `/gsd-plan-phase 3`
