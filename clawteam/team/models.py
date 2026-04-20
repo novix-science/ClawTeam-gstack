@@ -119,6 +119,17 @@ class TeamMessage(BaseModel):
     # idle notification fields
     last_task: str | None = Field(default=None, alias="lastTask")
     status: str | None = None
+    # Phase 2 envelope fields (§02-CONTEXT D-06 with Pitfall #8 BC-preservation).
+    # Optional with None defaults on the model so existing 15+ TeamMessage
+    # construction sites keep working. Enforcement happens at
+    # clawteam.transport.base.Transport.deliver() (Plan 02-08) where the three
+    # fields MUST be present for gstack-sprint turns — transport extracts them
+    # and runs TurnEnvelope.model_validate, raising MalformedEnvelopeError on
+    # None. Existing (non-gstack) templates deliver without the fields and the
+    # transport logic scopes enforcement to sprint-scoped messages only.
+    persona: str | None = None
+    step_label: str | None = Field(default=None, alias="stepLabel")
+    done: bool | None = None
 
 
 class TaskItem(BaseModel):
