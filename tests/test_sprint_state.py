@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from clawteam.sprint.state import SprintState
 
@@ -142,3 +144,183 @@ def test_sprint_state_path_contains_both_team_and_sprint_id(monkeypatch, tmp_pat
     p = SprintState._state_path(team="alpha-team", sprint_id="abcd1234")
     suffix = str(Path("teams") / "alpha-team" / "sprints" / "abcd1234" / "state.json")
     assert str(p).endswith(suffix), f"path {p!s} does not end with {suffix!r}"
+
+
+# ── Phase 2 additive-field tests (02-CONTEXT §D-14/D-15/D-16/D-21/D-27/D-28) ──
+# Every new field has a default so Phase 1 state.json files rehydrate cleanly
+# (pydantic v2 BC guarantee — 02-RESEARCH §Runtime State Inventory).
+
+
+def test_sprint_state_turn_counters_defaults_to_empty_dict():
+    """turn_counters default_factory=dict — per-agent theater detection counter (D-14)."""
+    state = SprintState(
+        goal="x",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    assert state.turn_counters == {}
+    assert isinstance(state.turn_counters, dict)
+
+
+def test_sprint_state_artifact_cap_bytes_defaults_to_50kb():
+    """artifact_cap_bytes default = 50 * 1024 = 51200 (D-27 per-file cap)."""
+    state = SprintState(
+        goal="x",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    assert state.artifact_cap_bytes == 50 * 1024
+    assert state.artifact_cap_bytes == 51200
+
+
+def test_sprint_state_phase_artifact_cap_bytes_defaults_to_500kb():
+    """phase_artifact_cap_bytes default = 500 * 1024 = 512000 (D-28 per-phase cap)."""
+    state = SprintState(
+        goal="x",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    assert state.phase_artifact_cap_bytes == 500 * 1024
+    assert state.phase_artifact_cap_bytes == 512000
+
+
+def test_sprint_state_status_defaults_to_running():
+    """status Literal['running','paused','completed'] defaults to 'running' (D-22 pause idempotency)."""
+    state = SprintState(
+        goal="x",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    assert state.status == "running"
+    for ok in ["running", "paused", "completed"]:
+        assert (
+            SprintState(
+                goal="x",
+                team="t",
+                current_phase="think",
+                created_at="2026-04-17T00:00:00Z",
+                status=ok,
+            ).status
+            == ok
+        )
+    with pytest.raises(ValidationError):
+        SprintState(
+            goal="x",
+            team="t",
+            current_phase="think",
+            created_at="2026-04-17T00:00:00Z",
+            status="bogus",
+        )
+
+
+def test_sprint_state_suppressed_topics_defaults_to_empty_dict():
+    """suppressed_topics default_factory=dict — cycle-detector suppression persistence (D-21)."""
+    state = SprintState(
+        goal="x",
+        team="t",
+        current_phase="think",
+        created_at="2026-04-17T00:00:00Z",
+    )
+    assert state.suppressed_topics == {}
+    assert isinstance(state.suppressed_topics, dict)
+
+
+def test_sprint_state_rehydrates_from_phase1_json_without_new_fields():
+    """BC invariant: pydantic v2 default-fills missing fields (RESEARCH Runtime State Inventory).
+
+    Phase 1 state.json files on disk have only the 11 RFC 001 §4.4 fields. After Phase 2
+    ships, model_validate(phase1_dict) MUST succeed and auto-populate Phase 2 defaults.
+    """
+    phase1_dict = {
+        "sprint_id": "abc12345",
+        "goal": "ship dark mode",
+        "team": "gstack",
+        "current_phase": "plan",
+        "phase_history": [],
+        "artifacts": {},
+        "participants": ["engineer"],
+        "pending_question_ids": [],
+        "auto_advance": True,
+        "workspace_branch": "feature/dark-mode",
+        "created_at": "2026-04-16T10:00:00Z",
+    }
+    state = SprintState.model_validate(phase1_dict)
+    assert state.turn_counters == {}
+    assert state.artifact_cap_bytes == 50 * 1024
+    assert state.phase_artifact_cap_bytes == 500 * 1024
+    assert state.status == "running"
+    assert state.suppressed_topics == {}
+    # Phase 1 fields still round-trip identically.
+    assert state.sprint_id == "abc12345"
+    assert state.goal == "ship dark mode"
+    assert state.workspace_branch == "feature/dark-mode"
+
+
+def test_sprint_state_save_load_roundtrip_with_phase2_fields(monkeypatch, tmp_path):
+    """save -> load preserves every Phase 2 field byte-equal."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    s = SprintState(
+        goal="ship dark mode",
+        team="team1",
+        current_phase="plan",
+        created_at="2026-04-16T00:00:00Z",
+        turn_counters={"engineer": 3, "reviewer": 1},
+        artifact_cap_bytes=100_000,
+        phase_artifact_cap_bytes=1_000_000,
+        status="paused",
+        suppressed_topics={"engineer->reviewer": ["abc123"]},
+    )
+    s.save(team="team1")
+    loaded = SprintState.load(team="team1", sprint_id=s.sprint_id)
+    assert loaded.model_dump() == s.model_dump()
+    # Explicit field checks for trace readability.
+    assert loaded.turn_counters == {"engineer": 3, "reviewer": 1}
+    assert loaded.artifact_cap_bytes == 100_000
+    assert loaded.phase_artifact_cap_bytes == 1_000_000
+    assert loaded.status == "paused"
+    assert loaded.suppressed_topics == {"engineer->reviewer": ["abc123"]}
+
+
+def test_sprint_state_load_of_legacy_phase1_file_rehydrates_defaults(monkeypatch, tmp_path):
+    """A raw Phase-1-shape JSON file on disk loads through .load() with Phase 2 defaults applied.
+
+    Mirrors RESEARCH §Runtime State Inventory: Phase 1 users upgrade cleanly without
+    a migration script — pydantic v2 BC default-fills missing fields on model_validate.
+    """
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    team = "legacy-team"
+    sprint_id = "deadbeef"
+    phase1_shape = {
+        "sprint_id": sprint_id,
+        "goal": "legacy goal",
+        "team": team,
+        "current_phase": "plan",
+        "phase_history": [{"phase": "think", "completed_at": "2026-04-16T00:05:00Z"}],
+        "artifacts": {"design-doc.md": "/tmp/d.md"},
+        "participants": ["pm", "ceo"],
+        "pending_question_ids": [],
+        "auto_advance": True,
+        "workspace_branch": "feature/legacy",
+        "created_at": "2026-04-16T00:00:00Z",
+    }
+    # Write the legacy JSON directly (bypassing .save so no Phase 2 fields leak in).
+    sprint_dir = tmp_path / "teams" / team / "sprints" / sprint_id
+    sprint_dir.mkdir(parents=True, exist_ok=True)
+    (sprint_dir / "state.json").write_text(json.dumps(phase1_shape, indent=2), encoding="utf-8")
+
+    loaded = SprintState.load(team=team, sprint_id=sprint_id)
+    # Phase 1 fields preserved.
+    assert loaded.sprint_id == sprint_id
+    assert loaded.goal == "legacy goal"
+    assert loaded.workspace_branch == "feature/legacy"
+    assert loaded.artifacts == {"design-doc.md": "/tmp/d.md"}
+    # Phase 2 fields auto-defaulted.
+    assert loaded.turn_counters == {}
+    assert loaded.artifact_cap_bytes == 50 * 1024
+    assert loaded.phase_artifact_cap_bytes == 500 * 1024
+    assert loaded.status == "running"
+    assert loaded.suppressed_topics == {}
