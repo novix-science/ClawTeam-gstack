@@ -479,8 +479,9 @@ class DefaultRoutingPolicy(RoutingPolicy):
         timestamp: datetime,
         error: str = "",
         topic_hash: str = "",
+        progress_signal: bool = False,
     ) -> None:
-        event = {
+        event: dict[str, Any] = {
             "timestamp": timestamp.isoformat(),
             "routeKey": route_key,
             "source": route.get("source", ""),
@@ -496,10 +497,11 @@ class DefaultRoutingPolicy(RoutingPolicy):
         # Always written (empty string allowed) so downstream consumers can rely on the key.
         event["topicHash"] = topic_hash
         # Plan 02-09 theater-detector populates `progressSignal` on entries where the
-        # agent shipped artifact bytes; cycle detector reads this flag to avoid false
-        # positives on legitimate iteration (Pitfall #3). Not written here — Plan 02-09
-        # extends this helper or mutates the entry post-write. Documented so readers
-        # of `recentEvents` know the field is part of the contract.
+        # agent shipped artifact bytes or TaskCompleted fired during the turn; cycle
+        # detector reads this flag to skip the streak on legitimate iteration
+        # (Pitfall #3). Written unconditionally (default False) so readers of
+        # `recentEvents` can rely on the key being present.
+        event["progressSignal"] = bool(progress_signal)
         state["recentEvents"] = (state.get("recentEvents", []) + [event])[-_RECENT_EVENT_LIMIT:]
 
     # ── Phase 2: cycle detector helpers (§02-CONTEXT D-18..D-21) ─────────────────

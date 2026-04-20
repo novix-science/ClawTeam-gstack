@@ -20,6 +20,7 @@ continue to succeed unmodified — enforced by
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -76,17 +77,27 @@ class ArtifactStore:
         harness_id: str,
         *,
         artifact_cap_bytes: int | None = None,
+        turn_counter_callback: Callable[[str, str], None] | None = None,
     ) -> None:
         """Construct a per-team/per-harness artifact directory.
 
         ``artifact_cap_bytes`` is keyword-only (additive kwarg preserves BC —
         existing three-arg call sites in software-dev/hedge-fund templates
         continue to work). ``None`` means no cap (BC default).
+
+        ``turn_counter_callback`` (Plan 02-09, §02-CONTEXT D-14): optional
+        ``(agent, turn_id) -> None`` hook invoked at the END of a successful
+        :meth:`write` when metadata carries an ``agent`` field. SprintConductor
+        (Plan 02-11) supplies a callback that dedupes by ``(agent, turn_id)``
+        and increments :attr:`SprintState.turn_counters`. Non-sprint templates
+        (software-dev, hedge-fund, ...) construct ArtifactStore without this
+        callback and the write path stays turn-counter-free (BC preserved).
         """
         self._dir = base_dir / team_name / harness_id / "artifacts"
         self._dir.mkdir(parents=True, exist_ok=True)
         self._cap = artifact_cap_bytes
         self._team_name = team_name  # surfaced to BeforeFileWrite.team_name
+        self._turn_counter_callback = turn_counter_callback
 
     def write(self, name: str, content: str, metadata: dict[str, Any] | None = None) -> Path:
         """Write an artifact file through the Phase 2 hook chain. Returns the path.
@@ -157,6 +168,20 @@ class ArtifactStore:
                 json.dumps({**metadata, "written_at": _now_iso()}, indent=2),
                 encoding="utf-8",
             )
+        # ── Hook 4 (Plan 02-09, §02-CONTEXT D-14): turn-counter increment ───
+        # Runs AFTER atomic_write + metadata write so a crashed write does NOT
+        # advance the turn counter. Gated on metadata["agent"] so non-sprint
+        # writes (no agent attribution) are skipped — preserves Pitfall #8 BC.
+        if self._turn_counter_callback is not None and metadata:
+            agent_attr = str(metadata.get("agent", ""))
+            turn_id_attr = str(metadata.get("turn_id", ""))
+            if agent_attr:
+                try:
+                    self._turn_counter_callback(agent_attr, turn_id_attr)
+                except Exception:
+                    # Turn-counter increments are observation-only; never fail
+                    # the write path on a callback crash.
+                    pass
         return path
 
     def read(self, name: str) -> str | None:
