@@ -112,3 +112,44 @@ prompt_file = "gstack/prompts/sre.md"
 # `clawteam sprint start` to dispatch work via SprintConductor. Starter
 # tasks would break the product narrative ("team is dormant until you
 # give it work").
+
+# ── Phase 4 (Plan 04-06, §04-CONTEXT D-04): review-phase routing rules.
+# Consumed by clawteam.harness.gstack_review_router.GstackReviewRouter at
+# plugin load. The `reviewer` role ALWAYS participates (SPRINT-03 floor);
+# matching rules accumulate ADDITIONAL reviewers per path glob.
+
+[template.review]
+# §04-CONTEXT D-09 / D-20: agreement-rate threshold for the
+# sycophancy_cascade_detected alarm. Default 0.9 per research; tune if
+# teams see cascades fire on legitimate unanimous verdicts.
+sycophancy_threshold = 0.9
+
+[[template.review.rules]]
+pattern = "src/components/**/*.tsx"
+reviewers = ["designer"]
+signal = "ui"
+
+[[template.review.rules]]
+pattern = "**/*.css"
+reviewers = ["designer"]
+signal = "ui"
+
+[[template.review.rules]]
+pattern = "src/auth/**"
+reviewers = ["security"]
+signal = "crypto"
+
+[[template.review.rules]]
+pattern = "**/crypto/**"
+reviewers = ["security"]
+signal = "crypto"
+
+[[template.review.rules]]
+pattern = "app/api/**"
+reviewers = ["dx-lead"]
+signal = "api"
+
+[[template.review.rules]]
+pattern = "package.json"
+reviewers = ["dx-lead"]
+signal = "api"
