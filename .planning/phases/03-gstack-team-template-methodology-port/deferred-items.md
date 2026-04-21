@@ -82,3 +82,4 @@ gate to `len(sizes) == 11`.
 D-01/D-02/D-03 + D-14 budget gate + cross-file presence). Zero xfails.
 All 11 prompt files present.
 
+- Pre-existing: tests/test_sprint_conductor.py::test_resume_after_process_restart fails via subprocess env isolation (not touched by 03-07; discovered during targeted regression run)

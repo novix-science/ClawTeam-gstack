@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 03-05-role-prompts-pure-rubric-PLAN.md
-last_updated: "2026-04-20T21:31:36.093Z"
+stopped_at: Completed 03-06-role-prompts-stubs-PLAN.md
+last_updated: "2026-04-21T05:15:18.292Z"
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 29
-  percent: 85
+  completed_plans: 31
+  percent: 91
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 03 (gstack-team-template-methodology-port) — EXECUTING
-Plan: 6 of 9
+Plan: 7 of 9
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Plan: 6 of 9
 | Phase 03 P02 | 30min | 3 tasks | 7 files |
 | Phase 03 P03 | 10min | 3 tasks | 15 files |
 | Phase 03 P05 | 1h | 5 tasks | 9 files |
+| Phase 03 P06 | 15min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-03: Ship 6 pydantic v2 evidence schemas (DesignDoc, PlanDoc, TestReport, ReviewReport, ShipNotes, Retro) with artifact_type: Literal[<name>] discriminators + stub-defeating min_length/Literal constraints at clawteam/templates/gstack/schemas/ — defeats Pitfall 8 gate gaming by construction.
 - [Phase 03]: 03-03: 12 fixture markdown files (6 valid + 6 stub-tbd) under tests/fixtures/gstack_artifacts/ — stub-grade fixtures prove constraint enforcement by construction at test collection time; verifier cannot skip.
 - [Phase 03]: [Phase 03]: 03-05: Port 8 pure-rubric role prompts (pm/ceo/eng-mgr/designer/dx-lead/reviewer/qa/security) as per-file markdown under 4KB per D-14; drift-adjusted verbatim from upstream fixtures (7 design passes not 10; 22 cso exclusions not 17)
+- [Phase 03]: 03-06: Ship engineer.md (D-01 substantive implementation-discipline rubric, 2025B) + shipper.md + sre.md (D-02/D-03 honest Phase-5-deferred stubs with rubric:none SIGNATURE flag as Phase 5 swap target); tighten D-14 gate to == 11 prompts; un-xfail cross-file presence test. All 11 prompts now present.
 
 ### Pending Todos
 
@@ -115,8 +117,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-20T21:31:36.087Z
-Stopped at: Completed 03-05-role-prompts-pure-rubric-PLAN.md
+Last session: 2026-04-21T05:15:18.287Z
+Stopped at: Completed 03-06-role-prompts-stubs-PLAN.md
 Resume files:
 
   - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md
