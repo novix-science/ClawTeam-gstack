@@ -35,7 +35,23 @@ class HarnessPlugin(ABC):
         """Called when the plugin is unloaded."""
 
     def contribute_gates(self) -> dict[str, list[PhaseGate]]:
-        """Contribute gates to specific phases. Returns {phase: [gates]}."""
+        """Contribute gates to specific phases (§04-CONTEXT D-13 — Plan 04-05 wiring).
+
+        Returns a mapping of phase-name → list of :class:`PhaseGate` instances
+        to append to that phase's gate chain. ``PluginManager`` aggregates
+        plugin-contributed gates via :meth:`PluginManager.get_plugin_gates`
+        (Phase 4 Plan 04-05); ``SprintConductor._build_gate_chain`` (Phase 4
+        Plan 04-10 Task 3) unions those gates into the standard
+        EvidenceGate → forced_progress_gate → InteractionGate chain so
+        plugin-provided gates (e.g., Phase 4's ShipApprovalGate) actually
+        execute.
+
+        Empty-dict default means the plugin contributes no gates. Existing
+        plugins (software-dev, hedge-fund, code-review, harness-default,
+        research-paper, strategy-room, ralph-loop) inherit the empty default
+        and are unaffected. Phase 4's GstackSprintPlugin overrides this in
+        Plan 04-11 to return ``{"ship": [ShipApprovalGate()]}``.
+        """
         return {}
 
     def contribute_prompts(self, phase: str, role: str) -> str:

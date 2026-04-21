@@ -21,6 +21,10 @@ class PluginManager:
         # Phase 4 Plan 05 additive: resolved (VerificationPair, callable) tuples.
         # Populated by _instantiate_and_register from plugin.contribute_verification_pairs.
         self._verification_pairs: list[tuple[Any, Any]] = []
+        # Phase 4 Plan 05 additive: aggregated {phase: [PhaseGate, ...]} from
+        # plugin.contribute_gates. Consumed by SprintConductor._build_gate_chain
+        # (Plan 10 Task 3). Preserves plugin-load order per phase.
+        self._plugin_gates: dict[str, list[Any]] = {}
 
     # ── Discovery ─────────────────────────────────────────────────────
 
@@ -198,6 +202,29 @@ class PluginManager:
                     exc,
                 )
                 continue
+        # Phase 4 / Plan 04-05 Task 2: aggregate plugin-contributed gates per phase.
+        # Consumed by SprintConductor._build_gate_chain (Plan 10 Task 3) so
+        # plugin-provided gates (e.g., ShipApprovalGate attached to "ship")
+        # actually execute. T-04-17 DoS mitigation: contribute_gates raising
+        # logs a warning but does NOT crash plugin load.
+        try:
+            gates_map = plugin.contribute_gates() or {}
+        except Exception as exc:  # noqa: BLE001 — plugin load must not crash
+            _logger.warning(
+                "Plugin %s: contribute_gates raised: %s", plugin.name, exc
+            )
+            gates_map = {}
+        for phase_name, gate_list in gates_map.items():
+            if not isinstance(phase_name, str) or not phase_name:
+                _logger.warning(
+                    "Plugin %s: contribute_gates invalid phase key %r skipped",
+                    plugin.name,
+                    phase_name,
+                )
+                continue
+            bucket = self._plugin_gates.setdefault(phase_name, [])
+            for gate in (gate_list or []):
+                bucket.append(gate)
         self._loaded[plugin.name] = plugin
         return plugin
 
@@ -216,6 +243,16 @@ class PluginManager:
         constructing CrossAgentVerificationGate instances per phase.
         """
         return list(self._verification_pairs)
+
+    def get_plugin_gates(self, phase: str) -> list[Any]:
+        """Return list of plugin-contributed gates for ``phase`` (§04-CONTEXT D-13).
+
+        Consumed by SprintConductor._build_gate_chain (Plan 04-10 Task 3) so
+        plugin-contributed gates (e.g., Phase 4's ShipApprovalGate attached to
+        "ship") actually execute. Returns an empty list when no plugin contributed
+        gates for this phase. Order preserves plugin-load order.
+        """
+        return list(self._plugin_gates.get(phase, []))
 
     def loaded_plugins(self) -> dict[str, HarnessPlugin]:
         return dict(self._loaded)
