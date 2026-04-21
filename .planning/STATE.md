@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 5 executing (wave 2 — /codex skill landed)
-stopped_at: Completed 05-03 (codex-skill landed — 3-mode handler + sub-package + GstackSprintPlugin.contribute_skills /codex registration + 9 tests)
-last_updated: "2026-04-21T22:35:00Z"
+status: Phase 5 executing (wave 2 — /codex + /setup-deploy skills landed)
+stopped_at: Completed 05-05 (setup-deploy-wizard landed — questionary wizard + atomic TOML [deploy] block write + shell-injection hardening + 11 tests)
+last_updated: "2026-04-21T14:30:48Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 5
-Plan: 03 complete (wave 2 — /codex skill landed)
+Plan: 05 complete (wave 2 — /setup-deploy skill landed)
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Plan: 03 complete (wave 2 — /codex skill landed)
 | Phase 05 P01 | 35min | 3 tasks | 15 files |
 | Phase 05 P02 | 80min | 3 tasks | 12 files |
 | Phase 05 P03 | 25min | 2 tasks | 7 files |
+| Phase 05 P05 | 20min | 1 task  | 4 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-02: Test files placed flat at tests/ (test_event_types_phase5.py / test_evidence_schemas_phase5.py / test_ship_notes_phase5_fields.py) matching existing convention (tests/test_event_types_phase2.py + tests/test_event_types_phase4.py already at root); plan's suggested subdirs don't exist in this repo.
 - [Phase 05]: 05-03: Ship /codex skill at clawteam/templates/gstack/skills/codex/ as 2-file sub-package (__init__.py re-exports codex_handler + invoke_codex + tool_available; handler.py contains all implementation + hand-rolled YAML frontmatter emitter + verdict heuristic). 3 modes (review/adversarial/consultation); mode fail-fast BEFORE CLI invocation via ValueError; verdict heuristic only applies to mode='review' (adversarial/consultation always n/a); summary truncated to 500 chars (T-05-03-04 accept). 9 tests (6 handler + 3 plugin-wiring) green. CODEX_TIMEOUT=600s vs invoke_native_cli default 120s (codex can be slow on long files).
 - [Phase 05]: 05-03: GstackSprintPlugin.contribute_skills extended with /codex entry (roles={engineer,reviewer}, install_hint='npm install -g @openai/codex'); first concrete Phase 5 skill. Subsequent Wave 2-4 plans (05-04 /ship, 05-05 /setup-deploy) appended additively in the same method during parallel execution.
+- [Phase 05]: 05-05: /setup-deploy wizard uses pure-UI (wizard.py) vs side-effect-handler (handler.py) split so tests can feed canned questionary answers without TTY; _load_questionary lazy-import mirrors commands.py:173 pattern. Shell-injection defense is triple-layer — validate_project_slug fullmatch regex + validate_custom_cmd deny-list {; | & ` $ < > \\ newline} + DeployConfig pydantic Literal enum + downstream invoke_native_cli(shell=False) in 05-06.
+- [Phase 05]: 05-05: [deploy] block write uses regex-splice (_DEPLOY_BLOCK_RE with negative-lookahead (?!^\\[)) NOT full tomllib serialize — preserves comments, blank lines, and key ordering in gstack.toml. Post-render tomllib.loads round-trip is a HARD assertion (raises RuntimeError if splice malformed) so a bug in _render_block cannot corrupt the user's config. args['_skip_confirm'] underscore-prefixed test/CLI bypass flag — not part of agent-facing dispatch contract.
+- [Phase 05]: 05-05: Wave 2 parallel execution caused cross-attribution between 05-03/05-04/05-05 commits (three-way concurrent index writes) — git blame lines are shuffled but on-disk content correct, all tests green, acceptance criteria met. Symmetrically acknowledged in 05-03 and 05-05 SUMMARYs.
 - [Phase 05]: 05-03: Cross-executor stash interaction (recurrence of Plan 04-10 Task 3 pattern): parallel executors for Plans 05-04 + 05-05 committed my staged test/handler/plugin files under their own commit hashes (f3113d8 / 0b52021 / a991ea8) rather than a standalone feat(05-03). Functional correctness preserved (9/9 codex tests green + plugin returns /codex entry). Audit via `git blame clawteam/plugins/gstack_sprint_plugin.py | grep /codex` still surfaces the wiring. NO feat(05-03) commit exists in the log — tree content is intact and correct.
 
 ### Pending Todos
@@ -166,14 +170,14 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T22:35:00Z
-Stopped at: Completed 05-03 (codex-skill landed — /codex SkillRegistration + 3-mode handler + 9 tests)
+Last session: 2026-04-21T14:30:48Z
+Stopped at: Completed 05-05 (setup-deploy-wizard landed — /setup-deploy SkillRegistration + wizard.py + handler.py + 11 tests)
 Resume files:
 
-  - Phase 5 (executing wave 2): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
-  - Phase 5 Plan 03 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-03-SUMMARY.md
+  - Phase 5 (executing wave 2 -> wave 3): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 Plan 05 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-05-SUMMARY.md
+  - Phase 5 Plan 06 (Wave 3, /land-and-deploy): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-06-PLAN.md
   - Phase 5 Plan 04 (Wave 2, /ship): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-04-PLAN.md
-  - Phase 5 Plan 05 (Wave 2, /setup-deploy): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-05-PLAN.md
 
 ## Recent Activity
 

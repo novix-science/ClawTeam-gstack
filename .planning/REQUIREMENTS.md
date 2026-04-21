@@ -89,7 +89,7 @@ Methodology as role prompts (baked-in) + tool-heavy skills as invokable ClawTeam
 - [ ] **SKILL-16**: `/document-release` — cross-reference diff against all doc files, update stale ones. Auto-invoked by `/ship`.
 - [ ] **SKILL-17**: `/canary` — post-deploy monitoring loop (console errors, perf regressions).
 - [ ] **SKILL-18**: `/benchmark` — Core Web Vitals + page load baselines with before/after on every PR.
-- [ ] **SKILL-19**: `/setup-deploy` — one-time deployment configuration wizard.
+- [x] **SKILL-19**: `/setup-deploy` — one-time deployment configuration wizard.
 
 ### Safety Rails (SAFETY)
 
@@ -247,7 +247,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SKILL-16 | Phase 5 | Pending |
 | SKILL-17 | Phase 5 | Pending |
 | SKILL-18 | Phase 5 | Pending |
-| SKILL-19 | Phase 5 | Pending |
+| SKILL-19 | Phase 5 | Complete (Plan 05-05) |
 | SAFETY-01 | Phase 2 | Pending |
 | SAFETY-02 | Phase 2 | Pending |
 | SAFETY-03 | Phase 2 | Pending |
