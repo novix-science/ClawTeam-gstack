@@ -1,0 +1,19 @@
+{
+  "skill": "investigate",
+  "role": "reviewer",
+  "initial_state": "idle",
+  "final_states": ["resolved", "halted_after_3", "abandoned"],
+  "turn_budget": 12,
+  "max_hypotheses": 3,
+  "transitions": [
+    {"from": "idle",                    "event": "open_investigation",        "to": "hypothesis_declared"},
+    {"from": "hypothesis_declared",     "event": "module_validated",          "to": "hypothesis_testing",        "side_effect": "freeze_module"},
+    {"from": "hypothesis_testing",      "event": "confirmed",                 "to": "resolved",                  "side_effect": "unfreeze_module"},
+    {"from": "hypothesis_testing",      "event": "disconfirmed",              "to": "hypothesis_disconfirmed"},
+    {"from": "hypothesis_disconfirmed", "event": "next_hypothesis_if_under_3","to": "hypothesis_declared",       "side_effect": "unfreeze_module"},
+    {"from": "hypothesis_disconfirmed", "event": "reached_3",                 "to": "halted_after_3",            "side_effect": "unfreeze_module"},
+    {"from": "hypothesis_testing",      "event": "abandon",                   "to": "abandoned",                 "side_effect": "unfreeze_module"},
+    {"from": "hypothesis_declared",     "event": "abandon",                   "to": "abandoned"}
+  ],
+  "freeze_reason_template": "investigate:{sprint_id}:{hypothesis_id}"
+}
