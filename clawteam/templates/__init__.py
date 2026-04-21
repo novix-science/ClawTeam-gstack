@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -96,6 +97,71 @@ class ReviewConfig(BaseModel):
     rules: list[ReviewRule] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Phase 5 Wave 0 (Plan 05-01 Task 3, A5): optional top-level sub-blocks on
+# TemplateDef. All four fields default to None so existing templates parse
+# unchanged (BC preservation for gstack.toml + 6 bundled templates).
+# ---------------------------------------------------------------------------
+
+
+class ShipConfig(BaseModel):
+    """[ship] TOML block — /ship skill config (D-07, SKILL-14)."""
+
+    coverage_threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum test coverage ratio required before /ship advances.",
+    )
+
+
+class DeployConfig(BaseModel):
+    """[deploy] TOML block — /land-and-deploy target (D-08, SKILL-15)."""
+
+    provider: Literal["vercel", "netlify", "fly", "custom"] = Field(
+        ...,
+        description="Deploy backend; 'custom' requires custom_deploy_cmd.",
+    )
+    project: str = Field(..., min_length=1)
+    custom_deploy_cmd: str = Field(
+        default="",
+        description=(
+            "Shell command to run when provider == 'custom'. Empty string "
+            "is allowed at schema level; /setup-deploy wizard enforces at "
+            "write time."
+        ),
+    )
+
+
+class CanaryConfig(BaseModel):
+    """[canary] TOML block — /canary skill config (D-09, SKILL-17)."""
+
+    window_seconds: int = Field(
+        default=300, ge=1, description="Monitoring window after deploy."
+    )
+    poll_interval_seconds: int = Field(
+        default=15, ge=1, description="Polling cadence during the window."
+    )
+    ci_wait_timeout_seconds: int = Field(
+        default=1800,
+        ge=1,
+        description="Max time to wait for post-deploy CI checks.",
+    )
+
+
+class BenchmarkConfig(BaseModel):
+    """[benchmark] TOML block — /benchmark skill config (D-10, SKILL-18)."""
+
+    regression_threshold_ratio: float = Field(
+        default=1.5,
+        gt=0.0,
+        description=(
+            "New/baseline timing ratio above which /benchmark flags a "
+            "regression (e.g. 1.5 = 50% slower)."
+        ),
+    )
+
+
 class TemplateDef(BaseModel):
     name: str
     description: str = ""
@@ -121,6 +187,13 @@ class TemplateDef(BaseModel):
     # decorrelation config. Default empty ReviewConfig keeps the 6 existing
     # non-gstack templates BC-safe (they omit [template.review] entirely).
     review: ReviewConfig = Field(default_factory=ReviewConfig)
+    # Phase 5 Wave 0 (Plan 05-01 Task 3, A5): optional top-level sub-blocks
+    # consumed by Phase 5 slash-skills. All default to None so existing
+    # templates (gstack + 6 bundled) continue to parse unchanged.
+    ship: ShipConfig | None = None
+    deploy: DeployConfig | None = None
+    canary: CanaryConfig | None = None
+    benchmark: BenchmarkConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +252,18 @@ def _parse_toml(path: Path) -> TemplateDef:
         rules=[ReviewRule(**r) for r in raw_rules],
     )
 
+    # Phase 5 Wave 0 (Plan 05-01 Task 3, A5): optional TOP-LEVEL sub-blocks
+    # (NOT under [template]). Matches the §05-CONTEXT Specifics layout:
+    #   [ship]        — /ship thresholds
+    #   [deploy]      — /land-and-deploy target
+    #   [canary]      — /canary monitoring window
+    #   [benchmark]   — /benchmark regression threshold
+    # Absent blocks map to None (BC-safe for gstack + 6 bundled templates).
+    ship_raw = raw.get("ship")
+    deploy_raw = raw.get("deploy")
+    canary_raw = raw.get("canary")
+    benchmark_raw = raw.get("benchmark")
+
     return TemplateDef(
         name=tmpl.get("name", path.stem),
         description=tmpl.get("description", ""),
@@ -196,6 +281,13 @@ def _parse_toml(path: Path) -> TemplateDef:
         # Phase 4 (Plan 04-06): review-phase config. Default empty when the
         # template declares no [template.review] block.
         review=review_config,
+        # Phase 5 Wave 0 (Plan 05-01 Task 3): top-level optional sub-blocks.
+        ship=ShipConfig(**ship_raw) if ship_raw is not None else None,
+        deploy=DeployConfig(**deploy_raw) if deploy_raw is not None else None,
+        canary=CanaryConfig(**canary_raw) if canary_raw is not None else None,
+        benchmark=(
+            BenchmarkConfig(**benchmark_raw) if benchmark_raw is not None else None
+        ),
     )
 
 
