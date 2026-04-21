@@ -401,3 +401,229 @@ def test_conductor_dispatch_wrapper_invokes_async(tmp_path, monkeypatch):
     result = c._dispatch_review_phase("xyz12345", plugin_manager=pm, spawn_fn=fake_spawn)
     assert result["review_sha"] == "n" * 40
     assert "designer" in result["participants"]
+
+
+# ── Plan 10 Task 3: _build_gate_chain plugin-gate wiring tests ────────
+
+from clawteam.harness.phases import PhaseGate
+from clawteam.sprint.state import SprintState
+
+
+class _FakePluginMgrWithGates:
+    """In-test plugin manager returning canned gate + verification-pair data."""
+
+    def __init__(
+        self,
+        *,
+        plugin_gates=None,
+        verification_pairs=None,
+        raise_gates=False,
+        raise_pairs=False,
+    ):
+        self._plugin_gates = plugin_gates or {}
+        self._verification_pairs = verification_pairs or []
+        self._raise_gates = raise_gates
+        self._raise_pairs = raise_pairs
+
+    def get_plugin_gates(self, phase):
+        if self._raise_gates:
+            raise RuntimeError("plugin gates boom")
+        return list(self._plugin_gates.get(phase, []))
+
+    def get_verification_pairs(self):
+        if self._raise_pairs:
+            raise RuntimeError("verification pairs boom")
+        return list(self._verification_pairs)
+
+
+class _AlwaysPassGate(PhaseGate):
+    name = "always-pass"
+
+    def check(self, state):
+        return True, ""
+
+
+def _ship_state(tmp_path):
+    return SprintState(
+        team="t1",
+        sprint_id="gc123456",
+        goal="g",
+        current_phase="ship",
+        workspace_branch=str(tmp_path),
+    )
+
+
+def _test_state(tmp_path):
+    return SprintState(
+        team="t1",
+        sprint_id="gc765432",
+        goal="g",
+        current_phase="test",
+        workspace_branch=str(tmp_path),
+    )
+
+
+def test_build_gate_chain_includes_plugin_gates(tmp_path, monkeypatch):
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.harness.ship_approval_gate import ShipApprovalGate
+
+    state = _ship_state(tmp_path)
+    state.save(team="t1")
+
+    pm = _FakePluginMgrWithGates(plugin_gates={"ship": [ShipApprovalGate()]})
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    assert any(isinstance(g, ShipApprovalGate) for g in chain), (
+        f"ShipApprovalGate not in gate chain: {[type(g).__name__ for g in chain]}"
+    )
+
+
+def test_build_gate_chain_includes_cross_agent_verification_gates(tmp_path, monkeypatch):
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.harness.cross_agent_verification_gate import (
+        CrossAgentVerificationGate,
+        VerificationPair,
+    )
+
+    state = _test_state(tmp_path)
+    state.save(team="t1")
+
+    def dummy_verifier(src, tgt):
+        return True, ""
+
+    pair = VerificationPair(
+        phase="test",
+        source_artifact="test-report.md",
+        target_artifact="build-report.md",
+        verifier_dotted_path="irrelevant.for.this.test",
+    )
+    pm = _FakePluginMgrWithGates(verification_pairs=[(pair, dummy_verifier)])
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    cav_gates = [g for g in chain if isinstance(g, CrossAgentVerificationGate)]
+    assert len(cav_gates) == 1, (
+        f"Expected 1 CrossAgentVerificationGate in test phase, got {len(cav_gates)} "
+        f"(chain={[type(g).__name__ for g in chain]})"
+    )
+
+
+def test_build_gate_chain_filters_verification_pairs_by_phase(tmp_path, monkeypatch):
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.harness.cross_agent_verification_gate import (
+        CrossAgentVerificationGate,
+        VerificationPair,
+    )
+
+    state = _test_state(tmp_path)  # phase="test"
+    state.save(team="t1")
+
+    def dummy(src, tgt):
+        return True, ""
+
+    # Pair targeted at review phase — must NOT appear in the test-phase chain.
+    review_pair = VerificationPair(
+        phase="review",
+        source_artifact="design-doc.md",
+        target_artifact="office-hours-answers.md",
+        verifier_dotted_path="irrelevant",
+    )
+    pm = _FakePluginMgrWithGates(verification_pairs=[(review_pair, dummy)])
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    cav_gates = [g for g in chain if isinstance(g, CrossAgentVerificationGate)]
+    assert cav_gates == [], (
+        f"Review-phase pair leaked into test-phase chain: {cav_gates}"
+    )
+
+
+def test_build_gate_chain_ordering(tmp_path, monkeypatch):
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.harness.cross_agent_verification_gate import (
+        CrossAgentVerificationGate,
+        VerificationPair,
+    )
+    from clawteam.harness.evidence_gate import EvidenceGate  # noqa: F401
+    from clawteam.harness.interaction_gate import InteractionGate  # noqa: F401
+    from clawteam.sprint.conductor import SprintConductor
+
+    state = _test_state(tmp_path)
+    state.auto_advance = False  # force InteractionGate insertion
+    state.save(team="t1")
+
+    def dummy(src, tgt):
+        return True, ""
+
+    pair = VerificationPair(
+        phase="test",
+        source_artifact="a.md",
+        target_artifact="b.md",
+        verifier_dotted_path="irrelevant",
+    )
+    pm = _FakePluginMgrWithGates(
+        verification_pairs=[(pair, dummy)],
+        plugin_gates={"test": [_AlwaysPassGate()]},
+    )
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    type_names = [type(g).__name__ for g in chain]
+    assert type_names[0] == "EvidenceGate", f"EvidenceGate must be first: {type_names}"
+    assert type_names[-1] == "InteractionGate", (
+        f"InteractionGate must be last when forced: {type_names}"
+    )
+    # CrossAgentVerificationGate appears before plugin-contributed gate.
+    cav_idx = next(i for i, n in enumerate(type_names) if n == "CrossAgentVerificationGate")
+    plugin_idx = next(i for i, n in enumerate(type_names) if n == "_AlwaysPassGate")
+    assert cav_idx < plugin_idx, (
+        f"CrossAgentVerificationGate ({cav_idx}) must precede plugin gate ({plugin_idx}): {type_names}"
+    )
+
+
+def test_build_gate_chain_no_plugin_manager_backward_compatible(tmp_path, monkeypatch):
+    """BC: SprintConductor without plugin_manager matches Phase 2 chain."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    state = _test_state(tmp_path)
+    state.save(team="t1")
+
+    conductor = SprintConductor(team_name="t1")  # no plugin_manager
+    chain = conductor._build_gate_chain(state)
+    # Phase 2 behaviour: EvidenceGate + forced_progress + maybe InteractionGate.
+    type_names = [type(g).__name__ for g in chain]
+    assert type_names[0] == "EvidenceGate"
+    assert "CrossAgentVerificationGate" not in type_names
+    # Phase 2 had 2 or 3 gates depending on auto_advance / pending questions.
+    assert 2 <= len(chain) <= 3, f"BC chain size drift: {type_names}"
+
+
+def test_build_gate_chain_plugin_manager_exception_safe(tmp_path, monkeypatch, caplog):
+    """plugin_manager accessors raising should not crash gate-chain assembly."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    state = _test_state(tmp_path)
+    state.save(team="t1")
+
+    pm = _FakePluginMgrWithGates(raise_gates=True, raise_pairs=True)
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    with caplog.at_level("WARNING"):
+        chain = conductor._build_gate_chain(state)
+    # Still have the two base gates (EvidenceGate + forced_progress_gate).
+    type_names = [type(g).__name__ for g in chain]
+    assert type_names[0] == "EvidenceGate"
+    # Second gate is the forced_progress_gate (closure — not a class; check it's
+    # NOT EvidenceGate or a plugin gate — it's the "ForcedProgressGate" derived class).
+    assert type_names[1] != "EvidenceGate"
+    # Both accessors raised — both warnings logged.
+    msgs = " ".join(r.message for r in caplog.records)
+    assert "get_plugin_gates raised" in msgs
+    assert "get_verification_pairs raised" in msgs
+
+
+def test_save_sprint_state_helper_exists_iss09():
+    """ISS-09: Plan 10 call sites use save_sprint_state(state). Helper must exist."""
+    from clawteam.sprint.state import save_sprint_state
+    assert callable(save_sprint_state)
