@@ -20,3 +20,40 @@ changes). Re-evaluate at Phase 4 close or defer to v1.x.
   dedicated cleanup in Plan 04-13 (e2e regression). Fix likely needs a
   module-scope fixture that clears `_REGISTERED` between tests, or lazy
   registration inside a function body instead of module import time.
+
+## 04-12 Observations
+
+### ~~Pre-existing failure: test_contribute_review_routers_returns_gstack_router~~ (RESOLVED by 04-11 GREEN)
+
+- **Test:** `tests/test_gstack_plugin.py::test_contribute_review_routers_returns_gstack_router`
+- **Symptom:** Fails in isolation with `AssertionError` at test_gstack_plugin.py:305.
+- **Scope:** Unrelated to Plan 04-12 changes. Introduced by Plan 04-11's RED
+  commit (`41407e4 test(04-11): add failing tests for GstackSprintPlugin Phase 4 hooks`)
+  and awaiting GREEN implementation by the Wave 3 sibling executor.
+- **Observed:** 2026-04-21 during Plan 04-12 post-implementation broad regression.
+  Plan 04-12 test files (`test_sprint_approve_cli.py`) pass 10/10; CLI/gate/state
+  regression suites (69 tests) all pass.
+- **Proposed owner:** Plan 04-11 (will land the matching GREEN implementation).
+- **Resolution:** Plan 04-11 GREEN commit landed 2026-04-21. All 12 new
+  Phase 4 plugin tests green in isolation (22/22 in test_gstack_plugin.py;
+  71/71 in the plan's scoped verification suite — test_gstack_plugin.py +
+  test_cross_agent_verifiers.py + test_gstack_template.py +
+  test_orchestrator_phase_registry.py + test_plugins.py +
+  test_cross_agent_verification_gate.py).
+
+## 04-11 Observations
+
+### Full-suite ordering flake persists (still out-of-scope; owned by 04-13)
+
+- **Symptom:** `pytest tests/` (full suite, alphabetical collection order)
+  still fails at `test_six_evidence_schemas_registered` with the same
+  `Duplicate evidence-schema registration: 'design-doc'` error noted in the
+  04-06 observation above.
+- **Confirmed by bisection:** With Plan 04-11's plugin edits stashed, the
+  same failure reproduces at the same assertion. Plan 04-11 introduces no
+  new state-leak; the flake is pre-existing and inherited from Phase 3
+  plugin substrate.
+- **Scope decision (2026-04-21):** Remains out-of-scope per GSD scope
+  boundary rule. Plan 04-11 scoped verification suite (71 tests) all green.
+  Full-suite cleanup stays with Plan 04-13 (e2e regression) as originally
+  proposed in the 04-06 entry above.

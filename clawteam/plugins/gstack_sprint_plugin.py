@@ -47,6 +47,16 @@ GSTACK_ROLES: list[str] = [
 # clawteam/plugins/gstack_sprint_plugin.py -> clawteam/templates/gstack/prompts/
 PROMPTS_DIR: Path = Path(__file__).parent.parent / "templates" / "gstack" / "prompts"
 
+# Phase 4 Plan 04-11 (§04-CONTEXT D-07): roles that receive a review-phase
+# decorrelation supplement (prompts/review/<role>.md) appended to their base
+# prompt. pm/ceo/eng-mgr/engineer/qa/shipper/sre are NOT in this set — they
+# either are not review participants or do not need the staff-eng / rubric /
+# threat-model / friction cross-cutting anchor.
+_DECORRELATION_ROLES: frozenset[str] = frozenset(
+    {"reviewer", "designer", "security", "dx-lead"}
+)
+_REVIEW_PROMPTS_SUBDIR: str = "review"
+
 
 def _valid_role(role: str) -> bool:
     """Guard against path traversal + symlink escape via attacker-controlled role.
@@ -108,6 +118,13 @@ class GstackSprintPlugin(HarnessPlugin):
 
         Caches per (role) with mtime invalidation so edits during dev loops
         are picked up without process restart (T-07-04 mitigation).
+
+        Phase 4 Plan 04-11 (§04-CONTEXT D-07): when ``phase == "review"``
+        AND role is a decorrelation role (reviewer/designer/security/dx-lead),
+        ALSO read clawteam/templates/gstack/prompts/review/<role>.md and
+        append it as a supplement. Separator header marks the review-phase
+        decorrelation boundary. Missing supplement file falls back gracefully
+        to the base prompt (no supplement appended).
         """
         if role not in GSTACK_ROLES:
             return ""
@@ -116,28 +133,117 @@ class GstackSprintPlugin(HarnessPlugin):
             # check above (GSTACK_ROLES is a frozen list of 11 kebab strings).
             return ""
 
-        prompt_path = PROMPTS_DIR / f"{role}.md"
-        if not prompt_path.is_file():
-            # File missing - propagate empty so downstream sees the gap.
-            # 03-09 integration test asserts all 11 files exist.
+        base = self._load_prompt_file(
+            PROMPTS_DIR / f"{role}.md", cache_key=f"base:{role}"
+        )
+        if not base:
             return ""
 
+        # Phase 4 Plan 04-11: decorrelation supplement for review phase.
+        if phase == "review" and role in _DECORRELATION_ROLES:
+            supplement_path = PROMPTS_DIR / _REVIEW_PROMPTS_SUBDIR / f"{role}.md"
+            supplement = self._load_prompt_file(
+                supplement_path, cache_key=f"review:{role}"
+            )
+            if supplement:
+                return (
+                    base
+                    + "\n\n---\n\n"
+                    + "<!-- PHASE 4 REVIEW DECORRELATION SUPPLEMENT -->\n\n"
+                    + supplement
+                )
+
+        return base
+
+    def _load_prompt_file(self, path: Path, *, cache_key: str) -> str:
+        """Read a prompt file with mtime-invalidated caching.
+
+        Generalization of the Phase 3 base-prompt cache so review-phase
+        decorrelation supplements share the same mtime-invalidation semantics
+        (T-07-04 mitigation). Returns "" on any failure — the plugin never
+        raises from contribute_prompts.
+        """
+        if not path.is_file():
+            return ""
         try:
-            mtime = prompt_path.stat().st_mtime
+            mtime = path.stat().st_mtime
         except OSError:
             return ""
-
-        cached = self._prompt_cache.get(role)
+        cached = self._prompt_cache.get(cache_key)
         if cached is not None and cached[0] == mtime:
             return cached[1]
-
         try:
-            content = prompt_path.read_text(encoding="utf-8")
+            content = path.read_text(encoding="utf-8")
         except OSError:
             return ""
-
-        self._prompt_cache[role] = (mtime, content)
+        self._prompt_cache[cache_key] = (mtime, content)
         return content
+
+    # ── Phase 4 / Plan 04-11 hooks ────────────────────────────────────
+
+    def contribute_review_routers(self):  # type: ignore[override]
+        """Return a GstackReviewRouter loaded from the gstack template's rules.
+
+        §04-CONTEXT D-06 / SPRINT-03. Template is loaded lazily so this method
+        is safe to call at plugin registration time regardless of template-load
+        ordering. If the gstack template fails to load (unusual), returns empty.
+        """
+        try:
+            from clawteam.harness.gstack_review_router import GstackReviewRouter
+            from clawteam.templates import load_template
+            tmpl = load_template("gstack")
+            rules = list(tmpl.review.rules or [])
+            return [GstackReviewRouter(rules)]
+        except Exception:
+            return []
+
+    def contribute_verification_pairs(self):  # type: ignore[override]
+        """Return the 2 gstack cross-verification pairs (§04-CONTEXT D-11).
+
+        Pair 1 — Test phase:   test-report.md ↔ build-report.md   (qa verifies engineer)
+        Pair 2 — Review phase: design-doc.md  ↔ office-hours-answers.md  (reviewer verifies designer)
+
+        Verifier fns are resolved from dotted paths at plugin-load time by
+        PluginManager._instantiate_and_register (Plan 04-05).
+        """
+        try:
+            from clawteam.harness.cross_agent_verification_gate import VerificationPair
+        except Exception:
+            return []
+        return [
+            VerificationPair(
+                phase="test",
+                source_artifact="test-report.md",
+                target_artifact="build-report.md",
+                verifier_dotted_path=(
+                    "clawteam.templates.gstack.verifiers.test_report_matches_diff."
+                    "verify_test_report_matches_engineer_output"
+                ),
+            ),
+            VerificationPair(
+                phase="review",
+                source_artifact="design-doc.md",
+                target_artifact="office-hours-answers.md",
+                verifier_dotted_path=(
+                    "clawteam.templates.gstack.verifiers.design_doc_covers_forcing_qs."
+                    "verify_design_doc_covers_forcing_questions"
+                ),
+            ),
+        ]
+
+    def contribute_gates(self):  # type: ignore[override]
+        """Attach Phase 4 gates to phases (§04-CONTEXT D-13 — Plan 04-04 ShipApprovalGate).
+
+        Extends the base-class default (empty dict). Returns a
+        ``{phase -> [gates]}`` mapping; SprintConductor consumes via
+        ``PluginManager.get_plugin_gates`` (Plan 04-05) + its
+        ``_build_gate_chain`` extension (Plan 04-10 Task 3).
+        """
+        try:
+            from clawteam.harness.ship_approval_gate import ShipApprovalGate
+            return {"ship": [ShipApprovalGate()]}
+        except Exception:
+            return {}
 
     # -- Event subscription (Phase 2 PhaseTransition) ------------------
 
