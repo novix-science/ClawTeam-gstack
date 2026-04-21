@@ -105,6 +105,21 @@ class SprintState(BaseModel):
         ),
     )
 
+    # ── Phase 4 additive field (§04-CONTEXT D-05) ────────────────────
+    # Pinned at Review-phase entry from git rev-parse HEAD; consumed by
+    # GstackReviewRouter + _dispatch_review_phase (Plan 10). Defaults to
+    # None so pre-Phase-4 state.json files load cleanly (pydantic v2 BC
+    # guarantee — same mechanism Phase 2 used for artifact_cap_bytes et al.)
+    review_sha: str | None = Field(
+        default=None,
+        description=(
+            "Commit SHA captured at Review-phase entry (D-05). Used by "
+            "GstackReviewRouter to pin diff_paths = git diff "
+            "<review_sha>..<review_sha>. Mid-review HEAD advance emits "
+            "MidReviewThrash event so reviewers can re-pin or supersede."
+        ),
+    )
+
     # ── Persistence ─────────────────────────────────────────────────
 
     @staticmethod
