@@ -60,7 +60,7 @@ The `GstackSprintPlugin` registering the 7-phase sprint.
 - [ ] **SPRINT-01**: `GstackSprintPlugin` registers 7 phases via `PhaseRegistry`: Think → Plan → Build → Review → Test → Ship → Reflect. Phases appear only when the plugin is loaded; other templates are not affected.
 - [ ] **SPRINT-02**: Each phase ships with an `EvidenceGate` (extension of `ArtifactRequiredGate`) that checks for both presence AND structural validity of the phase's artifact: design-doc.md (Think), plan-doc.md (Plan), diff+patch-notes.md (Build), review-report.md (Review), test-report.md (Test), ship-notes.md (Ship), retro.md (Reflect). Prevents gate gaming (PITFALLS #8).
 - [ ] **SPRINT-03**: `SmartReviewRouter` selects Review-phase participants by diff content via rule config in `gstack.toml`: UI touched → designer; public API → dx-lead; crypto/auth → security; always → reviewer.
-- [ ] **SPRINT-04**: Review phase agents run in parallel; `reviewer` agent runs last, synthesizes parallel reports into a single `review-report.md` aggregation. Gate passes on aggregation, not individual reports.
+- [x] **SPRINT-04**: Review phase agents run in parallel; `reviewer` agent runs last, synthesizes parallel reports into a single `review-report.md` aggregation. Gate passes on aggregation, not individual reports.
 - [x] **SPRINT-05**: Ship phase always requires human approval via `InteractionGate` (ignores `auto_advance: true`). Reason: production blast radius.
 - [x] **SPRINT-06**: Reflect phase writes retro.md AND invokes `/learn` to capture sprint-level patterns to team-shared memory.
 
@@ -115,7 +115,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 - [x] **QUALITY-07
 **: Gstack interactive skill state-machines: `/office-hours`, `/plan-design-review`, `/autoplan` ported as multi-turn state machines (not one-shot prompt bakings) that preserve the per-question interactivity (PITFALLS #7).
 - [ ] **QUALITY-08**: `EvidenceGate` validates artifact structure (not just presence) — e.g., design-doc.md must contain all 6 forcing-question answers; test-report.md must cite actual test run output (PITFALLS #8).
-- [ ] **QUALITY-09**: `SmartReviewRouter` pins to a commit SHA — routing decision is made on the SHA that will be reviewed, not the HEAD that might have moved (PITFALLS #9 thrashing prevention).
+- [x] **QUALITY-09**: `SmartReviewRouter` pins to a commit SHA — routing decision is made on the SHA that will be reviewed, not the HEAD that might have moved (PITFALLS #9 thrashing prevention).
 - [ ] **QUALITY-10**: Memory provenance + decay + human gate on high-impact (covered by MEM-05, MEM-06, MEM-07) (PITFALLS #10).
 - [ ] **QUALITY-11**: Progress-on-artifact rule: an agent's turn is "progress" only if it produced new artifact content or an AttentionQueue entry. Consecutive no-progress turns trigger human escalation (theater prevention per PITFALLS #11).
 - [ ] **QUALITY-12**: Cost observability: `clawteam team show` displays per-agent token usage and estimated cost; sprint-level cost rollups. Advisor pattern reserves expensive model calls for critical gates. Cache hit rate surfaced (PITFALLS #12).
@@ -226,7 +226,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SPRINT-01 | Phase 2 | Pending |
 | SPRINT-02 | Phase 2 | Pending |
 | SPRINT-03 | Phase 4 | Partial (04-06: router + rules shipped; 04-10 wires dispatch; 04-11: plugin contribute_review_routers glue shipped) |
-| SPRINT-04 | Phase 4 | Pending |
+| SPRINT-04 | Phase 4 | Complete |
 | SPRINT-05 | Phase 4 | Complete |
 | SPRINT-06 | Phase 3 | Complete |
 | SKILL-01 | Phase 3 | Complete |
@@ -261,7 +261,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-06 | Phase 2 | Pending |
 | QUALITY-07 | Phase 4 | Complete |
 | QUALITY-08 | Phase 2 | Pending |
-| QUALITY-09 | Phase 4 | Partial (04-06: schema substrate; 04-10 wires SHA pinning) |
+| QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event) |
 | QUALITY-10 | Phase 6 | Pending |
 | QUALITY-11 | Phase 2 | Pending |
 | QUALITY-12 | Phase 7 | Pending |
