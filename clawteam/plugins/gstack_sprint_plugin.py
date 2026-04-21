@@ -44,6 +44,9 @@ from clawteam.templates.gstack.skills.ship.handler import (
 from clawteam.templates.gstack.skills.setup_deploy.handler import (
     setup_deploy_handler as _setup_deploy_handler,
 )
+from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+    land_and_deploy_handler as _land_and_deploy_handler,
+)
 
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
@@ -156,6 +159,10 @@ class GstackSprintPlugin(HarnessPlugin):
         /setup-deploy — one-time deploy-config wizard (SKILL-19, Plan 05-05).
             roles={sre}: SRE-only. questionary is a hard dep (already in
             clawteam/cli) so no tool_available probe; install_hint empty.
+        /land-and-deploy — merged-PR deploy action (SKILL-15, Plan 05-06).
+            roles={shipper}: shipper-only. Provider-specific tool detection
+            (vercel / netlify / flyctl / gh) happens inside the handler so
+            the SkillRegistration has no static tool_available probe.
         """
         return [
             SkillRegistration(
@@ -183,6 +190,17 @@ class GstackSprintPlugin(HarnessPlugin):
                 handler=_setup_deploy_handler,
                 tool_available=None,
                 install_hint="",
+            ),
+            # Plan 05-06:
+            SkillRegistration(
+                name="/land-and-deploy",
+                roles=frozenset({"shipper"}),
+                handler=_land_and_deploy_handler,
+                tool_available=None,  # provider detection is per-call in handler
+                install_hint=(
+                    "apt install gh | brew install gh  AND  "
+                    "npm install -g <vercel|netlify>  OR  brew install flyctl"
+                ),
             ),
         ]
 

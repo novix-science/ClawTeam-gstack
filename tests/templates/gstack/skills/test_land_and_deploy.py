@@ -139,6 +139,9 @@ def test_precondition_ship_failed(tmp_path):
 
 def test_ci_wait_happy(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -181,6 +184,9 @@ def test_ci_wait_happy(tmp_path, monkeypatch):
 
 def test_ci_wait_timeout(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -222,6 +228,9 @@ def test_ci_wait_timeout(tmp_path, monkeypatch):
 
 def test_deploy_vercel_happy(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -270,6 +279,9 @@ def test_deploy_vercel_happy(tmp_path, monkeypatch):
 
 def test_deploy_netlify_happy(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -313,6 +325,9 @@ def test_deploy_netlify_happy(tmp_path, monkeypatch):
 
 def test_deploy_fly_happy(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -356,6 +371,9 @@ def test_deploy_fly_happy(tmp_path, monkeypatch):
 
 def test_deploy_custom_happy(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -412,6 +430,9 @@ def test_deploy_custom_happy(tmp_path, monkeypatch):
 
 def test_deploy_health_probe_timeout_adversarial(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -458,6 +479,9 @@ def test_deploy_health_probe_timeout_adversarial(tmp_path, monkeypatch):
 
 def test_no_deploy_block_pending(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
@@ -533,6 +557,9 @@ def test_registered_in_plugin():
 
 def test_shell_injection_via_custom_cmd_safe(tmp_path, monkeypatch):
     import clawteam.templates.gstack.skills.land_and_deploy.handler as h
+    from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+        land_and_deploy_handler,
+    )
 
     sprint_dir = tmp_path / "sprint"
     _write_ship_notes(sprint_dir)
