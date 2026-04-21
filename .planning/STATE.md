@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 4 executing (wave 3 complete)
-stopped_at: Completed 04-10 + 04-11 + 04-12 (wave 3 parallel fully landed)
-last_updated: "2026-04-21T10:45:00Z"
+status: Phase 4 executing (wave 4 in progress)
+stopped_at: Completed 04-13 (adversarial-routing-golden-tests landed)
+last_updated: "2026-04-21T10:51:24Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 4
-Plan: 10 + 11 + 12 complete (wave 3 all done; 13 + 14 next wave)
+Plan: 13 complete (wave 4 parallel with 14 in flight)
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Plan: 10 + 11 + 12 complete (wave 3 all done; 13 + 14 next wave)
 | Phase 04 P11 | 6min | 2 tasks | 6 files |
 | Phase 04 P12 | 4min | 1 task | 2 files |
 | Phase 04 P10 | 18min | 3 tasks | 3 files |
+| Phase 04 P13 | 10min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,7 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-10: Ship async dispatch_review_phase at clawteam/sprint/review_phase.py (297 LOC, new module per PLAN_PREP_NOTES A4 — keeps conductor <700 LOC); parallel peers via asyncio.gather + sequential reviewer aggregator + review_sha pin at entry + mid-review HEAD-advance → MidReviewThrash event + agreement-rate > threshold → SycophancyCascadeDetected event. _compute_agreement_rate severity-only (RESEARCH Open Q3) skips Exception entries from return_exceptions=True so single spawn failure does not mask real cascade. Default _default_spawn_fn is Phase 5 replacement seam (loop.run_in_executor bridge around SpawnBackend.spawn). Subprocess helpers mirror evidence_gate shell=False + 10s timeout (T-04-31 mitigation).
 - [Phase 04]: 04-10 Task 3: SprintConductor._build_gate_chain gains plugin_manager kwarg + self._plugin_manager storage; chain order now EvidenceGate → forced_progress_gate → [CrossAgentVerificationGate per pair whose phase==current_phase] → [plugin gates from get_plugin_gates(phase)] → (InteractionGate?). Both plugin-manager accessors try/except'd with logged warning — gate chain never crashes on broken plugin (T-04-17 posture). Closes ISS-03 (ShipApprovalGate unreachable) + ISS-07 (CrossAgentVerificationGate unreachable); ShipApprovalGate + cross-verify pairs from Plan 04-11 now actually execute in production.
 - [Phase 04]: 04-10: Cross-executor stash interaction noted — Task 3 conductor.py edits landed as part of commit 5902ede docs(04-12) rather than its own feat(04-10) commit due to sibling-executor working-tree snapshot timing. Functional correctness preserved (87 tests green); future audits grep `plugin_manager` across wave-3 commit range to see Task 3 wiring.
+- [Phase 04]: 04-13: Ship 8 adversarial diff fixtures (renamed_ui / crypto_test / whitespace_only / package_json_dep_bump / auth_middleware_rewrite / cross_cutting_refactor / mixed_ui_and_api / generated_migration) + expected_routing.json oracle + parametrized golden test (12 tests) over GstackReviewRouter using load_template('gstack') real rules; plus consolidated state-machine golden harness (10 tests = 3x3 bijective parametrized + 1 coverage meta) asserting in-code _TRANSITIONS / TURN_BUDGET / _FINAL_STATES match fixtures exactly. ISS-06 tightening applied: removed soft-bound monologue-collapse test in favor of strict TURN_BUDGET equality per fixture. 22/22 green; 71/71 Plan 06/07/08/09 scoped regression green. SPRINT-03 + QUALITY-07 closed.
 
 ### Pending Todos
 
@@ -145,8 +147,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T10:45:00Z
-Stopped at: Completed 04-10 + 04-11 + 04-12 (wave 3 parallel fully landed)
+Last session: 2026-04-21T10:51:24Z
+Stopped at: Completed 04-13 (adversarial-routing-golden-tests landed)
 Resume files:
 
   - Phase 4 (executing wave 4): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md
