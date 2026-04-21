@@ -442,3 +442,52 @@ def test_save_sprint_state_uses_file_locked(monkeypatch, tmp_path):
     sprint_dir = tmp_path / "teams" / "t" / "sprints" / "abcdef12"
     stray = list(sprint_dir.glob("*.tmp"))
     assert not stray, f"stray tempfiles: {stray}"
+
+
+# ── Phase 4 additive-field tests (Plan 04-02 §04-CONTEXT D-05) ───────────────
+# review_sha is pinned at Review-phase entry; defaults to None so pre-Phase-4
+# state.json files load cleanly (pydantic v2 BC guarantee).
+
+
+def test_review_sha_default_none(tmp_path, monkeypatch):
+    """D-05: fresh SprintState has review_sha == None."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    s = SprintState(goal="g", team="t1", current_phase="think")
+    assert s.review_sha is None
+
+
+def test_review_sha_round_trip(tmp_path, monkeypatch):
+    """D-05: review_sha survives save/load."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    s = SprintState(
+        goal="g",
+        team="t1",
+        current_phase="review",
+        review_sha="a1b2c3d4e5f6a1b2c3d4",
+    )
+    s.save(team="t1")
+    loaded = SprintState.load(team="t1", sprint_id=s.sprint_id)
+    assert loaded.review_sha == "a1b2c3d4e5f6a1b2c3d4"
+
+
+def test_review_sha_backwards_compat(tmp_path, monkeypatch):
+    """Pre-Phase-4 state.json (missing review_sha key) loads without ValidationError."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    s = SprintState(goal="g", team="t1", current_phase="plan")
+    path = s.save(team="t1")
+    # Round-trip through raw JSON, stripping review_sha key to simulate pre-Phase-4.
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.pop("review_sha", None)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    loaded = SprintState.load(team="t1", sprint_id=s.sprint_id)
+    assert loaded.review_sha is None
+
+
+def test_review_sha_accepts_full_sha(tmp_path, monkeypatch):
+    """D-05: SprintState.review_sha is permissive; ReviewReport schema enforces stricter regex."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    full = "a" * 40
+    s = SprintState(goal="g", team="t1", current_phase="review", review_sha=full)
+    s.save(team="t1")
+    loaded = SprintState.load(team="t1", sprint_id=s.sprint_id)
+    assert loaded.review_sha == full
