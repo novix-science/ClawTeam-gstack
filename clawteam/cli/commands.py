@@ -1656,6 +1656,214 @@ def team_status(
     _output(data, _human)
 
 
+# ---------------------------------------------------------------------------
+# UX-07: `clawteam team show` team dashboard (Phase 3 Plan 03-08)
+# ---------------------------------------------------------------------------
+
+
+def _team_show_active_sprint(team: str) -> dict | None:
+    """Look up the active sprint for a team. Returns None if none found.
+
+    Best-effort — Phase 3 plan 03-08 UX-07 requires the dashboard to render
+    the roster even if the sprint sub-system is absent or raises. On any
+    failure returns None; the human renderer degrades to "no active sprint".
+    """
+    try:
+        from clawteam.sprint.conductor import SprintConductor
+
+        conductor = SprintConductor(team_name=team)
+        sprints = conductor.list_sprints()
+        # Prefer a sprint that is not 'completed' over a completed one;
+        # tie-break by the last (most-recently-sorted) entry.
+        active = None
+        for s in sprints:
+            if getattr(s, "status", "running") != "completed":
+                active = s  # keep the latest non-completed
+        if active is None:
+            return None
+        phases_list = _team_show_phases_for_template(
+            getattr(active, "team", team)
+        )
+        current = getattr(active, "current_phase", "") or ""
+        if current and current in phases_list:
+            idx = phases_list.index(current) + 1
+            total = len(phases_list)
+            phase_index = f"{idx}/{total}"
+        elif phases_list:
+            phase_index = f"?/{len(phases_list)}"
+        else:
+            phase_index = ""
+        return {
+            "sprintId": getattr(active, "sprint_id", ""),
+            "currentPhase": current,
+            "phaseIndex": phase_index,
+            "goal": getattr(active, "goal", "") or "",
+            "status": getattr(active, "status", "") or "",
+        }
+    except Exception:
+        return None
+
+
+def _team_show_phases_for_template(team: str) -> list[str]:
+    """Return the declared phase order for this team's template (empty on miss).
+
+    Looks up the TeamConfig to find `template`, then loads the TemplateDef
+    to read `phases`. Returns [] when the template isn't role-aware or the
+    lookup fails — the caller then falls back to an unknown phase index.
+    """
+    try:
+        from clawteam.team.manager import TeamManager
+        from clawteam.templates import load_template
+
+        config = TeamManager.get_team(team)
+        if not config:
+            return []
+        tmpl_name = getattr(config, "template", "") or ""
+        if not tmpl_name:
+            return []
+        tmpl = load_template(tmpl_name)
+        return list(getattr(tmpl, "phases", []) or [])
+    except Exception:
+        return []
+
+
+@team_app.command("show")
+def team_show(
+    team: str = typer.Argument(..., help="Team name"),
+):
+    """Show the team dashboard: roster + active sprint + memory + cost rollup.
+
+    UX-07 dashboard (Phase 3 Plan 03-08). For gstack-templated teams the
+    roster lists all 11 specialists and the memory row counts Phase-6
+    `/learn` placeholder files under `_phase6_pending/`. For non-gstack
+    templates the roster + sprint row render; memory + cost rows show
+    "N/A" / "pending" so the command never crashes cross-template.
+    """
+    from clawteam.team.manager import TeamManager
+    from clawteam.team.models import get_data_dir
+
+    config = TeamManager.get_team(team)
+    if not config:
+        _output(
+            {"error": f"Team '{team}' not found"},
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
+
+    # 03-02 extended TeamConfig with `template` + `leader_role`. Use getattr
+    # defensively so teams created before 03-02 (no such fields) still render.
+    template_name = getattr(config, "template", "") or ""
+    leader_role = getattr(config, "leader_role", "") or ""
+
+    # Active sprint: best-effort lookup via Phase 2 SprintConductor.
+    active_sprint = _team_show_active_sprint(team)
+
+    # Memory placeholder count: only scan `_phase6_pending/` for gstack teams
+    # (per 03-07 filter — other templates never write there).
+    memory_placeholder_count = 0
+    if template_name == "gstack":
+        pending_dir = get_data_dir() / "teams" / team / "_phase6_pending"
+        if pending_dir.is_dir():
+            memory_placeholder_count = len(
+                list(pending_dir.glob("*-retro.json"))
+            )
+
+    data = {
+        "name": config.name,
+        "template": template_name,
+        "leaderRole": leader_role,
+        "createdAt": config.created_at,
+        "description": getattr(config, "description", "") or "",
+        "members": [m.model_dump(by_alias=True) for m in config.members],
+        "activeSprint": active_sprint,
+        "memory": {
+            "status": (
+                "pending_phase_6"
+                if template_name == "gstack"
+                else "not_applicable"
+            ),
+            "placeholderEntries": memory_placeholder_count,
+        },
+        "costRollup": {
+            "status": "pending_phase_7",
+            "perAgent": [],
+            "totalTokens": None,
+            "totalUsd": None,
+        },
+    }
+
+    def _human(d):
+        # Header
+        console.print(f"\nTeam: [cyan]{d['name']}[/cyan]")
+        if d.get("description"):
+            console.print(f"  {d['description']}")
+        if d.get("template"):
+            leader_chip = (
+                f" (leader: [magenta]{d['leaderRole']}[/magenta])"
+                if d.get("leaderRole")
+                else ""
+            )
+            console.print(
+                f"  Template: [green]{d['template']}[/green]{leader_chip}"
+            )
+        console.print(f"  Created: {format_timestamp(d['createdAt'])}")
+
+        # Member roster (role-aware — gstack agents' `name` IS the role name
+        # since the template uses `name = "pm"`, `name = "ceo"`, etc.).
+        members_table = Table(title=f"Members ({len(d['members'])})")
+        members_table.add_column("Role / Name", style="cyan")
+        members_table.add_column("ID", style="dim")
+        members_table.add_column("Type")
+        members_table.add_column("Joined", style="dim")
+        for m in d["members"]:
+            members_table.add_row(
+                m.get("name", ""),
+                m.get("agentId", ""),
+                m.get("agentType", ""),
+                format_timestamp(m.get("joinedAt")),
+            )
+        console.print(members_table)
+
+        # Active sprint row
+        sprint = d.get("activeSprint")
+        if sprint:
+            phase_str = (
+                f" ({sprint['phaseIndex']})"
+                if sprint.get("phaseIndex")
+                else ""
+            )
+            console.print(
+                f"\nActive sprint: [cyan]{sprint['sprintId']}[/cyan]"
+                f" — phase [green]{sprint.get('currentPhase', '')}[/green]"
+                f"{phase_str}"
+            )
+            if sprint.get("goal"):
+                console.print(f"  Goal: {sprint['goal']}")
+        else:
+            console.print(
+                "\nActive sprint: [dim]none — run `clawteam sprint start`[/dim]"
+            )
+
+        # Memory placeholder row
+        mem = d["memory"]
+        if mem["status"] == "pending_phase_6":
+            console.print(
+                f"\nMemory: [yellow]Phase 6 pending[/yellow]"
+                f" — {mem['placeholderEntries']} entries in _phase6_pending/"
+            )
+        else:
+            console.print(
+                "\nMemory: [dim]N/A (non-gstack template)[/dim]"
+            )
+
+        # Cost rollup placeholder row (Phase 7 deferred)
+        console.print(
+            "Cost rollup: [dim]pending Phase 7 observability[/dim]"
+        )
+
+    _output(data, _human)
+
+
 @team_app.command("spawn")
 def team_spawn(
     template: str = typer.Argument(..., help="Template name (e.g., 'gstack', 'software-dev')"),
