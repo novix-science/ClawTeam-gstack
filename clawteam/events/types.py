@@ -278,3 +278,46 @@ class ArtifactCapExceeded(HarnessEvent):
     size_bytes: int = 0
     cap_bytes: int = 0
     scope: str = ""  # "file" or "phase"
+
+
+# ── Phase 4: Review-phase events (§04-CONTEXT D-09 / D-19 / D-20) ──────
+
+
+@dataclass
+class MidReviewThrash(HarnessEvent):
+    """Emitted when sprint branch HEAD advances during an in-flight Review phase.
+
+    §04-CONTEXT D-19 / Pitfall 9. Reviewers consume this event in their next
+    turn to choose between re-pinning (extending review to ``new_sha``) or
+    marking the prior review ``superseded``. Payload gives reviewers the
+    diff-delta info they need to decide without shelling out to git.
+
+    Emitted by ``dispatch_review_phase`` (Plan 10) at post-turn boundaries
+    when ``git rev-parse HEAD != state.review_sha``.
+    """
+
+    sprint_id: str = ""
+    review_sha: str = ""
+    new_sha: str = ""
+    reviewer_roles_active: list[str] = field(default_factory=list)
+    diff_paths_added: list[str] = field(default_factory=list)
+    diff_paths_removed: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SycophancyCascadeDetected(HarnessEvent):
+    """Emitted when parallel-reviewer agreement-rate crosses sycophancy_threshold.
+
+    §04-CONTEXT D-09 / D-20 / Pitfall 13. Advisory only — does NOT block
+    phase advance. ``review_round`` is scoped to a single Review-phase
+    dispatch; re-running Review after gap closure opens a new window (D-20).
+
+    Phase 7's ``clawteam attend --summary`` surfaces this event in the
+    cross-sprint digest; Phase 4 only emits + logs.
+    """
+
+    sprint_id: str = ""
+    review_round: int = 0
+    agreement_rate: float = 0.0
+    threshold: float = 0.9
+    reviewer_roles: list[str] = field(default_factory=list)
