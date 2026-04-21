@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 5 executing (wave 3 — /land-and-deploy landed)
-stopped_at: Completed 05-06 (/land-and-deploy skill landed — 4-phase pipeline precondition→CI-wait→deploy→health-probe + DeployNotes artifact + 13 tests)
-last_updated: "2026-04-21T15:00:00Z"
+status: Phase 5 executing (wave 3 — /land-and-deploy + /document-release landed)
+stopped_at: Completed 05-07 (/document-release — doc_walker + patch_emitter + handler + /ship D-11 auto-invoke chain + plugin registration; 10+3 new tests)
+last_updated: "2026-04-21T14:46:54Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 5
-Plan: 06 complete (wave 3 — /land-and-deploy skill landed)
+Plan: 07 complete (wave 3 — /document-release skill + /ship auto-invoke chain landed; /land-and-deploy also landed in parallel)
 
 ## Performance Metrics
 
@@ -142,6 +142,8 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-03: Cross-executor stash interaction (recurrence of Plan 04-10 Task 3 pattern): parallel executors for Plans 05-04 + 05-05 committed my staged test/handler/plugin files under their own commit hashes (f3113d8 / 0b52021 / a991ea8) rather than a standalone feat(05-03). Functional correctness preserved (9/9 codex tests green + plugin returns /codex entry). Audit via `git blame clawteam/plugins/gstack_sprint_plugin.py | grep /codex` still surfaces the wiring. NO feat(05-03) commit exists in the log — tree content is intact and correct.
 - [Phase 05]: 05-06: Ship /land-and-deploy at clawteam/templates/gstack/skills/land_and_deploy/ as 4-phase pipeline (precondition ship_status=succeeded → gh pr checks --watch ci_timeout → provider deploy cmd → exponential-backoff HEAD probe with deploy_verify_timeout_seconds deadline → always write deploy.md). Provider dispatch table {vercel, netlify, fly, custom} via _build_deploy_cmd; custom uses shlex.split (POSIX) + invoke_native_cli(shell=False) — double-layer shell-injection defense proven by test_shell_injection_via_custom_cmd_safe that ["echo","foo;","rm","-rf","/"] stays as literal argv. Handler's own poll precedes EvidenceGate's 10s HEAD (Pitfall 3 closure). Missing or failed ship-notes.md → SkillPreconditionError with hint "Run /ship first" (D-12). No [deploy] block → deploy.md pending + question artifact prompting /setup-deploy. 13 tests green; plugin now registers 4 skills.
 - [Phase 05]: 05-06: Parallel wave-3 execution surfaced the same cross-executor stash pattern as 04-10 / 05-03 — an intermediate linter/editor pre-populated gstack_sprint_plugin.py with Plan 05-07's /document-release registration during my 05-06 execution. Resolved by scoping `git add` to 05-06 content only: built a 05-06-only plugin.py variant via regex-delete of 05-07 hunks, staged + committed, then restored the 05-07 WIP to working copy for 05-07 executor to land atomically with its own handler.py. No 05-07 files committed by this plan.
+- [Phase 05]: 05-07: Ship /document-release at clawteam/templates/gstack/skills/document_release/ as 4-module sub-package: __init__.py (PEP 562 __getattr__ lazy handler import to break ship↔document_release collection cycle) + doc_walker.py (pure walk_docs + extract_code_refs with linear-time regex only — T-05-07-01 DoS-safe) + patch_emitter.py (difflib.unified_diff emission with STALE marker prepend + max_patches cap + deferred-count trailer — T-05-07-05) + handler.py (git diff --diff-filter=D orchestration + InteractionGate question artifact emission for >5-line patches + idempotent no_changes summary on re-run — Pitfall 7). /ship handler wires D-11 auto-invoke on success inside try/except → auto_invoked_skills populated with '/document-release' on success or '/document-release:failed:<reason>' on exception (T-05-07-04 — never fails ship). GstackSprintPlugin.contribute_skills now returns 5 SkillRegistrations. 13 new tests (10 document_release + 3 ship auto-invoke) all green.
+- [Phase 05]: 05-07: Ship tests appended to existing tests/test_ship_skill.py (not the aspirational tests/templates/gstack/skills/test_ship.py path in the plan) — test_ship_skill.py predates the per-skill subdir convention and keeping all ship tests in one module keeps the 21-test pipeline surface visible to any future editor. Deviation Rule 3 — auto-fixed blocking path mismatch.
 
 ### Pending Todos
 
@@ -173,13 +175,13 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T15:00:00Z
-Stopped at: Completed 05-06 (/land-and-deploy landed — SKILL-15: 4-phase pipeline + DeployNotes artifact + 13 tests + frontmatter precondition check + exponential-backoff HEAD probe)
+Last session: 2026-04-21T14:46:54Z
+Stopped at: Completed 05-07 (/document-release landed — SKILL-16: doc_walker + patch_emitter pure helpers + handler orchestration + /ship D-11 auto-invoke chain + plugin registration; 10+3 tests green; plugin now exposes 5 skills)
 Resume files:
 
-  - Phase 5 (executing wave 3): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 (executing wave 3 -> wave 4): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 Plan 07 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-07-SUMMARY.md
   - Phase 5 Plan 06 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-06-SUMMARY.md
-  - Phase 5 Plan 07 (Wave 3 parallel, /document-release): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-07-PLAN.md
   - Phase 5 Plan 08 (Wave 4, /canary): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-08-PLAN.md
 
 ## Recent Activity
