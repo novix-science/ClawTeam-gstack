@@ -57,3 +57,22 @@ changes). Re-evaluate at Phase 4 close or defer to v1.x.
   boundary rule. Plan 04-11 scoped verification suite (71 tests) all green.
   Full-suite cleanup stays with Plan 04-13 (e2e regression) as originally
   proposed in the 04-06 entry above.
+
+## 04-13 Observations
+
+### Parallel-wave RED test from Plan 04-14 visible during 04-13 broad sanity
+
+- **Test:** `tests/test_gstack_role_prompts.py::test_reviewer_review_and_investigate`
+- **Symptom:** Asserts `INTERACTIVE-RUNTIME-DEFERRED` is NOT present in the
+  reviewer role prompt; still present in the prompt because Plan 04-14's
+  GREEN (marker removal) has not landed yet.
+- **Scope:** Pre-existing commit from Plan 04-14's own TDD RED cycle
+  (`dc474ba test(04-14): add failing D-18 marker removal + inverse runtime tests`),
+  observed during 04-13 sanity sweep. Not caused by 04-13 fixtures/tests —
+  both 04-13 test files (`test_adversarial_routing.py`,
+  `test_state_machine_goldens.py`) pass in isolation and in the
+  router+state-machine scoped suite (22/22).
+- **Scope decision (2026-04-21):** Out-of-scope — Plan 04-14's own GREEN
+  commit will resolve. Plan 04-13 ships green for its own 22 tests.
+- **Proposed owner:** Plan 04-14 (will land the marker-removal + runtime-
+  stub GREEN).
