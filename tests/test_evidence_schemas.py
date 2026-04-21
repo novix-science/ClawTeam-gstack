@@ -502,9 +502,17 @@ class TestGstackBarrelComplete:
             )
 
     def test_all_six_in___all__(self) -> None:
+        """Phase 3 barrel — all six Phase 3 schemas must remain exported.
+
+        Phase 5 Plan 05-02 added four more (DeployNotes, CanaryReport,
+        BenchmarkReport, CodexReview); those are validated in
+        :class:`TestGstackBarrelPhase5` below. This test guards the Phase 3
+        export surface as a subset to protect BC without pinning the exact
+        set (which Phase 5 expanded).
+        """
         from clawteam.templates.gstack import schemas as s
 
-        assert set(s.__all__) == {
+        phase3_expected = {
             "DesignDoc",
             "PlanDoc",
             "TestReport",
@@ -512,6 +520,7 @@ class TestGstackBarrelComplete:
             "ShipNotes",
             "Retro",
         }
+        assert phase3_expected.issubset(set(s.__all__))
 
     def test_ship_notes_importable_from_barrel(self) -> None:
         from clawteam.templates.gstack.schemas import ShipNotes as BarrelShipNotes
