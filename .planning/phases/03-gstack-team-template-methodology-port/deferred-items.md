@@ -43,3 +43,23 @@ by 03-02 changes (confirmed via `git stash` baseline run):**
 **03-02 scope-only suite result:** 97 passed (test_team_manager_memory +
 test_manager + test_template_regression_matrix + test_gstack_template +
 test_templates). All BC preserved across 6 existing templates.
+
+## From 03-05 Execution (2026-04-21)
+
+Plan 03-05 (role-prompts-pure-rubric) owns `tests/test_gstack_role_prompts.py`.
+Un-xfailed 8 SKILL tests (pm/ceo/eng-mgr/designer/dx-lead/reviewer/qa/security)
++ preserved D-14 budget gate + added cross-file presence xfail (un-xfails in
+03-06 once engineer/shipper/sre stubs ship). All 9 non-xfail tests PASS.
+
+**Pre-existing failure observed when running full suite; NOT caused by 03-05
+changes (confirmed via `git stash` baseline run):**
+
+- `tests/test_sprint_conductor.py::test_resume_after_process_restart` —
+  pre-existing subprocess-based flake. Fails identically on the `git stash`
+  baseline (no changes), so it is not 03-05-caused. Same flake already logged
+  under 03-02 Execution above; still out of scope for 03-05.
+
+**03-05 scope-only suite result:** 9 passed + 1 xfailed in
+`tests/test_gstack_role_prompts.py`. Full suite: 939 passed, 8 skipped,
+1 xfailed, 1 pre-existing fail (above).
+
