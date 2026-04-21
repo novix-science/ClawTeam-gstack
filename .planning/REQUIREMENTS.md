@@ -99,7 +99,8 @@ Ported gstack guardrails as harness primitives, not per-agent skills.
 - [ ] **SAFETY-02**: `/freeze <path>` — WorkspaceManager enforces write-lock to paths outside the frozen path. Agents attempting writes receive an error (blocked at tool-call level, not after the fact).
 - [ ] **SAFETY-03**: `/guard` — composite of `/careful` + `/freeze`.
 - [ ] **SAFETY-04**: `/unfreeze` — release write-lock; requires audit log entry.
-- [ ] **SAFETY-05**: `/investigate` skill (reviewer role) auto-applies `/freeze` to the module under investigation for the duration of the investigation.
+- [x] **SAFETY-05
+**: `/investigate` skill (reviewer role) auto-applies `/freeze` to the module under investigation for the duration of the investigation.
 
 ### Quality / Pitfall Prevention (QUALITY)
 
@@ -111,7 +112,8 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 - [ ] **QUALITY-04**: Active-agent slot pool: harness caps concurrent active agents at N (default 6). Idle agents dormant. Prevents resource blowup on laptops (PITFALLS #4).
 - [ ] **QUALITY-05**: `AttentionQueue` auto-digest: questions grouped by sprint + age; Catch-Up digest view surfaces "4 sprints stalled >2h, 1 CRITICAL" — prevents attention fatigue (PITFALLS #5).
 - [ ] **QUALITY-06**: Workspace hardening: file-lock retry with exponential backoff; `git index` corruption detection + auto-recovery; per-agent worktree integrity check on resume (PITFALLS #6).
-- [ ] **QUALITY-07**: Gstack interactive skill state-machines: `/office-hours`, `/plan-design-review`, `/autoplan` ported as multi-turn state machines (not one-shot prompt bakings) that preserve the per-question interactivity (PITFALLS #7).
+- [x] **QUALITY-07
+**: Gstack interactive skill state-machines: `/office-hours`, `/plan-design-review`, `/autoplan` ported as multi-turn state machines (not one-shot prompt bakings) that preserve the per-question interactivity (PITFALLS #7).
 - [ ] **QUALITY-08**: `EvidenceGate` validates artifact structure (not just presence) — e.g., design-doc.md must contain all 6 forcing-question answers; test-report.md must cite actual test run output (PITFALLS #8).
 - [ ] **QUALITY-09**: `SmartReviewRouter` pins to a commit SHA — routing decision is made on the SHA that will be reviewed, not the HEAD that might have moved (PITFALLS #9 thrashing prevention).
 - [ ] **QUALITY-10**: Memory provenance + decay + human gate on high-impact (covered by MEM-05, MEM-06, MEM-07) (PITFALLS #10).

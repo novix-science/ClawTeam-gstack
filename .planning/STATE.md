@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 4 executing (wave 1)
-stopped_at: Completed 04-06-review-router-and-template-extension-PLAN.md
-last_updated: "2026-04-21T10:17:16Z"
+status: Phase 4 executing (wave 2)
+stopped_at: Completed 04-09-investigate-state-machine-freeze-PLAN.md
+last_updated: "2026-04-21T10:28:09.014Z"
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 48
-  completed_plans: 40
-  percent: 83
+  completed_plans: 42
+  percent: 88
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 4
-Plan: 06 complete (wave 1)
+Plan: 09 complete (wave 2)
 
 ## Performance Metrics
 
@@ -68,6 +68,8 @@ Plan: 06 complete (wave 1)
 | Phase 03 P08 | 20min | 2 tasks | 2 files |
 | Phase 03 P09 | 9min | 2 tasks | 2 files |
 | Phase 04 P06 | 5min | 3 tasks | 9 files |
+| Phase 04 P09 | 3min | 2 tasks | 4 files |
+| Phase 04 P08 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -102,6 +104,7 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-06: Per-rule try/except with logged continue (T-04-18 mitigation per RFC 001 §4.3b req 4) — broken glob does not crash the router; floor + other rules still fire.
 - [Phase 04]: 04-06: 4 decorrelation prompt supplements shipped under clawteam/templates/gstack/prompts/review/ (reviewer=staff-eng cross-cutting, designer=rubric-first, security=threat-model-first, dx-lead=friction-first); all under 2 KB budget (max 1760 B at 86% of budget); verbatim persona anchors from §04-CONTEXT specifics.
 - [Phase 04]: 04-06: gstack.toml ships 6 [[template.review.rules]] rows covering ui/crypto/api/package signals + sycophancy_threshold=0.9 (D-09/D-20 cascade alarm); SPRINT-03 / QUALITY-09 substrate / QUALITY-13 decorrelation prompts all satisfied.
+- [Phase 04]: 04-09: InvestigateState ships per-hypothesis state machine (290 LOC) with 8-transition bijective graph against fixture; auto-freeze/unfreeze wired via FreezeRegistry with reason='investigate:<sprint_id>:<hypothesis_id>' for grep-correlatable freeze_audit.jsonl; D-16 path validation rejects ** / * / ? / [ + out-of-workspace; 23 tests pass, Phase 2 FreezeRegistry unregressed
 
 ### Pending Todos
 
@@ -133,8 +136,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T10:17:16Z
-Stopped at: Completed 04-06-review-router-and-template-extension-PLAN.md
+Last session: 2026-04-21T10:27:42.150Z
+Stopped at: Completed 04-09-investigate-state-machine-freeze-PLAN.md
 Resume files:
 
   - Phase 4 (executing wave 1): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md
