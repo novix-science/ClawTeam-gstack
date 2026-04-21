@@ -98,6 +98,47 @@ class GstackSprintPlugin(HarnessPlugin):
             "retro": Retro,
         }
 
+    # -- Per-role prompt resolution (T-07-02 + T-07-04 mitigations) ----
+
+    def contribute_prompts(self, phase: str, role: str) -> str:
+        """Resolve clawteam/templates/gstack/prompts/<role>.md for gstack roles.
+
+        Returns empty string for non-gstack roles so other templates' roles
+        flow through undisturbed (CORE-03 + QUALITY-14 backwards compat).
+
+        Caches per (role) with mtime invalidation so edits during dev loops
+        are picked up without process restart (T-07-04 mitigation).
+        """
+        if role not in GSTACK_ROLES:
+            return ""
+        if not _valid_role(role):
+            # Belt-and-suspenders: should be unreachable given containment
+            # check above (GSTACK_ROLES is a frozen list of 11 kebab strings).
+            return ""
+
+        prompt_path = PROMPTS_DIR / f"{role}.md"
+        if not prompt_path.is_file():
+            # File missing - propagate empty so downstream sees the gap.
+            # 03-09 integration test asserts all 11 files exist.
+            return ""
+
+        try:
+            mtime = prompt_path.stat().st_mtime
+        except OSError:
+            return ""
+
+        cached = self._prompt_cache.get(role)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+
+        try:
+            content = prompt_path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
+        self._prompt_cache[role] = (mtime, content)
+        return content
+
     # -- Event subscription (Phase 2 PhaseTransition) ------------------
 
     def on_register(self, ctx: HarnessContext) -> None:
