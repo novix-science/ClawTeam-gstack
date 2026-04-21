@@ -1,0 +1,42 @@
+{
+  "renamed_ui_component": {
+    "diff_files": ["src/components/Button.tsx", "src/components/OldButton.tsx"],
+    "expected_participants": ["designer", "reviewer"],
+    "note": "Renamed UI file still pulls designer; both old+new paths considered (git diff --name-only emits both)."
+  },
+  "crypto_test_file": {
+    "diff_files": ["tests/test_crypto_helpers.py", "lib/crypto/keys.py"],
+    "expected_participants": ["reviewer", "security"],
+    "note": "lib/crypto/keys.py matches **/crypto/** -> security."
+  },
+  "whitespace_only": {
+    "diff_files": ["README.md"],
+    "expected_participants": ["reviewer"],
+    "note": "No rules match README.md; floor only."
+  },
+  "package_json_dep_bump": {
+    "diff_files": ["package.json"],
+    "expected_participants": ["dx-lead", "reviewer"],
+    "note": "package.json rule pulls dx-lead."
+  },
+  "auth_middleware_rewrite": {
+    "diff_files": ["src/auth/middleware.py"],
+    "expected_participants": ["reviewer", "security"],
+    "note": "src/auth/** rule pulls security."
+  },
+  "cross_cutting_refactor": {
+    "diff_files": ["src/components/Form.tsx", "src/auth/tokens.py", "app/api/users.ts", "package.json"],
+    "expected_participants": ["designer", "dx-lead", "reviewer", "security"],
+    "note": "Union of designer (UI) + security (auth) + dx-lead (api + package)."
+  },
+  "mixed_ui_and_api": {
+    "diff_files": ["src/components/Dashboard.tsx", "app/api/dashboard/route.ts"],
+    "expected_participants": ["designer", "dx-lead", "reviewer"],
+    "note": "UI + api = designer + dx-lead + floor."
+  },
+  "generated_migration": {
+    "diff_files": ["migrations/20260421_add_user_table.sql", "docs/changelog.md"],
+    "expected_participants": ["reviewer"],
+    "note": "Migrations + docs not routed; floor only."
+  }
+}

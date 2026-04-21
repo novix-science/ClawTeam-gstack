@@ -1,0 +1,15 @@
+diff --git a/src/auth/middleware.py b/src/auth/middleware.py
+--- a/src/auth/middleware.py
++++ b/src/auth/middleware.py
+@@ -1,10 +1,15 @@
+-def verify_token(token):
+-    if not token:
+-        return None
+-    return jwt.decode(token)
++def verify_token(token):
++    if not token or len(token) < 10:
++        return None
++    try:
++        return jwt.decode(token, verify=True)
++    except InvalidTokenError:
++        return None

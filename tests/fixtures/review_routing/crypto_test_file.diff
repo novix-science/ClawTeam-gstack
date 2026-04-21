@@ -1,0 +1,16 @@
+diff --git a/tests/test_crypto_helpers.py b/tests/test_crypto_helpers.py
+--- a/tests/test_crypto_helpers.py
++++ b/tests/test_crypto_helpers.py
+@@ -1,3 +1,4 @@
+ from lib.crypto.aes import encrypt
++from lib.crypto.keys import rotate
+
+ def test_encrypt():
+     pass
+diff --git a/lib/crypto/keys.py b/lib/crypto/keys.py
+new file mode 100644
+--- /dev/null
++++ b/lib/crypto/keys.py
+@@ -0,0 +1,3 @@
++def rotate():
++    pass

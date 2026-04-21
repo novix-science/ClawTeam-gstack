@@ -1,0 +1,15 @@
+diff --git a/migrations/20260421_add_user_table.sql b/migrations/20260421_add_user_table.sql
+new file mode 100644
+--- /dev/null
++++ b/migrations/20260421_add_user_table.sql
+@@ -0,0 +1,5 @@
++CREATE TABLE users (
++    id SERIAL PRIMARY KEY,
++    email TEXT NOT NULL
++);
+diff --git a/docs/changelog.md b/docs/changelog.md
+--- a/docs/changelog.md
++++ b/docs/changelog.md
+@@ -1,3 +1,4 @@
+ # Changelog
++2026-04-21: Added users table.
