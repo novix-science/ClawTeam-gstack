@@ -131,7 +131,7 @@ CLI and dashboard surfaces.
 - [ ] **UX-04**: `clawteam sprint list --team <name>` lists all sprints with phase + status.
 - [ ] **UX-05**: `clawteam sprint show <id>` displays full sprint detail: participants, phase history, artifacts, memory writes.
 - [ ] **UX-06**: `clawteam attend` surfaces the top-N pending questions across sprints; user answers, queue re-refreshes.
-- [ ] **UX-07**: `clawteam team show <name>` displays team dashboard: member list + memory highlights + active sprint progress bars + cost/token rollup.
+- [x] **UX-07**: `clawteam team show <name>` displays team dashboard: member list + memory highlights + active sprint progress bars + cost/token rollup.
 - [ ] **UX-08**: `clawteam doctor` detects missing optional tools (Chromium, codex CLI, ngrok, watchdog) and prints install instructions per detected OS.
 - [ ] **UX-09**: All user-facing CLI commands support `--json` for machine-readable output (consistent with existing `clawteam` pattern).
 
@@ -272,7 +272,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | UX-04 | Phase 2 | Pending |
 | UX-05 | Phase 2 | Pending |
 | UX-06 | Phase 7 | Pending |
-| UX-07 | Phase 3 | Pending |
+| UX-07 | Phase 3 | Complete |
 | UX-08 | Phase 0 | Pending |
 | UX-09 | Phase 2 | Pending |
 

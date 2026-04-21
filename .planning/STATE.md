@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 03-07-plugin-wiring-PLAN.md
-last_updated: "2026-04-21T05:17:45.638Z"
+stopped_at: Completed 03-08-team-show-cli-PLAN.md
+last_updated: "2026-04-21T05:27:34.707Z"
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 32
-  percent: 94
+  completed_plans: 33
+  percent: 97
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 03 (gstack-team-template-methodology-port) — EXECUTING
-Plan: 8 of 9
+Plan: 9 of 9
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Plan: 8 of 9
 | Phase 03 P05 | 1h | 5 tasks | 9 files |
 | Phase 03 P06 | 15min | 3 tasks | 5 files |
 | Phase 03 P07 | 45min | 4 tasks | 2 files |
+| Phase 03 P08 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - [Phase 03]: [Phase 03]: 03-05: Port 8 pure-rubric role prompts (pm/ceo/eng-mgr/designer/dx-lead/reviewer/qa/security) as per-file markdown under 4KB per D-14; drift-adjusted verbatim from upstream fixtures (7 design passes not 10; 22 cso exclusions not 17)
 - [Phase 03]: 03-06: Ship engineer.md (D-01 substantive implementation-discipline rubric, 2025B) + shipper.md + sre.md (D-02/D-03 honest Phase-5-deferred stubs with rubric:none SIGNATURE flag as Phase 5 swap target); tighten D-14 gate to == 11 prompts; un-xfail cross-file presence test. All 11 prompts now present.
 - [Phase 03]: 03-07: Ship GstackSprintPlugin as single cohesive 334 LOC plugin (Pattern 2); 5 HarnessPlugin hooks + 3-layer cross-template isolation (T-07-01 HIGH mitigation); D-09 Reflect-phase placeholder written atomically via file_locked
+- [Phase 03]: 03-08: Ship clawteam team show Typer subcommand per UX-07 — 4-section dashboard (roster + active sprint + memory placeholder + cost rollup placeholder); JSON contract reserves Phase 6/7 swap points (pending_phase_6 / pending_phase_7 literals)
+- [Phase 03]: 03-08: Member role chip uses TeamMember.name (gstack.toml sets AgentDef.name to role identifiers pm/ceo/engineer/...); no schema change needed — TeamMember has no .role field because only AgentDef (template-time) carries it
+- [Phase 03]: 03-08: Sprint lookup is best-effort (SprintConductor.list_sprints wrapped in try/except) — UX-07 floor is 'roster visible'; broken sprint substrate must never hide the 11-specialist dashboard
 
 ### Pending Todos
 
@@ -119,8 +123,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T05:17:37.486Z
-Stopped at: Completed 03-07-plugin-wiring-PLAN.md
+Last session: 2026-04-21T05:27:34.701Z
+Stopped at: Completed 03-08-team-show-cli-PLAN.md
 Resume files:
 
   - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md
