@@ -21,6 +21,10 @@ from typing import TYPE_CHECKING
 
 from clawteam.plugins.base import HarnessPlugin
 from clawteam.templates.gstack.schemas import (
+    BenchmarkReport,
+    CanaryReport,
+    CodexReview,
+    DeployNotes,
     DesignDoc,
     PlanDoc,
     Retro,
@@ -98,7 +102,15 @@ class GstackSprintPlugin(HarnessPlugin):
     # -- Phase 2 hooks -------------------------------------------------
 
     def contribute_evidence_schemas(self) -> dict[str, type]:
-        """Register 6 pydantic schemas keyed by artifact_type Literal discriminator."""
+        """Register 10 pydantic schemas keyed by artifact_type Literal discriminator.
+
+        Phase 3 Plan 03-07 shipped the 6 canonical gstack artifacts (design-doc /
+        plan-doc / test-report / review-report / ship-notes / retro). Phase 5
+        Plan 05-02 appends the 4 tool-heavy-skill artifacts (deploy-notes /
+        canary-report / benchmark-report / codex-review) so Wave 2-4 skill
+        handlers (Plans 05-03 through 05-09) can write typed evidence that
+        passes through EvidenceGate without further plugin wiring.
+        """
         return {
             "design-doc": DesignDoc,
             "plan-doc": PlanDoc,
@@ -106,6 +118,11 @@ class GstackSprintPlugin(HarnessPlugin):
             "review-report": ReviewReport,
             "ship-notes": ShipNotes,
             "retro": Retro,
+            # Phase 5 Plan 05-02:
+            "deploy-notes": DeployNotes,
+            "canary-report": CanaryReport,
+            "benchmark-report": BenchmarkReport,
+            "codex-review": CodexReview,
         }
 
     # -- Per-role prompt resolution (T-07-02 + T-07-04 mitigations) ----

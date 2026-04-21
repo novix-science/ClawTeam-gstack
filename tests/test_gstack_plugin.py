@@ -73,7 +73,13 @@ def test_seven_phases_registered_in_order():
 
 
 def test_six_schemas_registered():
-    """contribute_evidence_schemas keys match the 6 artifact_type discriminators."""
+    """contribute_evidence_schemas includes the 6 Phase 3 artifact discriminators.
+
+    Phase 5 Plan 05-02 extended the dict to 10 keys (adds deploy-notes /
+    canary-report / benchmark-report / codex-review); full 10-key surface
+    tested in tests/test_evidence_schemas_phase5.py. This test guards the
+    Phase 3 subset as a BC anchor.
+    """
     from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
     from clawteam.templates.gstack.schemas import (
         DesignDoc,
@@ -86,9 +92,10 @@ def test_six_schemas_registered():
 
     plugin = GstackSprintPlugin()
     schemas = plugin.contribute_evidence_schemas()
-    assert set(schemas.keys()) == {
+    phase3_expected = {
         "design-doc", "plan-doc", "test-report", "review-report", "ship-notes", "retro",
     }
+    assert phase3_expected.issubset(set(schemas.keys()))
     assert schemas["design-doc"] is DesignDoc
     assert schemas["plan-doc"] is PlanDoc
     assert schemas["test-report"] is TestReport
