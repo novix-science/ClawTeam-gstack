@@ -223,7 +223,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | TEAM-06 | Phase 0 | Pending |
 | SPRINT-01 | Phase 2 | Pending |
 | SPRINT-02 | Phase 2 | Pending |
-| SPRINT-03 | Phase 4 | Pending |
+| SPRINT-03 | Phase 4 | Partial (04-06: router + rules shipped; 04-10 wires dispatch) |
 | SPRINT-04 | Phase 4 | Pending |
 | SPRINT-05 | Phase 4 | Pending |
 | SPRINT-06 | Phase 3 | Complete |
@@ -259,11 +259,11 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-06 | Phase 2 | Pending |
 | QUALITY-07 | Phase 4 | Pending |
 | QUALITY-08 | Phase 2 | Pending |
-| QUALITY-09 | Phase 4 | Pending |
+| QUALITY-09 | Phase 4 | Partial (04-06: schema substrate; 04-10 wires SHA pinning) |
 | QUALITY-10 | Phase 6 | Pending |
 | QUALITY-11 | Phase 2 | Pending |
 | QUALITY-12 | Phase 7 | Pending |
-| QUALITY-13 | Phase 4 | Pending |
+| QUALITY-13 | Phase 4 | Partial (04-06: 4 decorrelation prompts shipped; 04-11 plugin appends them) |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
 | UX-01 | Phase 3 | Complete |

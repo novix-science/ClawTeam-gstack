@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 03-09-e2e-cross-template-regression-PLAN.md
-last_updated: "2026-04-21T05:47:09.084Z"
+status: Phase 4 executing (wave 1)
+stopped_at: Completed 04-06-review-router-and-template-extension-PLAN.md
+last_updated: "2026-04-21T10:17:16Z"
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 34
-  completed_plans: 34
-  percent: 100
+  total_plans: 48
+  completed_plans: 40
+  percent: 83
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 4
-Plan: Not started
+Plan: 06 complete (wave 1)
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Plan: Not started
 | Phase 03 P07 | 45min | 4 tasks | 2 files |
 | Phase 03 P08 | 20min | 2 tasks | 2 files |
 | Phase 03 P09 | 9min | 2 tasks | 2 files |
+| Phase 04 P06 | 5min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,12 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-08: Member role chip uses TeamMember.name (gstack.toml sets AgentDef.name to role identifiers pm/ceo/engineer/...); no schema change needed — TeamMember has no .role field because only AgentDef (template-time) carries it
 - [Phase 03]: 03-08: Sprint lookup is best-effort (SprintConductor.list_sprints wrapped in try/except) — UX-07 floor is 'roster visible'; broken sprint substrate must never hide the 11-specialist dashboard
 - [Phase 03]: 03-09: Ship 13 cross-template isolation tests (6+6+1 parametrized) + un-xfail 3 active TEAM-03/UX-01 tests; Phase 3 requirements 16/16 covered. T-07-01 HIGH now 2-layer mitigated.
+- [Phase 04]: 04-06: Ship GstackReviewRouter at clawteam/harness/gstack_review_router.py with custom _match_path globstar shim (verbatim from PLAN_PREP_NOTES A-fnmatch; portable to Python 3.10+ where PurePosixPath.full_match is 3.13+ only); 151 LOC; 20 tests green including 7-case fixture from prep notes.
+- [Phase 04]: 04-06: TemplateDef gains ReviewRule + ReviewConfig pydantic models + review field (Pattern 1 strict-additive, default empty); _parse_toml reads optional [template.review] block. All 6 non-gstack templates parse unchanged with ReviewConfig() defaults (parametrized BC test locks).
+- [Phase 04]: 04-06: Reviewer floor is NOT negotiable via rules (T-04-20): router unconditionally seeds matched={'reviewer'} before iterating rules; set semantics + sorted output means rule that adds 'reviewer' does not duplicate the floor.
+- [Phase 04]: 04-06: Per-rule try/except with logged continue (T-04-18 mitigation per RFC 001 §4.3b req 4) — broken glob does not crash the router; floor + other rules still fire.
+- [Phase 04]: 04-06: 4 decorrelation prompt supplements shipped under clawteam/templates/gstack/prompts/review/ (reviewer=staff-eng cross-cutting, designer=rubric-first, security=threat-model-first, dx-lead=friction-first); all under 2 KB budget (max 1760 B at 86% of budget); verbatim persona anchors from §04-CONTEXT specifics.
+- [Phase 04]: 04-06: gstack.toml ships 6 [[template.review.rules]] rows covering ui/crypto/api/package signals + sycophancy_threshold=0.9 (D-09/D-20 cascade alarm); SPRINT-03 / QUALITY-09 substrate / QUALITY-13 decorrelation prompts all satisfied.
 
 ### Pending Todos
 
@@ -126,12 +133,11 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T05:36:02.328Z
-Stopped at: Completed 03-09-e2e-cross-template-regression-PLAN.md
+Last session: 2026-04-21T10:17:16Z
+Stopped at: Completed 04-06-review-router-and-template-extension-PLAN.md
 Resume files:
 
-  - Phase 2 (executing): .planning/phases/02-sprint-engine-evidence-gates-theater-drift-deadlock-prevention/02-CONTEXT.md
-  - Phase 3 (planning next): .planning/phases/03-gstack-team-template-methodology-port/03-CONTEXT.md
+  - Phase 4 (executing wave 1): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md
 
 ## Recent Activity
 

@@ -214,7 +214,7 @@ Plans:
 - [ ] 04-03-PLAN.md — CrossAgentVerificationGate base class + VerificationPair pydantic model
 - [ ] 04-04-PLAN.md — ShipApprovalGate (HumanApprovalGate variant — SPRINT-05 always-human)
 - [ ] 04-05-PLAN.md — HarnessPlugin.contribute_verification_pairs + contribute_gates hooks + PluginManager accessors (revised: Task 2 adds contribute_gates wiring)
-- [ ] 04-06-PLAN.md — GstackReviewRouter + [[template.review.rules]] TOML extension
+- [x] 04-06-PLAN.md — GstackReviewRouter + [[template.review.rules]] TOML extension (completed 2026-04-21)
 - [ ] 04-07-PLAN.md — OfficeHoursState machine (pm / /office-hours)
 - [ ] 04-08-PLAN.md — DesignConsultationState machine (designer / /design-consultation)
 - [ ] 04-09-PLAN.md — InvestigateState machine (reviewer / /investigate) + FreezeRegistry wiring
