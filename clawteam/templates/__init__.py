@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # TOML support: built-in on 3.11+, conditional dependency on 3.10
 if sys.version_info >= (3, 11):
@@ -45,6 +45,57 @@ class TaskDef(BaseModel):
     owner: str = ""
 
 
+# ---------------------------------------------------------------------------
+# Phase 4 Plan 04-06 (§04-CONTEXT D-04 / A5): review-phase routing config.
+# Declared here alongside TemplateDef so `_parse_toml` can populate
+# `TemplateDef.review` atomically with the rest of the template shape.
+# ---------------------------------------------------------------------------
+
+
+class ReviewRule(BaseModel):
+    """One routing rule for SmartReviewRouter (§04-CONTEXT D-04).
+
+    Evaluated by :class:`clawteam.harness.gstack_review_router.GstackReviewRouter`.
+    ``pattern`` is a path glob (engine selected per PLAN_PREP_NOTES A-fnmatch);
+    ``reviewers`` are role names to add when any diff path matches. First-match
+    WITH accumulation: a path matching two rules unions both reviewers.
+    """
+
+    pattern: str = Field(
+        ...,
+        min_length=1,
+        description="Path glob (e.g. 'src/components/**/*.tsx').",
+    )
+    reviewers: list[str] = Field(
+        default_factory=list,
+        description="Roles to add on match.",
+    )
+    signal: str = Field(
+        default="",
+        description="Optional classification tag (ui|api|crypto|security).",
+    )
+
+
+class ReviewConfig(BaseModel):
+    """Review-phase configuration (§04-CONTEXT D-04 / D-09).
+
+    Default empty; only gstack.toml ships rules. The 6 other bundled
+    templates omit the [template.review] block entirely and rehydrate to
+    ``ReviewConfig(rules=[], sycophancy_threshold=0.9)``.
+    """
+
+    sycophancy_threshold: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Agreement-rate threshold for sycophancy_cascade_detected "
+            "event (D-09/D-20)."
+        ),
+    )
+    rules: list[ReviewRule] = Field(default_factory=list)
+
+
 class TemplateDef(BaseModel):
     name: str
     description: str = ""
@@ -66,6 +117,10 @@ class TemplateDef(BaseModel):
     # {"root": "{data_dir}/teams/{team_name}/memory", "per_role": True}.
     # TeamManager.create_team consults this to pre-create per-role dirs.
     memory: dict[str, str | bool] = {}
+    # Phase 4 (Plan 04-06, §04-CONTEXT D-04): review-phase routing +
+    # decorrelation config. Default empty ReviewConfig keeps the 6 existing
+    # non-gstack templates BC-safe (they omit [template.review] entirely).
+    review: ReviewConfig = Field(default_factory=ReviewConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +168,17 @@ def _parse_toml(path: Path) -> TemplateDef:
     # Parse tasks
     tasks = [TaskDef(**t) for t in tmpl.get("tasks", [])]
 
+    # Phase 4 (Plan 04-06, §04-CONTEXT D-04 / A5): parse optional
+    # [template.review] + [[template.review.rules]]. BC-safe: if no review
+    # block is declared, ReviewConfig() defaults apply (empty rules,
+    # sycophancy_threshold=0.9).
+    review_tmpl = tmpl.get("review", {}) or {}
+    raw_rules = review_tmpl.get("rules", []) or []
+    review_config = ReviewConfig(
+        sycophancy_threshold=float(review_tmpl.get("sycophancy_threshold", 0.9)),
+        rules=[ReviewRule(**r) for r in raw_rules],
+    )
+
     return TemplateDef(
         name=tmpl.get("name", path.stem),
         description=tmpl.get("description", ""),
@@ -127,6 +193,9 @@ def _parse_toml(path: Path) -> TemplateDef:
         phases=tmpl.get("phases", []),
         model_profile=tmpl.get("model_profile", {}),
         memory=tmpl.get("memory", {}),
+        # Phase 4 (Plan 04-06): review-phase config. Default empty when the
+        # template declares no [template.review] block.
+        review=review_config,
     )
 
 
