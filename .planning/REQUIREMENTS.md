@@ -119,7 +119,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 - [ ] **QUALITY-10**: Memory provenance + decay + human gate on high-impact (covered by MEM-05, MEM-06, MEM-07) (PITFALLS #10).
 - [ ] **QUALITY-11**: Progress-on-artifact rule: an agent's turn is "progress" only if it produced new artifact content or an AttentionQueue entry. Consecutive no-progress turns trigger human escalation (theater prevention per PITFALLS #11).
 - [ ] **QUALITY-12**: Cost observability: `clawteam team show` displays per-agent token usage and estimated cost; sprint-level cost rollups. Advisor pattern reserves expensive model calls for critical gates. Cache hit rate surfaced (PITFALLS #12).
-- [ ] **QUALITY-13**: Reviewer decorrelation: parallel reviewers receive different system prompts optimized for their persona (reviewer=staff-eng-cross-cutting, security=threat-model-first, designer=rubric-first, dx-lead=friction-first) so their findings diverge rather than mirror each other (PITFALLS #13).
+- [x] **QUALITY-13**: Reviewer decorrelation: parallel reviewers receive different system prompts optimized for their persona (reviewer=staff-eng-cross-cutting, security=threat-model-first, designer=rubric-first, dx-lead=friction-first) so their findings diverge rather than mirror each other (PITFALLS #13).
 - [ ] **QUALITY-14**: Backwards-compatibility regression matrix in CI: every existing template (software-dev, hedge-fund, etc.) spawns + runs + passes existing tests after every gstack-related change (PITFALLS #14).
 - [ ] **QUALITY-15**: Env deny-filter: `_env()` helpers never surface secret-shaped values (API keys, tokens) into logs, board views, or memory (PITFALLS #17).
 
@@ -225,7 +225,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | TEAM-06 | Phase 0 | Pending |
 | SPRINT-01 | Phase 2 | Pending |
 | SPRINT-02 | Phase 2 | Pending |
-| SPRINT-03 | Phase 4 | Partial (04-06: router + rules shipped; 04-10 wires dispatch) |
+| SPRINT-03 | Phase 4 | Partial (04-06: router + rules shipped; 04-10 wires dispatch; 04-11: plugin contribute_review_routers glue shipped) |
 | SPRINT-04 | Phase 4 | Pending |
 | SPRINT-05 | Phase 4 | Pending |
 | SPRINT-06 | Phase 3 | Complete |
@@ -265,7 +265,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-10 | Phase 6 | Pending |
 | QUALITY-11 | Phase 2 | Pending |
 | QUALITY-12 | Phase 7 | Pending |
-| QUALITY-13 | Phase 4 | Partial (04-06: 4 decorrelation prompts shipped; 04-11 plugin appends them) |
+| QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook) |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
 | UX-01 | Phase 3 | Complete |
