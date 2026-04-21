@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 5 executing (wave 0 substrate complete)
-stopped_at: Completed 05-01 (wave0-substrate landed — skill dispatch + invoke_native_cli + doctor + TemplateDef sub-blocks)
-last_updated: "2026-04-21T12:05:00Z"
+status: Phase 5 executing (wave 1 schemas + events complete)
+stopped_at: Completed 05-02 (wave1-substrate landed — 4 pydantic schemas + ShipNotes Phase 5 extension + 2 HarnessEvents + 10-schema plugin wiring)
+last_updated: "2026-04-21T14:10:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 5
-Plan: 01 complete (wave 0 substrate landed)
+Plan: 02 complete (wave 1 schemas + events landed)
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Plan: 01 complete (wave 0 substrate landed)
 | Phase 04 P13 | 10min | 3 tasks | 12 files |
 | Phase 04 P14 | 10min | 3 tasks | 5 files |
 | Phase 05 P01 | 35min | 3 tasks | 15 files |
+| Phase 05 P02 | 80min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,12 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-01: invoke_native_cli scrub_env is default, NOT required preprocessor — callers passing explicit env={...} bypass scrub_env (explicit opt-out) so Phase 5 skill handlers can legitimately reach subprocess with provider auth tokens when needed.
 - [Phase 05]: 05-01: TemplateDef sub-blocks live at TOP LEVEL of the TOML (NOT under [template]) per CONTEXT.md example `[ship] coverage_threshold = 0.7`. All four default to None so gstack + 6 bundled templates parse unchanged; DeployConfig.provider is Literal['vercel','netlify','fly','custom'] — pydantic enforces enum at parse time (T-05-01-07).
 - [Phase 05]: 05-01 defers test-cross-contamination (evidence_schemas._registry process-global) to future hygiene plan — pre-existing on ed8c32a, unrelated to Plan 05-01; logged at .planning/phases/05-tool-heavy-skills-ship-sre-codex/deferred-items.md.
+- [Phase 05]: 05-02: Wave 1 artifact/event substrate — 4 new pydantic evidence schemas (DeployNotes / CanaryReport / BenchmarkReport / CodexReview) at clawteam/templates/gstack/schemas/ + ShipNotes Phase 5 optional fields (ship_status/steps_completed/coverage/coverage_threshold/failure_step/failure_reason/branch/auto_invoked_skills) all backward-compatible + 2 HarnessEvent dataclasses (DeployRegressionDetected / WebVitalRegressionDetected) auto-registered on import + GstackSprintPlugin.contribute_evidence_schemas extended from 6 to 10 keys. 18 new tests; zero skill handler code — handlers arrive in Waves 2-4. Closes SKILL-13, SKILL-14, SKILL-15, SKILL-17, SKILL-18 substrate portions.
+- [Phase 05]: 05-02: DeployNotes.provider Literal enum matches TemplateDef.deploy.provider enum (['vercel','netlify','fly','custom']) so deploy pipeline is type-level consistent from config to artifact.
+- [Phase 05]: 05-02: BenchmarkReport Core Web Vitals (lcp_ms/fid_ms/cls_score) are Optional[float] for D-15 adversarial partial-Lighthouse JSON and D-10 curl-fallback; ttfb_ms/dom_loaded_ms remain required (curl always provides them).
+- [Phase 05]: 05-02: ShipNotes Phase 5 fields ALL optional with None / empty-list defaults — Phase 3 test `test_minimal_phase3_shape_still_valid` explicitly locks BC; tests/test_gstack_plugin.py::test_six_schemas_registered relaxed to issubset so it passes with the 10-key dict (full surface locked in tests/test_evidence_schemas_phase5.py).
+- [Phase 05]: 05-02: register_event_type for new HarnessEvents lives at module bottom of clawteam/events/types.py after a late `from clawteam.events.bus import register_event_type` to break the bus<->types circular dep (same Phase 4 pattern for MidReviewThrash).
+- [Phase 05]: 05-02: Test files placed flat at tests/ (test_event_types_phase5.py / test_evidence_schemas_phase5.py / test_ship_notes_phase5_fields.py) matching existing convention (tests/test_event_types_phase2.py + tests/test_event_types_phase4.py already at root); plan's suggested subdirs don't exist in this repo.
 
 ### Pending Todos
 
@@ -155,12 +162,13 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T12:05:00Z
-Stopped at: Completed 05-01 (wave0-substrate landed)
+Last session: 2026-04-21T14:10:00Z
+Stopped at: Completed 05-02 (wave1-substrate landed — schemas + events)
 Resume files:
 
-  - Phase 5 (executing wave 0): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
-  - Phase 5 Plan 01 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-01-SUMMARY.md
+  - Phase 5 (executing wave 1 -> wave 2): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 Plan 02 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-02-SUMMARY.md
+  - Phase 5 Plan 03 (Wave 2, /codex): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-03-PLAN.md
 
 ## Recent Activity
 
