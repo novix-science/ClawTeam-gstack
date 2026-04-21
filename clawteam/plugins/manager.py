@@ -9,6 +9,7 @@ import sys
 from typing import Any
 
 from clawteam.plugins.base import HarnessPlugin
+from clawteam.plugins.skill_registration import SkillRegistration
 
 _logger = logging.getLogger(__name__)
 
@@ -253,6 +254,40 @@ class PluginManager:
         gates for this phase. Order preserves plugin-load order.
         """
         return list(self._plugin_gates.get(phase, []))
+
+    def get_plugin_skills(self) -> dict[str, SkillRegistration]:
+        """Aggregate slash-skill registrations from all loaded plugins (§05-CONTEXT D-04).
+
+        Iterates loaded plugins in registration order (``self._loaded`` is a
+        dict, insertion order preserved). For each plugin, calls its
+        :meth:`HarnessPlugin.contribute_skills` hook and merges the returned
+        list into a ``{name: SkillRegistration}`` dict.
+
+        Raises
+        ------
+        ValueError
+            When two plugins contribute :class:`SkillRegistration` instances
+            with the same ``.name``. The message contains the literal
+            ``"duplicate skill"`` and the offending name, mirroring the
+            PhaseRegistry namespace rule (§04-CONTEXT D-03).
+
+        Returns
+        -------
+        dict[str, SkillRegistration]
+            Aggregated skill registry keyed by ``SkillRegistration.name``.
+            :class:`clawteam.plugins.skill_dispatcher.SkillDispatcher`
+            consumes this mapping directly.
+        """
+        skills: dict[str, SkillRegistration] = {}
+        for plugin in self._loaded.values():
+            for reg in plugin.contribute_skills() or []:
+                if reg.name in skills:
+                    raise ValueError(
+                        f"duplicate skill name {reg.name!r}: "
+                        f"already contributed by another plugin"
+                    )
+                skills[reg.name] = reg
+        return skills
 
     def loaded_plugins(self) -> dict[str, HarnessPlugin]:
         return dict(self._loaded)

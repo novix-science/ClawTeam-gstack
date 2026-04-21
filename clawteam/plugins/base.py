@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from clawteam.plugins.skill_registration import SkillRegistration
+
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
     from clawteam.harness.cross_agent_verification_gate import VerificationPair
@@ -129,5 +131,23 @@ class HarnessPlugin(ABC):
         Hook is optional; existing plugins (software-dev, hedge-fund, code-review,
         harness-default, research-paper, strategy-room, ralph-loop) inherit the
         empty-list default and are unaffected.
+        """
+        return []
+
+    # ── Phase 5 / Plan 05-01 hook ─────────────────────────────────────
+
+    def contribute_skills(self) -> list[SkillRegistration]:
+        """Contribute slash-skill dispatch entries (§05-CONTEXT D-04).
+
+        Returns a list of :class:`SkillRegistration` describing skills this
+        plugin exposes to agents. :meth:`PluginManager.get_plugin_skills`
+        aggregates across plugins and raises ``ValueError`` on duplicate
+        ``name`` (mirrors the PhaseRegistry duplicate-name rule).
+
+        Empty-list default means the plugin contributes no skills. Existing
+        plugins (software-dev, hedge-fund, code-review, harness-default,
+        research-paper, strategy-room, ralph-loop, and the current Phase 3
+        GstackSprintPlugin) inherit the empty default and are unaffected.
+        Wave 2+ plans register actual skills on GstackSprintPlugin.
         """
         return []
