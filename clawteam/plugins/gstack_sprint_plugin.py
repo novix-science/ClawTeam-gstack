@@ -47,6 +47,9 @@ from clawteam.templates.gstack.skills.setup_deploy.handler import (
 from clawteam.templates.gstack.skills.land_and_deploy.handler import (
     land_and_deploy_handler as _land_and_deploy_handler,
 )
+from clawteam.templates.gstack.skills.document_release.handler import (
+    document_release_handler as _document_release_handler,
+)
 
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
@@ -163,6 +166,10 @@ class GstackSprintPlugin(HarnessPlugin):
             roles={shipper}: shipper-only. Provider-specific tool detection
             (vercel / netlify / flyctl / gh) happens inside the handler so
             the SkillRegistration has no static tool_available probe.
+        /document-release — diff-vs-docs stale-ref detector (SKILL-16, Plan 05-07).
+            roles={shipper}: shipper-only. Auto-invoked by /ship on success
+            per D-11; pure-git baseline so no tool_available probe needed
+            (git is always present in a ClawTeam checkout).
         """
         return [
             SkillRegistration(
@@ -201,6 +208,14 @@ class GstackSprintPlugin(HarnessPlugin):
                     "apt install gh | brew install gh  AND  "
                     "npm install -g <vercel|netlify>  OR  brew install flyctl"
                 ),
+            ),
+            # Plan 05-07:
+            SkillRegistration(
+                name="/document-release",
+                roles=frozenset({"shipper"}),
+                handler=_document_release_handler,
+                tool_available=None,  # git is baseline — no probe needed
+                install_hint="",
             ),
         ]
 

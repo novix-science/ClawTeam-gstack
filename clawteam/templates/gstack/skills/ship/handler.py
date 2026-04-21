@@ -242,7 +242,22 @@ def ship_handler(
     pr_url = pr_result.details.get("pr_url")
     steps_completed.append("pr")
 
-    # All 5 steps succeeded.
+    # All 5 steps succeeded — Plan 05-07 D-11: auto-invoke /document-release.
+    # Failure of /document-release MUST NOT fail /ship: the try/except demotes
+    # any exception to a ``/document-release:failed:<reason>`` marker in the
+    # ship-notes. Import is inside the try/except so a missing
+    # document_release sub-package (extremely unlikely post-05-07) also
+    # degrades gracefully.
+    auto_invoked: list[str] = []
+    try:
+        from clawteam.templates.gstack.skills.document_release import (
+            handler as _dr_mod,
+        )
+        _dr_mod.document_release_handler(ctx, role=role, args={})
+        auto_invoked.append("/document-release")
+    except Exception as exc:  # noqa: BLE001 — deliberate: never fail /ship
+        auto_invoked.append(f"/document-release:failed:{exc}")
+
     artifact = _write_ship_notes(
         sprint_dir,
         sprint_id=sprint_id,
@@ -254,8 +269,7 @@ def ship_handler(
         failure_reason=None,
         pr_url=pr_url,
         branch=branch,
-        # Plan 05-07 appends /document-release here; Plan 05-04 leaves empty.
-        auto_invoked_skills=[],
+        auto_invoked_skills=auto_invoked,
     )
     return {
         "artifact_path": str(artifact),
