@@ -61,7 +61,7 @@ The `GstackSprintPlugin` registering the 7-phase sprint.
 - [ ] **SPRINT-02**: Each phase ships with an `EvidenceGate` (extension of `ArtifactRequiredGate`) that checks for both presence AND structural validity of the phase's artifact: design-doc.md (Think), plan-doc.md (Plan), diff+patch-notes.md (Build), review-report.md (Review), test-report.md (Test), ship-notes.md (Ship), retro.md (Reflect). Prevents gate gaming (PITFALLS #8).
 - [ ] **SPRINT-03**: `SmartReviewRouter` selects Review-phase participants by diff content via rule config in `gstack.toml`: UI touched → designer; public API → dx-lead; crypto/auth → security; always → reviewer.
 - [ ] **SPRINT-04**: Review phase agents run in parallel; `reviewer` agent runs last, synthesizes parallel reports into a single `review-report.md` aggregation. Gate passes on aggregation, not individual reports.
-- [ ] **SPRINT-05**: Ship phase always requires human approval via `InteractionGate` (ignores `auto_advance: true`). Reason: production blast radius.
+- [x] **SPRINT-05**: Ship phase always requires human approval via `InteractionGate` (ignores `auto_advance: true`). Reason: production blast radius.
 - [x] **SPRINT-06**: Reflect phase writes retro.md AND invokes `/learn` to capture sprint-level patterns to team-shared memory.
 
 ### Gstack Skill Ports (SKILL)
@@ -227,7 +227,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SPRINT-02 | Phase 2 | Pending |
 | SPRINT-03 | Phase 4 | Partial (04-06: router + rules shipped; 04-10 wires dispatch; 04-11: plugin contribute_review_routers glue shipped) |
 | SPRINT-04 | Phase 4 | Pending |
-| SPRINT-05 | Phase 4 | Pending |
+| SPRINT-05 | Phase 4 | Complete |
 | SPRINT-06 | Phase 3 | Complete |
 | SKILL-01 | Phase 3 | Complete |
 | SKILL-02 | Phase 3 | Complete |

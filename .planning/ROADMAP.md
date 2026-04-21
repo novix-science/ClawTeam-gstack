@@ -220,7 +220,7 @@ Plans:
 - [ ] 04-09-PLAN.md — InvestigateState machine (reviewer / /investigate) + FreezeRegistry wiring
 - [ ] 04-10-PLAN.md — Review-phase dispatch: parallel reviewers + SHA-pin + thrash + sycophancy events (revised: Task 3 wires plugin gates + CrossAgentVerificationGate into _build_gate_chain)
 - [ ] 04-11-PLAN.md — GstackSprintPlugin extensions: contribute_review_routers + contribute_verification_pairs + contribute_gates + decorrelation prompts
-- [ ] 04-12-PLAN.md — clawteam sprint approve CLI subcommand (writes ship-approval.md)
+- [x] 04-12-PLAN.md — clawteam sprint approve CLI subcommand (writes ship-approval.md) (completed 2026-04-21)
 - [ ] 04-13-PLAN.md — Adversarial routing golden tests (8 fixture diffs) + consolidated state-machine goldens
 - [ ] 04-14-PLAN.md — REVISION: D-18 marker cleanup + mid-review-push integration (closes SC #4) + ISS-06 test tightening
 

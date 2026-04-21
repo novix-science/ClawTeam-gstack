@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 4 executing (wave 2)
-stopped_at: Completed 04-08-design-consultation-state-machine-PLAN.md
-last_updated: "2026-04-21T10:29:14.300Z"
+status: Phase 4 executing (wave 3)
+stopped_at: Completed 04-11 + 04-12 (wave 3 parallel — 10 still in flight)
+last_updated: "2026-04-21T10:40:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 48
-  completed_plans: 43
-  percent: 90
+  completed_plans: 47
+  percent: 98
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 4
-Plan: 09 complete (wave 2)
+Plan: 11 + 12 complete (wave 3; 10 in flight)
 
 ## Performance Metrics
 
@@ -70,6 +70,8 @@ Plan: 09 complete (wave 2)
 | Phase 04 P06 | 5min | 3 tasks | 9 files |
 | Phase 04 P09 | 3min | 2 tasks | 4 files |
 | Phase 04 P08 | 5min | 2 tasks | 4 files |
+| Phase 04 P11 | 6min | 2 tasks | 6 files |
+| Phase 04 P12 | 4min | 1 task | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +109,7 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-09: InvestigateState ships per-hypothesis state machine (290 LOC) with 8-transition bijective graph against fixture; auto-freeze/unfreeze wired via FreezeRegistry with reason='investigate:<sprint_id>:<hypothesis_id>' for grep-correlatable freeze_audit.jsonl; D-16 path validation rejects ** / * / ? / [ + out-of-workspace; 23 tests pass, Phase 2 FreezeRegistry unregressed
 - [Phase 04]: 04-08: Ship DesignConsultationState at clawteam/templates/gstack/skills/design_consultation/state.py with 15-entry _TRANSITIONS bijective to fixture JSON; 7 rubric dimensions verbatim from plan-design-review.md; TURN_BUDGET=15 as plain assignment; mirrors OfficeHoursState shape for Plan 07 cross-consistency; 14/14 tests green including restart-survival (CORE-07).
 - [Phase 04]: 04-08: _state_path is @staticmethod so path-validation tests can reject bad identifiers without constructing a state instance; _sync_pending_dimension() derives pending_dimension_id from current_state after every handle() call (single source of truth).
+- [Phase 04]: 04-12: Ship `clawteam sprint approve <id> --phase ship` Typer subcommand at clawteam/cli/commands.py appended after sprint_resume (zero edits to existing sprint subcommands); canonical ship-approval.md frontmatter (artifact_type/approved_by/approved_at/sha_at_approval/sprint_id + optional approval_notes) synthesized from ordered dict without pyyaml dep; layered SHA resolution (state.review_sha → git rev-parse HEAD → error APPROVE_NO_SHA exit 2) and identity resolution (git config user.name → $USER → "unknown"); --no-sign is a forward-compat no-op (real git-signed commits = v1.x per T-04-39 accept); end-to-end test confirms written artifact satisfies ShipApprovalGate; 10 tests green, SPRINT-05 closed.
 
 ### Pending Todos
 
@@ -138,8 +141,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T10:28:19.140Z
-Stopped at: Completed 04-08-design-consultation-state-machine-PLAN.md
+Last session: 2026-04-21T10:40:00Z
+Stopped at: Completed 04-11 + 04-12 (wave 3 parallel — 10 still in flight)
 Resume files:
 
   - Phase 4 (executing wave 1): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md

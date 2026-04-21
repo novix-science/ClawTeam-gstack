@@ -241,6 +241,7 @@ class SprintConductor:
         artifact_cap_bytes: int | None = None,
         phase_artifact_cap_bytes: int | None = None,
         bus: "EventBus | None" = None,
+        plugin_manager=None,
     ) -> None:
         if not team_name:
             raise MissingTeamError()
@@ -256,6 +257,11 @@ class SprintConductor:
 
             bus = get_event_bus()
         self.bus = bus
+
+        # Phase 4 Plan 04-10 Task 3: optional plugin_manager for gate-chain
+        # aggregation. When None, _build_gate_chain falls back to the Phase 2
+        # three-gate composition (BC — Phase 2 tests do NOT pass a plugin_manager).
+        self._plugin_manager = plugin_manager
 
         # Activate safety rails (Plan 02-10). Idempotent — safe to double-call
         # per T-02-17 mitigation (see freeze_registry._subscribers_registered).
@@ -559,7 +565,16 @@ class SprintConductor:
         )
 
     def _build_gate_chain(self, state: SprintState) -> list:
-        """Compose EvidenceGate → forced_progress_gate → (InteractionGate?).
+        """Compose EvidenceGate → forced_progress_gate → [plugin cross-verify + plugin gates] → (InteractionGate?).
+
+        Phase 4 Plan 04-10 Task 3 (§04-CONTEXT D-10..D-13) extension:
+        when ``self._plugin_manager`` is set, the chain ALSO includes:
+          (a) CrossAgentVerificationGate instances from plugin_manager.get_verification_pairs()
+              filtered to pair.phase == state.current_phase (Plan 04-05 Task 1 accessor).
+          (b) Plugin-contributed gates from plugin_manager.get_plugin_gates(state.current_phase)
+              (Plan 04-05 Task 2 accessor). This is how Phase 4's ShipApprovalGate
+              (contributed by GstackSprintPlugin.contribute_gates in Plan 04-11)
+              actually reaches production — previously unreachable per revision ISS-03.
 
         InteractionGate insertion logic per §02-CONTEXT D-23 + force_interactive_phases:
 
@@ -567,6 +582,10 @@ class SprintConductor:
         - auto_advance=False → always insert.
         - auto_advance=True + pending_question_ids non-empty → insert.
         - auto_advance=True + no pending questions → skip.
+
+        BC: when plugin_manager is None (legacy Phase 2 callers), the chain is
+        identical to the Phase 2 three-gate composition. Phase 2 tests continue
+        to pass without modification.
 
         Gates are imported lazily so the conductor module loads cleanly even
         when optional sub-modules (evidence_gate, forced_progress_gate,
@@ -583,6 +602,54 @@ class SprintConductor:
         # True. Phase 3 GstackSprintPlugin populates the real artifact list.
         chain.append(EvidenceGate(artifact_names=list(state.artifacts.keys())))
         chain.append(forced_progress_gate())
+
+        # Phase 4 Plan 04-10 Task 3 — plugin contributions (ISS-03 + ISS-07).
+        if self._plugin_manager is not None:
+            import logging as _lg
+            # Cross-agent verification gates (Plan 04-05 Task 1 accessor,
+            # Plan 04-03 gate). Construct one CrossAgentVerificationGate per
+            # (VerificationPair, verifier) tuple whose phase matches the
+            # sprint's current_phase.
+            try:
+                pairs = self._plugin_manager.get_verification_pairs() or []
+            except Exception as exc:  # noqa: BLE001
+                _lg.getLogger(__name__).warning(
+                    "plugin_manager.get_verification_pairs raised: %s", exc
+                )
+                pairs = []
+            if pairs:
+                from clawteam.harness.cross_agent_verification_gate import (
+                    CrossAgentVerificationGate,
+                )
+                for pair, verifier in pairs:
+                    if getattr(pair, "phase", None) != state.current_phase:
+                        continue
+                    try:
+                        gate = CrossAgentVerificationGate(
+                            phase=pair.phase,
+                            source_artifact=pair.source_artifact,
+                            target_artifact=pair.target_artifact,
+                            verifier=verifier,
+                        )
+                        chain.append(gate)
+                    except Exception as exc:  # noqa: BLE001
+                        _lg.getLogger(__name__).warning(
+                            "CrossAgentVerificationGate construction failed for %r: %s",
+                            pair,
+                            exc,
+                        )
+
+            # Plugin-contributed gates (Plan 04-05 Task 2 accessor).
+            try:
+                plugin_gates = (
+                    self._plugin_manager.get_plugin_gates(state.current_phase) or []
+                )
+            except Exception as exc:  # noqa: BLE001
+                _lg.getLogger(__name__).warning(
+                    "plugin_manager.get_plugin_gates raised: %s", exc
+                )
+                plugin_gates = []
+            chain.extend(plugin_gates)
 
         has_pending = bool(state.pending_question_ids)
         forced = state.current_phase in self.force_interactive_phases
