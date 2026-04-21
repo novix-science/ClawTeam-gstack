@@ -321,3 +321,58 @@ class SycophancyCascadeDetected(HarnessEvent):
     agreement_rate: float = 0.0
     threshold: float = 0.9
     reviewer_roles: list[str] = field(default_factory=list)
+
+
+# ── Phase 5 / Plan 05-02: canary + benchmark regression events ────────
+
+
+@dataclass
+class DeployRegressionDetected(HarnessEvent):
+    """Canary observed a regression vs pre-deploy baseline (D-14, SKILL-17).
+
+    Emitted by ``/canary`` handler (Plan 05-08) when any of:
+      - 5xx rate > 1%
+      - avg response time > 2 * ``pre_deploy_avg_response_ms``
+      - any JS console error observed (browser mode)
+
+    Advisory-only in Phase 5; Phase 7's ``clawteam attend --summary``
+    surfaces the event in the cross-sprint digest so SRE can see rollback
+    candidates without poking at each sprint directory.
+    """
+
+    sprint_id: str = ""
+    deploy_url: str = ""
+    regression_flags: list[str] = field(default_factory=list)
+    http_2xx_count: int = 0
+    http_5xx_count: int = 0
+    avg_response_ms: float = 0.0
+    pre_deploy_avg_response_ms: float = 0.0
+
+
+@dataclass
+class WebVitalRegressionDetected(HarnessEvent):
+    """A Core Web Vital exceeded 1.5x pre-deploy baseline (D-14, SKILL-18).
+
+    Emitted by ``/benchmark`` handler (Plan 05-09). ``vital`` is one of:
+    ``"lcp"``, ``"fid"``, ``"cls"``, ``"ttfb"``, ``"dom_loaded"``.
+
+    Advisory-only; mirrors :class:`DeployRegressionDetected` shape so
+    Phase 7 aggregator can treat the two regression events uniformly.
+    """
+
+    sprint_id: str = ""
+    deploy_url: str = ""
+    vital: str = ""
+    baseline_value: float = 0.0
+    observed_value: float = 0.0
+    ratio: float = 0.0
+
+
+# Late import to avoid the clawteam.events.bus <-> clawteam.events.types
+# circular dependency: bus.py imports HarnessEvent from this module at top
+# level, so we MUST not import from bus.py until after HarnessEvent is
+# defined. Placing this at the bottom keeps the module-load order safe.
+from clawteam.events.bus import register_event_type  # noqa: E402
+
+register_event_type(DeployRegressionDetected)
+register_event_type(WebVitalRegressionDetected)

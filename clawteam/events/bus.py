@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-from clawteam.events.types import HarnessEvent
+if TYPE_CHECKING:
+    from clawteam.events.types import HarnessEvent
 
 # ── Event type registry (plugins can register custom event types) ─────
+#
+# Deviation (Plan 05-02, Rule 3 — blocking): the previous top-level import
+# ``from clawteam.events.types import HarnessEvent`` made ``types.py`` unable
+# to call ``register_event_type`` at module load. Phase 5 Plan 05-02 requires
+# the module-bottom registration calls (acceptance criteria + key_links
+# frontmatter pattern). Deferring the runtime import into resolve_event_type
+# + TYPE_CHECKING-gating the annotations breaks the cycle without changing
+# any public API.
 
 _EVENT_TYPE_REGISTRY: dict[str, type[HarnessEvent]] = {}
 
@@ -22,13 +31,21 @@ def resolve_event_type(name: str) -> type[HarnessEvent] | None:
     """Resolve an event class by name. Checks registry first, then types module."""
     if name in _EVENT_TYPE_REGISTRY:
         return _EVENT_TYPE_REGISTRY[name]
+    # Lazy imports — types.py imports register_event_type from this module
+    # at load time (Phase 5 Plan 05-02), so we cannot import HarnessEvent at
+    # module top. types is guaranteed fully loaded by the time any caller
+    # invokes resolve_event_type (all callers are post-init).
     from clawteam.events import types as _types
+    from clawteam.events.types import HarnessEvent as _HarnessEvent
     cls = getattr(_types, name, None)
-    if cls is not None and isinstance(cls, type) and issubclass(cls, HarnessEvent):
+    if cls is not None and isinstance(cls, type) and issubclass(cls, _HarnessEvent):
         return cls
     return None
 
-Handler = Callable[[HarnessEvent], Any]
+# ``HarnessEvent`` is TYPE_CHECKING-gated to break the types.py ↔ bus.py
+# circular-import cycle (Plan 05-02). Use a string forward-ref so the
+# assignment evaluates without a runtime resolution of HarnessEvent.
+Handler = Callable[["HarnessEvent"], Any]
 
 
 class _Subscription:
