@@ -9,43 +9,51 @@ files_modified:
   - clawteam/plugins/manager.py
   - tests/test_plugins.py
 autonomous: true
-requirements: [SPRINT-04, QUALITY-13]
+requirements: [SPRINT-04, SPRINT-05, QUALITY-13]
 must_haves:
   truths:
     - "HarnessPlugin.contribute_verification_pairs() exists as an optional hook returning list[VerificationPair], default []."
+    - "HarnessPlugin.contribute_gates() exists as an optional hook returning dict[str, list[PhaseGate]], default {} — REVISION: the base class hook declaration that Plan 11's GstackSprintPlugin overrides for ShipApprovalGate."
     - "PluginManager resolves each VerificationPair.verifier_dotted_path to a callable at plugin-load time."
-    - "Resolved pairs are exposed via PluginManager.get_verification_pairs() (or similar accessor) for SprintConductor to consume."
-    - "Existing plugins (ralph_loop, gstack_sprint, code_review etc.) that don't override the hook continue to work (default empty)."
+    - "Resolved pairs are exposed via PluginManager.get_verification_pairs() for SprintConductor to consume."
+    - "Plugin-contributed gates are aggregated per phase via PluginManager.get_plugin_gates(phase) for SprintConductor._build_gate_chain (Plan 10) to consume."
+    - "Existing plugins (ralph_loop, gstack_sprint, code_review etc.) that don't override the hooks continue to work (default empty)."
     - "Import-time registration does not crash if a verifier_dotted_path is unresolvable (logged + skipped)."
   artifacts:
     - path: "clawteam/plugins/base.py"
-      provides: "Optional contribute_verification_pairs hook on HarnessPlugin"
+      provides: "Optional contribute_verification_pairs + contribute_gates hooks on HarnessPlugin"
       contains: "def contribute_verification_pairs"
     - path: "clawteam/plugins/manager.py"
-      provides: "Resolver that imports verifier_dotted_path + stashes (VerificationPair, callable) tuples"
+      provides: "Resolver that imports verifier_dotted_path + stashes (VerificationPair, callable) tuples; plugin gates aggregator"
       contains: "_verification_pairs"
     - path: "tests/test_plugins.py"
-      provides: "Tests for hook default [], custom plugin returning pairs, dotted-path resolver"
+      provides: "Tests for hook defaults, custom plugins, dotted-path resolver, gate aggregator"
       contains: "def test_contribute_verification_pairs_default_empty"
   key_links:
     - from: "clawteam/plugins/base.py"
       to: "clawteam/harness/cross_agent_verification_gate.py (VerificationPair)"
       via: "contribute_verification_pairs return type is list[VerificationPair]"
       pattern: "list[VerificationPair]"
+    - from: "clawteam/plugins/base.py"
+      to: "clawteam/harness/phases.py (PhaseGate)"
+      via: "contribute_gates return type is dict[str, list[PhaseGate]]"
+      pattern: "dict[str, list[PhaseGate]]"
     - from: "clawteam/plugins/manager.py"
-      to: "PluginManager consumers (SprintConductor._build_gate_chain later)"
-      via: "get_verification_pairs() accessor"
+      to: "PluginManager consumers (SprintConductor._build_gate_chain in Plan 10)"
+      via: "get_verification_pairs() + get_plugin_gates(phase) accessors"
     - from: "Plan 11 (GstackSprintPlugin)"
-      to: "contribute_verification_pairs"
-      via: "Plugin overrides hook to return the two gstack verifiers"
+      to: "contribute_verification_pairs + contribute_gates"
+      via: "Plugin overrides hooks to return gstack verifiers + ShipApprovalGate"
 ---
 
 <objective>
-Add the optional `HarnessPlugin.contribute_verification_pairs()` hook (D-12), extend `PluginManager._instantiate_and_register` to resolve each returned `VerificationPair.verifier_dotted_path` to a callable at plugin-load time, and stash the resolved (pair, callable) tuples in a registry accessor so `SprintConductor._build_gate_chain` (Plan 10) can instantiate `CrossAgentVerificationGate` instances in later phases.
+Add TWO optional `HarnessPlugin` hooks (D-12 + D-13 wiring): `contribute_verification_pairs()` returning `list[VerificationPair]`, and `contribute_gates()` returning `dict[str, list[PhaseGate]]`. Extend `PluginManager._instantiate_and_register` to (a) resolve each `VerificationPair.verifier_dotted_path` to a callable at plugin-load time and stash the resolved (pair, callable) tuples in a registry accessor, and (b) aggregate plugin-contributed gates per-phase for `SprintConductor._build_gate_chain` (Plan 10) to consume when constructing the gate chain.
 
-Purpose: This is the ONLY plugin-hook edit in Phase 4. The hook mirrors the existing optional pattern (`contribute_review_routers`, `contribute_evidence_schemas`) — empty default, resolved at plugin-load, consumed by later substrate. Phase 3's 5 existing plugin hooks are not modified.
+Purpose: This plan ships TWO plugin-hook edits in Phase 4. Both hooks mirror the existing optional pattern (`contribute_review_routers`, `contribute_evidence_schemas`) — empty default, resolved/aggregated at plugin-load, consumed by later substrate. Phase 3's 5 existing plugin hooks are not modified.
 
-Output: 1 line added to base.py (method default), ~25 lines added to manager.py (resolver + accessor), 1 test file updated with 4 tests.
+**REVISION NOTE (ISS-03 closure):** The original plan shipped only `contribute_verification_pairs`. Plan 11's `GstackSprintPlugin.contribute_gates` was orphaned because `HarnessPlugin` already had a placeholder `contribute_gates` in the base class BUT `PluginManager` never consumed it — so `ShipApprovalGate` was unreachable in production. Task 2 in this plan formalizes the hook signature AND adds `PluginManager.get_plugin_gates(phase)` so `SprintConductor._build_gate_chain` (Plan 10 Task 3) can union plugin gates into the chain.
+
+Output: 1 line added to base.py for verification-pairs hook (gates hook already exists — we formalize docstring only), ~40 lines added to manager.py (verifier resolver + accessor + plugin-gate aggregator), test file updated with ~8 tests.
 </objective>
 
 <execution_context>
@@ -58,12 +66,15 @@ Output: 1 line added to base.py (method default), ~25 lines added to manager.py 
 @.planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md
 
 <interfaces>
-From clawteam/plugins/base.py (lines 14-93, existing):
+From clawteam/plugins/base.py (existing, lines 14-93):
 ```python
 class HarnessPlugin(ABC):
     name: str = ""
     version: str = "0.1.0"
     # ...
+    def contribute_gates(self) -> dict[str, list[PhaseGate]]:
+        """Contribute gates to specific phases. Returns {phase: [gates]}."""
+        return {}  # <-- ALREADY EXISTS; this plan extends docstring + consumer wiring.
     def contribute_phases(self) -> list[Phase]: return []
     def contribute_phase_roles(self) -> dict[Phase, list[str]]: return {}
     def contribute_review_routers(self) -> list[ReviewRouter]: return []
@@ -100,6 +111,12 @@ class VerificationPair(BaseModel):
     source_artifact: str
     target_artifact: str
     verifier_dotted_path: str
+```
+
+From clawteam/harness/phases.py:
+```python
+class PhaseGate(ABC):
+    def check(self, state) -> tuple[bool, str]: ...
 ```
 </interfaces>
 </context>
@@ -357,7 +374,228 @@ def test_empty_plugin_contributes_no_pairs():
     - pytest tests/test_gstack_plugin.py -x -q passes (Phase 3 plugin unaffected)
     - pytest tests/test_orchestrator_phase_registry.py -x -q passes (Phase 1 plugin hook unaffected)
   </acceptance_criteria>
-  <done>Optional hook landed; resolver + accessor tested; existing plugin tests unregressed</done>
+  <done>Optional verification-pair hook landed; resolver + accessor tested; existing plugin tests unregressed</done>
+</task>
+
+<task type="auto" tdd="true">
+  <name>Task 2: Formalize contribute_gates hook on HarnessPlugin + PluginManager.get_plugin_gates aggregator (REVISION — closes ISS-03)</name>
+  <files>clawteam/plugins/base.py, clawteam/plugins/manager.py, tests/test_plugins.py</files>
+  <read_first>
+    - clawteam/plugins/base.py (existing contribute_gates around line 36-38 — already declared but unwired)
+    - clawteam/plugins/manager.py (after Task 1 edits — find _instantiate_and_register flow)
+    - clawteam/harness/phases.py (PhaseGate ABC shape)
+    - clawteam/harness/ship_approval_gate.py (Plan 04 — ShipApprovalGate subclass that consumers use)
+    - clawteam/sprint/conductor.py::_build_gate_chain (the consumer in Plan 10 Task 3)
+  </read_first>
+  <behavior>
+    - Test 1 (test_contribute_gates_optional): A plugin subclass that does NOT override contribute_gates returns `{}` by default (BC check).
+    - Test 2 (test_contribute_gates_default_empty): Calling `HarnessPlugin.contribute_gates()` on a bare subclass yields `{}` (no phases declared).
+    - Test 3 (test_plugin_gates_collected_per_phase): Two plugins each contribute one gate to phase "test" — `PluginManager.get_plugin_gates("test")` returns both gates in deterministic (plugin-load) order.
+    - Test 4 (test_plugin_gates_nonexistent_phase_returns_empty): `get_plugin_gates("unregistered-phase")` returns `[]`.
+    - Test 5 (test_plugin_gates_multiple_phases_segregated): One plugin contributes `{"ship": [g1], "test": [g2]}` — `get_plugin_gates("ship")` returns `[g1]`, `get_plugin_gates("test")` returns `[g2]`.
+    - Test 6 (test_plugin_gates_existing_plugins_unaffected): Loading a Phase-3 plugin (gstack_sprint_plugin) that currently does not override contribute_gates yields empty dict for every phase (BC check — Plan 11 Task 2 will land the actual override).
+    - Test 7 (test_plugin_gates_broken_return_skipped_with_log): Plugin whose contribute_gates raises is skipped with a warning; other plugins still contribute.
+  </behavior>
+  <action>
+**Edit 1: `clawteam/plugins/base.py`** — the `contribute_gates` method ALREADY exists at line 36-38 with signature `def contribute_gates(self) -> dict[str, list[PhaseGate]]: return {}`. Expand its docstring so the contract is explicit. Replace the 3-line stub with:
+
+```python
+    def contribute_gates(self) -> dict[str, list[PhaseGate]]:
+        """Contribute gates to specific phases (§04-CONTEXT D-13 — Plan 04-05 wiring).
+
+        Returns a mapping of phase-name → list of :class:`PhaseGate` instances
+        to append to that phase's gate chain. ``PluginManager`` aggregates
+        plugin-contributed gates via :meth:`PluginManager.get_plugin_gates`
+        (Phase 4 Plan 04-05); ``SprintConductor._build_gate_chain`` (Phase 4
+        Plan 04-10 Task 3) unions those gates into the standard
+        EvidenceGate → forced_progress_gate → InteractionGate chain so
+        plugin-provided gates (e.g., Phase 4's ShipApprovalGate) actually
+        execute.
+
+        Empty-dict default means the plugin contributes no gates. Existing
+        plugins (software-dev, hedge-fund, code-review, harness-default,
+        research-paper, strategy-room, ralph-loop) inherit the empty default
+        and are unaffected. Phase 4's GstackSprintPlugin overrides this in
+        Plan 04-11 to return ``{"ship": [ShipApprovalGate()]}``.
+        """
+        return {}
+```
+
+**Edit 2: `clawteam/plugins/manager.py`** — add a per-phase gate aggregator. Two additions:
+
+a) Add `_plugin_gates` initialization in `__init__` (right after the Task 1 `_verification_pairs` line):
+```python
+        # Phase 4 Plan 05 additive: aggregated {phase: [PhaseGate, ...]} from
+        # plugin.contribute_gates. Consumed by SprintConductor._build_gate_chain
+        # (Plan 10 Task 3). Preserves plugin-load order per phase.
+        self._plugin_gates: dict[str, list[Any]] = {}
+```
+
+b) Extend `_instantiate_and_register` — after the Task 1 verification-pairs block, still before `self._loaded[plugin.name] = plugin`:
+```python
+        # Phase 4 / Plan 04-05 Task 2: aggregate plugin-contributed gates per phase.
+        try:
+            gates_map = plugin.contribute_gates() or {}
+        except Exception as exc:  # noqa: BLE001 — plugin load must not crash
+            _logger.warning(
+                "Plugin %s: contribute_gates raised: %s", plugin.name, exc
+            )
+            gates_map = {}
+        for phase_name, gate_list in gates_map.items():
+            if not isinstance(phase_name, str) or not phase_name:
+                _logger.warning(
+                    "Plugin %s: contribute_gates invalid phase key %r skipped",
+                    plugin.name,
+                    phase_name,
+                )
+                continue
+            bucket = self._plugin_gates.setdefault(phase_name, [])
+            for gate in (gate_list or []):
+                bucket.append(gate)
+```
+
+c) Add public accessor after `get_verification_pairs`:
+```python
+    def get_plugin_gates(self, phase: str) -> list[Any]:
+        """Return list of plugin-contributed gates for ``phase`` (§04-CONTEXT D-13).
+
+        Consumed by SprintConductor._build_gate_chain (Plan 04-10 Task 3) so
+        plugin-contributed gates (e.g., Phase 4's ShipApprovalGate attached to
+        "ship") actually execute. Returns an empty list when no plugin contributed
+        gates for this phase. Order preserves plugin-load order.
+        """
+        return list(self._plugin_gates.get(phase, []))
+```
+
+**Edit 3: `tests/test_plugins.py`** — APPEND these seven tests at end of file (do NOT modify existing tests or Task 1 tests):
+
+```python
+# ── Phase 4 Plan 05 Task 2: contribute_gates + get_plugin_gates tests ────
+
+from clawteam.harness.phases import PhaseGate
+
+
+class _StubGateA(PhaseGate):
+    name = "stub-gate-a"
+
+    def check(self, state):
+        return True, ""
+
+
+class _StubGateB(PhaseGate):
+    name = "stub-gate-b"
+
+    def check(self, state):
+        return True, ""
+
+
+class _PluginGatesShip(HarnessPlugin):
+    name = "plugin-gates-ship"
+    version = "0.1.0"
+
+    def on_register(self, ctx):
+        self._ctx = ctx
+
+    def contribute_gates(self):
+        return {"ship": [_StubGateA()]}
+
+
+class _PluginGatesTestAndShip(HarnessPlugin):
+    name = "plugin-gates-test-and-ship"
+    version = "0.1.0"
+
+    def on_register(self, ctx):
+        self._ctx = ctx
+
+    def contribute_gates(self):
+        return {"test": [_StubGateB()], "ship": [_StubGateA()]}
+
+
+class _PluginGatesBroken(HarnessPlugin):
+    name = "plugin-gates-broken"
+    version = "0.1.0"
+
+    def on_register(self, ctx):
+        self._ctx = ctx
+
+    def contribute_gates(self):
+        raise RuntimeError("intentional test failure")
+
+
+def test_contribute_gates_optional():
+    """A plugin not overriding contribute_gates inherits empty-dict default."""
+    p = _PluginEmpty()  # Task 1 helper — does NOT override contribute_gates
+    assert p.contribute_gates() == {}
+
+
+def test_contribute_gates_default_empty():
+    """HarnessPlugin base-class contribute_gates returns {} (BC)."""
+    assert HarnessPlugin.contribute_gates(_PluginEmpty()) == {}
+
+
+def test_plugin_gates_collected_per_phase():
+    pm = PluginManager()
+    pm._instantiate_and_register(_PluginGatesShip)
+    pm._instantiate_and_register(_PluginGatesTestAndShip)
+    ship_gates = pm.get_plugin_gates("ship")
+    # Two plugins each contributed one gate to ship → 2 gates, load-order preserved.
+    assert len(ship_gates) == 2
+    assert isinstance(ship_gates[0], _StubGateA)  # plugin-gates-ship first
+    assert isinstance(ship_gates[1], _StubGateA)  # plugin-gates-test-and-ship second
+
+
+def test_plugin_gates_nonexistent_phase_returns_empty():
+    pm = PluginManager()
+    pm._instantiate_and_register(_PluginGatesShip)
+    assert pm.get_plugin_gates("unregistered-phase") == []
+
+
+def test_plugin_gates_multiple_phases_segregated():
+    pm = PluginManager()
+    pm._instantiate_and_register(_PluginGatesTestAndShip)
+    test_gates = pm.get_plugin_gates("test")
+    ship_gates = pm.get_plugin_gates("ship")
+    assert len(test_gates) == 1
+    assert isinstance(test_gates[0], _StubGateB)
+    assert len(ship_gates) == 1
+    assert isinstance(ship_gates[0], _StubGateA)
+
+
+def test_plugin_gates_existing_plugins_unaffected():
+    """Phase 3 plugin (not overriding contribute_gates) contributes nothing."""
+    pm = PluginManager()
+    pm._instantiate_and_register(_PluginEmpty)
+    for phase in ("think", "plan", "build", "review", "test", "ship", "reflect"):
+        assert pm.get_plugin_gates(phase) == [], (
+            f"_PluginEmpty leaked gates into phase {phase!r}"
+        )
+
+
+def test_plugin_gates_broken_return_skipped_with_log(caplog):
+    pm = PluginManager()
+    with caplog.at_level("WARNING"):
+        pm._instantiate_and_register(_PluginGatesBroken)
+        # Other plugins can still load after a broken one.
+        pm._instantiate_and_register(_PluginGatesShip)
+    # Ship still has the good plugin's gate despite the broken plugin.
+    assert len(pm.get_plugin_gates("ship")) == 1
+    assert any("contribute_gates raised" in r.message for r in caplog.records)
+```
+
+**Do not modify** existing hooks, existing Phase 3 plugins, or Task 1's tests/additions.
+  </action>
+  <verify>
+    <automated>pytest tests/test_plugins.py::test_contribute_gates_optional tests/test_plugins.py::test_contribute_gates_default_empty tests/test_plugins.py::test_plugin_gates_collected_per_phase tests/test_plugins.py::test_plugin_gates_nonexistent_phase_returns_empty tests/test_plugins.py::test_plugin_gates_multiple_phases_segregated tests/test_plugins.py::test_plugin_gates_existing_plugins_unaffected tests/test_plugins.py::test_plugin_gates_broken_return_skipped_with_log -x -q 2>&1 | tail -5</automated>
+  </verify>
+  <acceptance_criteria>
+    - grep -q "Plan 04-05 wiring" clawteam/plugins/base.py  # expanded docstring present
+    - grep -q "_plugin_gates" clawteam/plugins/manager.py
+    - grep -q "def get_plugin_gates" clawteam/plugins/manager.py
+    - grep -q "contribute_gates raised" clawteam/plugins/manager.py  # logging on failure
+    - pytest tests/test_plugins.py -x -q passes all 7 new tests + all Task 1 tests + all existing Phase 1/2/3 plugin tests
+    - pytest tests/test_gstack_plugin.py -x -q passes (Phase 3 plugin unaffected; Plan 11's contribute_gates override lands in a later plan wave)
+  </acceptance_criteria>
+  <done>contribute_gates hook formalized on HarnessPlugin; PluginManager.get_plugin_gates aggregator wired; consumer contract ready for SprintConductor._build_gate_chain (Plan 10 Task 3)</done>
 </task>
 
 </tasks>
@@ -369,6 +607,7 @@ def test_empty_plugin_contributes_no_pairs():
 |----------|-------------|
 | Plugin-declared dotted path ↔ importlib resolver | Attacker plugin could name a dotted path that triggers module import side-effects |
 | Plugin load sequence ↔ verification_pairs registry | Two plugins contributing same (phase, source, target) would create duplicate gates |
+| Plugin-declared gate instance ↔ gate chain consumer | Attacker plugin could register a gate that always returns (False, ...) to DoS a phase |
 
 ## STRIDE Threat Register
 
@@ -377,29 +616,38 @@ def test_empty_plugin_contributes_no_pairs():
 | T-04-14 | E (Elevation of privilege) | importlib.import_module on plugin-controlled string | accept | Plugins are already trusted (they register as HarnessPlugin subclasses); importing an attacker-controlled module is equivalent in risk to running attacker Python code, which the plugin mechanism already enables |
 | T-04-15 | D (DoS) | Unresolvable path crashes plugin load | mitigate | try/except around import + getattr; log warning; continue. test_unresolvable_dotted_path_skipped_with_log enforces |
 | T-04-16 | T (Tampering) | Duplicate (phase, source, target) triples across plugins | accept | Plan 10 deduplicates at gate-list construction time if required; Phase 4 scope is the hook + accessor, not deduplication policy |
+| T-04-17 | D (DoS) | contribute_gates raising crashes plugin load | mitigate | try/except around contribute_gates call; log warning; continue loading other plugins. test_plugin_gates_broken_return_skipped_with_log enforces |
+| T-04-18 | T (Tampering) | Malicious plugin registers an always-fail gate | accept | Plugins are trusted; if an agent loads a hostile plugin, it already has Python code-execution equivalence |
 </threat_model>
 
 <verification>
 Plan 05 integration checks:
 - [ ] `pytest tests/test_plugins.py tests/test_gstack_plugin.py tests/test_orchestrator_phase_registry.py -x -q` passes
-- [ ] `python3 -c "from clawteam.plugins.base import HarnessPlugin; p = HarnessPlugin.__subclasses__()[0](); assert p.contribute_verification_pairs() == []"` exits 0 (OR use an importable concrete subclass; alternatively smoke-check via `hasattr(HarnessPlugin, 'contribute_verification_pairs')`)
+- [ ] `python3 -c "from clawteam.plugins.base import HarnessPlugin; assert hasattr(HarnessPlugin, 'contribute_verification_pairs'); assert hasattr(HarnessPlugin, 'contribute_gates')"` exits 0
 - [ ] `grep -c "contribute_verification_pairs" clawteam/plugins/base.py clawteam/plugins/manager.py tests/test_plugins.py` prints 3 files with matches
-- [ ] Phase 3 GstackSprintPlugin still loads without overriding the new hook (confirmed by tests/test_gstack_plugin.py)
+- [ ] `grep -c "get_plugin_gates" clawteam/plugins/manager.py tests/test_plugins.py` prints 2 files with matches
+- [ ] Phase 3 GstackSprintPlugin still loads without overriding either new hook (confirmed by tests/test_gstack_plugin.py)
 </verification>
 
 <success_criteria>
 Plan 05 ships when:
 - [ ] `HarnessPlugin.contribute_verification_pairs()` method exists with empty default
-- [ ] `PluginManager._instantiate_and_register` resolves dotted paths to callables
+- [ ] `HarnessPlugin.contribute_gates()` method has expanded docstring referencing Plan 04-05 wiring + Plan 04-10 consumer
+- [ ] `PluginManager._instantiate_and_register` resolves dotted paths to callables AND aggregates plugin gates per phase
 - [ ] `PluginManager.get_verification_pairs()` returns `list[tuple[VerificationPair, Callable]]`
-- [ ] Unresolvable paths log a warning but do NOT crash plugin load
-- [ ] 5 new tests pass; all Phase 1/2/3 plugin tests still pass
+- [ ] `PluginManager.get_plugin_gates(phase)` returns `list[PhaseGate]` (plugin-load order preserved)
+- [ ] Unresolvable verifier paths log a warning but do NOT crash plugin load
+- [ ] `contribute_gates` raising logs a warning but does NOT crash plugin load
+- [ ] 5 Task 1 tests + 7 Task 2 tests pass; all Phase 1/2/3 plugin tests still pass
 - [ ] Plan 11 can override `contribute_verification_pairs` on `GstackSprintPlugin` to return the two gstack pairs
+- [ ] Plan 11 can override `contribute_gates` on `GstackSprintPlugin` to return `{"ship": [ShipApprovalGate()]}`
+- [ ] Plan 10 Task 3 can call `plugin_manager.get_plugin_gates(phase)` in `_build_gate_chain` to union plugin gates into the chain
 </success_criteria>
 
 <output>
 After completion, create `.planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-05-plugin-verification-hook-SUMMARY.md` with:
 - Line counts of added code in base.py + manager.py
-- Test coverage summary
+- Test coverage summary (Task 1: 5 tests; Task 2: 7 tests)
 - Confirmation: no existing plugin hook signatures changed
+- Confirmation: both hooks ready for Plan 10 + Plan 11 consumers
 </output>

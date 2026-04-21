@@ -3,13 +3,13 @@ phase: 04
 plan: 10
 type: execute
 wave: 3
-depends_on: [01, 02, 06]
+depends_on: [01, 02, 05, 06]
 files_modified:
   - clawteam/sprint/review_phase.py
   - clawteam/sprint/conductor.py
   - tests/test_review_phase_dispatch.py
 autonomous: true
-requirements: [SPRINT-04, QUALITY-09, QUALITY-13]
+requirements: [SPRINT-04, SPRINT-05, QUALITY-07, QUALITY-09, QUALITY-13]
 must_haves:
   truths:
     - "New file clawteam/sprint/review_phase.py exposes async def dispatch_review_phase(state, plugin_manager, bus)."
@@ -21,13 +21,15 @@ must_haves:
     - "Post-turn hook compares HEAD to review_sha; on advance, emits MidReviewThrash event with diff delta."
     - "Agreement-rate computed after aggregation; > threshold emits SycophancyCascadeDetected event."
     - "Per-sprint-per-round scoping of sycophancy event (D-20)."
+    - "REVISION (Task 3): SprintConductor._build_gate_chain unions CrossAgentVerificationGate instances (from plugin_manager.get_verification_pairs() filtered by phase) AND plugin-contributed gates (from plugin_manager.get_plugin_gates(phase)) — closes ISS-03 (ShipApprovalGate unreachable) + ISS-07 (CrossAgentVerificationGate unreachable)."
+    - "REVISION: save_sprint_state module-level helper in clawteam/sprint/state.py exists and is the call site for state persistence (ISS-09)."
   artifacts:
     - path: "clawteam/sprint/review_phase.py"
       provides: "async dispatch_review_phase + agreement-rate helper + SHA-diff helpers"
       contains: "async def dispatch_review_phase"
       min_lines: 180
     - path: "clawteam/sprint/conductor.py"
-      provides: "New _dispatch_review_phase method + review_sha pinning on Review-phase entry"
+      provides: "New _dispatch_review_phase method + review_sha pinning on Review-phase entry + Task 3 _build_gate_chain extension that wires plugin gates + CrossAgentVerificationGate"
       contains: "_dispatch_review_phase"
     - path: "tests/test_review_phase_dispatch.py"
       provides: "Parallel dispatch + SHA-pin + thrash event + sycophancy event + aggregation tests"
@@ -42,10 +44,13 @@ must_haves:
     - from: "clawteam/sprint/review_phase.py"
       to: "plugin_manager.get_review_routers()"
       via: "Iterate routers, union matches with floor"
+    - from: "clawteam/sprint/conductor.py::_build_gate_chain (Task 3)"
+      to: "clawteam/plugins/manager.py::PluginManager.get_plugin_gates + get_verification_pairs"
+      via: "Union plugin-contributed gates + construct CrossAgentVerificationGate per phase (closes ISS-03 + ISS-07)"
 ---
 
 <objective>
-Ship the Review-phase orchestration: parallel peer-reviewer dispatch via `asyncio.gather`, sequential `reviewer` aggregator after peers complete, SHA-pinning at entry, mid-review-thrash detection on post-turn HEAD advance, and sycophancy-cascade alarm on agreement-rate threshold crossings.
+Ship the Review-phase orchestration: parallel peer-reviewer dispatch via `asyncio.gather`, sequential `reviewer` aggregator after peers complete, SHA-pinning at entry, mid-review-thrash detection on post-turn HEAD advance, and sycophancy-cascade alarm on agreement-rate threshold crossings. **Task 3 (REVISION)** additionally wires plugin-contributed gates (Plan 04-05 accessors) into `SprintConductor._build_gate_chain` so `ShipApprovalGate` (Plan 11) and `CrossAgentVerificationGate` (Plan 03 + Plan 11) actually execute in production — closes ISS-03 and ISS-07.
 
 Purpose: The glue layer consuming all Wave 1 + 2 substrate. This is where the parallel reviewers actually run. Per research §Open Question 1, implemented as a new module `clawteam/sprint/review_phase.py` (keeps conductor.py under 700 LOC); SprintConductor gets a thin sync wrapper method `_dispatch_review_phase` that invokes `asyncio.run` on the async dispatcher and stores the resulting SHA.
 
@@ -866,6 +871,373 @@ def test_conductor_dispatch_wrapper_invokes_async(tmp_path, monkeypatch):
   <done>SprintConductor exposes sync wrapper; conductor size stays under 700 LOC</done>
 </task>
 
+<task type="auto" tdd="true">
+  <name>Task 3: Union plugin-contributed gates + CrossAgentVerificationGate into SprintConductor._build_gate_chain (REVISION — closes ISS-03 + ISS-07)</name>
+  <files>clawteam/sprint/conductor.py, tests/test_review_phase_dispatch.py</files>
+  <read_first>
+    - clawteam/sprint/conductor.py::_build_gate_chain (lines 517-549 — existing EvidenceGate → forced_progress_gate → InteractionGate composition)
+    - clawteam/plugins/manager.py (after Plan 05 Task 2 — get_plugin_gates accessor) (after Plan 05 Task 1 — get_verification_pairs accessor)
+    - clawteam/harness/cross_agent_verification_gate.py (Plan 03 — CrossAgentVerificationGate constructor signature)
+    - clawteam/harness/ship_approval_gate.py (Plan 04 — ShipApprovalGate that appears via plugin gates)
+  </read_first>
+  <behavior>
+    - Test 1 (test_build_gate_chain_includes_plugin_gates): Build a conductor with a PluginManager containing a plugin that contributes `{"ship": [ShipApprovalGate()]}`; advance a sprint to ship phase; `_build_gate_chain(state)` output contains a ShipApprovalGate instance after the standard gates.
+    - Test 2 (test_build_gate_chain_includes_cross_agent_verification_gates): Build conductor with plugin_manager.get_verification_pairs() returning one pair for phase="test"; sprint in test phase → gate chain includes a CrossAgentVerificationGate constructed from that pair (phase/source/target/verifier match).
+    - Test 3 (test_build_gate_chain_filters_verification_pairs_by_phase): Verification pairs for phase="review" are NOT included when sprint is in phase="test".
+    - Test 4 (test_build_gate_chain_ordering): Gate chain order is: EvidenceGate → forced_progress_gate → [CrossAgentVerificationGate(s)] → [plugin gates] → [InteractionGate if applicable]. Assert sequence via isinstance checks.
+    - Test 5 (test_build_gate_chain_no_plugin_gates_backward_compatible): SprintConductor with no plugin_manager (legacy path) produces the same gate chain as Phase 2. Tests the BC path — existing Phase 2 tests must not regress.
+    - Test 6 (test_build_gate_chain_plugin_manager_exception_safe): plugin_manager whose get_plugin_gates raises → gate chain still ships the standard 3 gates; warning logged; sprint advance not crashed.
+  </behavior>
+  <action>
+**Edit 1: `clawteam/sprint/conductor.py`** — modify `SprintConductor.__init__` to optionally accept a plugin_manager, and extend `_build_gate_chain` to union plugin-contributed gates + CrossAgentVerificationGate instances. Preserve existing behavior when plugin_manager is None (BC with Phase 2 callers).
+
+a) Modify `__init__` signature — add `plugin_manager=None` keyword arg. Near the existing `bus: "EventBus | None" = None,` parameter (line ~242), append:
+```python
+        plugin_manager=None,
+```
+
+And add storage for it in __init__ body (right after `self.bus = bus` around line 257):
+```python
+        # Phase 4 Plan 04-10 Task 3: optional plugin_manager for gate-chain
+        # aggregation. When None, _build_gate_chain falls back to the Phase 2
+        # three-gate composition (BC — Phase 2 tests do NOT pass a plugin_manager).
+        self._plugin_manager = plugin_manager
+```
+
+b) Extend `_build_gate_chain` (existing around line 517-549). REPLACE the existing body so it:
+  1. Builds EvidenceGate + forced_progress_gate first (unchanged).
+  2. Appends CrossAgentVerificationGate instances constructed from plugin_manager.get_verification_pairs() filtered to `pair.phase == state.current_phase`.
+  3. Appends plugin gates from plugin_manager.get_plugin_gates(state.current_phase).
+  4. Applies existing InteractionGate insertion logic (unchanged) AT THE END of the chain.
+
+Full replacement of `_build_gate_chain`:
+
+```python
+    def _build_gate_chain(self, state: SprintState) -> list:
+        """Compose EvidenceGate → forced_progress_gate → [plugin cross-verify + plugin gates] → (InteractionGate?).
+
+        Phase 4 Plan 04-10 Task 3 (§04-CONTEXT D-10..D-13) extension:
+        when ``self._plugin_manager`` is set, the chain ALSO includes:
+          (a) CrossAgentVerificationGate instances from plugin_manager.get_verification_pairs()
+              filtered to pair.phase == state.current_phase (Plan 04-05 Task 1 accessor).
+          (b) Plugin-contributed gates from plugin_manager.get_plugin_gates(state.current_phase)
+              (Plan 04-05 Task 2 accessor). This is how Phase 4's ShipApprovalGate
+              (contributed by GstackSprintPlugin.contribute_gates in Plan 04-11)
+              actually reaches production — previously unreachable per revision ISS-03.
+
+        InteractionGate insertion (Phase 2 D-23 + force_interactive_phases) preserved
+        verbatim and runs LAST in the chain.
+
+        BC: when plugin_manager is None (legacy Phase 2 callers), the chain is
+        identical to the Phase 2 three-gate composition. Phase 2 tests continue
+        to pass without modification.
+        """
+        from clawteam.harness.evidence_gate import EvidenceGate
+        from clawteam.harness.forced_progress_gate import forced_progress_gate
+        from clawteam.harness.interaction_gate import InteractionGate
+
+        chain: list = []
+        chain.append(EvidenceGate(artifact_names=list(state.artifacts.keys())))
+        chain.append(forced_progress_gate())
+
+        # Phase 4 Plan 04-10 Task 3 — plugin contributions.
+        if self._plugin_manager is not None:
+            # Cross-agent verification gates (Plan 04-05 Task 1 accessor, Plan 04-03 gate).
+            try:
+                pairs = self._plugin_manager.get_verification_pairs() or []
+            except Exception as exc:  # noqa: BLE001
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "plugin_manager.get_verification_pairs raised: %s", exc
+                )
+                pairs = []
+            if pairs:
+                from clawteam.harness.cross_agent_verification_gate import (
+                    CrossAgentVerificationGate,
+                )
+                for pair, verifier in pairs:
+                    if getattr(pair, "phase", None) != state.current_phase:
+                        continue
+                    try:
+                        gate = CrossAgentVerificationGate(
+                            phase=pair.phase,
+                            source_artifact=pair.source_artifact,
+                            target_artifact=pair.target_artifact,
+                            verifier=verifier,
+                        )
+                        chain.append(gate)
+                    except Exception as exc:  # noqa: BLE001
+                        import logging as _lg
+                        _lg.getLogger(__name__).warning(
+                            "CrossAgentVerificationGate construction failed for %r: %s",
+                            pair,
+                            exc,
+                        )
+
+            # Plugin-contributed gates (Plan 04-05 Task 2 accessor).
+            try:
+                plugin_gates = self._plugin_manager.get_plugin_gates(state.current_phase) or []
+            except Exception as exc:  # noqa: BLE001
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "plugin_manager.get_plugin_gates raised: %s", exc
+                )
+                plugin_gates = []
+            chain.extend(plugin_gates)
+
+        # InteractionGate (preserved verbatim from Phase 2 D-23 semantics).
+        has_pending = bool(state.pending_question_ids)
+        forced = state.current_phase in self.force_interactive_phases
+        if forced or (not state.auto_advance) or has_pending:
+            chain.append(InteractionGate())
+        return chain
+```
+
+**Edit 2: `tests/test_review_phase_dispatch.py`** — APPEND these six tests (do NOT modify existing tests). The imports `_mock_subprocess`, `_CapturingBus`, `_FakePluginManager`, `_Router` from Task 1/2 are already at module scope; re-use them.
+
+```python
+# ── Plan 10 Task 3: _build_gate_chain plugin-gate wiring tests ────────
+
+from clawteam.harness.phases import PhaseGate
+from clawteam.sprint.state import SprintState
+
+
+class _FakePluginMgrWithGates:
+    """In-test plugin manager returning canned gate + verification-pair data."""
+
+    def __init__(self, *, plugin_gates=None, verification_pairs=None, raise_gates=False, raise_pairs=False):
+        self._plugin_gates = plugin_gates or {}
+        self._verification_pairs = verification_pairs or []
+        self._raise_gates = raise_gates
+        self._raise_pairs = raise_pairs
+
+    def get_plugin_gates(self, phase):
+        if self._raise_gates:
+            raise RuntimeError("plugin gates boom")
+        return list(self._plugin_gates.get(phase, []))
+
+    def get_verification_pairs(self):
+        if self._raise_pairs:
+            raise RuntimeError("verification pairs boom")
+        return list(self._verification_pairs)
+
+
+class _AlwaysPassGate(PhaseGate):
+    name = "always-pass"
+
+    def check(self, state):
+        return True, ""
+
+
+def _ship_state(tmp_path):
+    return SprintState(
+        team="t1",
+        sprint_id="gc1234567",
+        goal="g",
+        current_phase="ship",
+        workspace_branch=str(tmp_path),
+    )
+
+
+def _test_state(tmp_path):
+    return SprintState(
+        team="t1",
+        sprint_id="gc7654321",
+        goal="g",
+        current_phase="test",
+        workspace_branch=str(tmp_path),
+    )
+
+
+def test_build_gate_chain_includes_plugin_gates(tmp_path, monkeypatch):
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.harness.ship_approval_gate import ShipApprovalGate
+
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    state = _ship_state(tmp_path)
+    state.save(team="t1")
+
+    pm = _FakePluginMgrWithGates(plugin_gates={"ship": [ShipApprovalGate()]})
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    assert any(isinstance(g, ShipApprovalGate) for g in chain), (
+        f"ShipApprovalGate not in gate chain: {[type(g).__name__ for g in chain]}"
+    )
+
+
+def test_build_gate_chain_includes_cross_agent_verification_gates(tmp_path, monkeypatch):
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.harness.cross_agent_verification_gate import (
+        CrossAgentVerificationGate,
+        VerificationPair,
+    )
+
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    state = _test_state(tmp_path)
+    state.save(team="t1")
+
+    def dummy_verifier(src, tgt):
+        return True, ""
+
+    pair = VerificationPair(
+        phase="test",
+        source_artifact="test-report.md",
+        target_artifact="build-report.md",
+        verifier_dotted_path="irrelevant.for.this.test",
+    )
+    pm = _FakePluginMgrWithGates(verification_pairs=[(pair, dummy_verifier)])
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    cav_gates = [g for g in chain if isinstance(g, CrossAgentVerificationGate)]
+    assert len(cav_gates) == 1, (
+        f"Expected 1 CrossAgentVerificationGate in test phase, got {len(cav_gates)} "
+        f"(chain={[type(g).__name__ for g in chain]})"
+    )
+
+
+def test_build_gate_chain_filters_verification_pairs_by_phase(tmp_path, monkeypatch):
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.harness.cross_agent_verification_gate import (
+        CrossAgentVerificationGate,
+        VerificationPair,
+    )
+
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    state = _test_state(tmp_path)  # phase="test"
+    state.save(team="t1")
+
+    def dummy(src, tgt):
+        return True, ""
+
+    # Pair targeted at review phase — must NOT appear in the test-phase chain.
+    review_pair = VerificationPair(
+        phase="review",
+        source_artifact="design-doc.md",
+        target_artifact="office-hours-answers.md",
+        verifier_dotted_path="irrelevant",
+    )
+    pm = _FakePluginMgrWithGates(verification_pairs=[(review_pair, dummy)])
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    cav_gates = [g for g in chain if isinstance(g, CrossAgentVerificationGate)]
+    assert cav_gates == [], (
+        f"Review-phase pair leaked into test-phase chain: {cav_gates}"
+    )
+
+
+def test_build_gate_chain_ordering(tmp_path, monkeypatch):
+    from clawteam.harness.cross_agent_verification_gate import (
+        CrossAgentVerificationGate,
+        VerificationPair,
+    )
+    from clawteam.harness.evidence_gate import EvidenceGate
+    from clawteam.harness.interaction_gate import InteractionGate
+    from clawteam.sprint.conductor import SprintConductor
+
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    state = _test_state(tmp_path)
+    state.auto_advance = False  # force InteractionGate insertion
+    state.save(team="t1")
+
+    def dummy(src, tgt):
+        return True, ""
+
+    pair = VerificationPair(
+        phase="test",
+        source_artifact="a.md",
+        target_artifact="b.md",
+        verifier_dotted_path="irrelevant",
+    )
+    pm = _FakePluginMgrWithGates(
+        verification_pairs=[(pair, dummy)],
+        plugin_gates={"test": [_AlwaysPassGate()]},
+    )
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    chain = conductor._build_gate_chain(state)
+    # Expected ordering: EvidenceGate first, CrossAgentVerificationGate middle,
+    # plugin gate after, InteractionGate last.
+    type_names = [type(g).__name__ for g in chain]
+    assert type_names[0] == "EvidenceGate", f"EvidenceGate must be first: {type_names}"
+    assert type_names[-1] == "InteractionGate", (
+        f"InteractionGate must be last when forced: {type_names}"
+    )
+    # CrossAgentVerificationGate appears before plugin-contributed gate.
+    cav_idx = next(i for i, n in enumerate(type_names) if n == "CrossAgentVerificationGate")
+    plugin_idx = next(i for i, n in enumerate(type_names) if n == "_AlwaysPassGate")
+    assert cav_idx < plugin_idx, (
+        f"CrossAgentVerificationGate ({cav_idx}) must precede plugin gate ({plugin_idx}): {type_names}"
+    )
+
+
+def test_build_gate_chain_no_plugin_manager_backward_compatible(tmp_path, monkeypatch):
+    """BC: SprintConductor without plugin_manager matches Phase 2 chain."""
+    from clawteam.sprint.conductor import SprintConductor
+
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    state = _test_state(tmp_path)
+    state.save(team="t1")
+
+    conductor = SprintConductor(team_name="t1")  # no plugin_manager
+    chain = conductor._build_gate_chain(state)
+    # Phase 2 behaviour: EvidenceGate + forced_progress + maybe InteractionGate.
+    type_names = [type(g).__name__ for g in chain]
+    assert type_names[0] == "EvidenceGate"
+    assert "CrossAgentVerificationGate" not in type_names
+    # Phase 2 had 2 or 3 gates depending on auto_advance / pending questions.
+    assert 2 <= len(chain) <= 3, f"BC chain size drift: {type_names}"
+
+
+def test_build_gate_chain_plugin_manager_exception_safe(tmp_path, monkeypatch, caplog):
+    """plugin_manager accessors raising should not crash gate-chain assembly."""
+    from clawteam.sprint.conductor import SprintConductor
+
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    state = _test_state(tmp_path)
+    state.save(team="t1")
+
+    pm = _FakePluginMgrWithGates(raise_gates=True, raise_pairs=True)
+    conductor = SprintConductor(team_name="t1", plugin_manager=pm)
+    with caplog.at_level("WARNING"):
+        chain = conductor._build_gate_chain(state)
+    # Still have the two base gates (EvidenceGate + forced_progress_gate).
+    type_names = [type(g).__name__ for g in chain]
+    assert type_names[0] == "EvidenceGate"
+    assert "forced_progress_gate" in type_names[1].lower() or type_names[1] != "EvidenceGate"
+    # Both accessors raised — both warnings logged.
+    msgs = " ".join(r.message for r in caplog.records)
+    assert "get_plugin_gates raised" in msgs
+    assert "get_verification_pairs raised" in msgs
+```
+
+**ISS-09 confirmation task:** Also add a 1-line acceptance test in this Task 3 block confirming that `save_sprint_state` module-level helper exists (it does — see `clawteam/sprint/state.py:159`). This test lives in the new code and fails loudly if a future refactor drops the helper:
+
+```python
+def test_save_sprint_state_helper_exists_iss09():
+    """ISS-09: Plan 10 call sites use save_sprint_state(state). Helper must exist."""
+    from clawteam.sprint.state import save_sprint_state
+    assert callable(save_sprint_state)
+```
+
+Append this test to `tests/test_review_phase_dispatch.py` alongside the Task 3 tests.
+
+**Do NOT modify** Phase 2 conductor tests; the BC test above confirms they keep passing.
+  </action>
+  <verify>
+    <automated>pytest tests/test_review_phase_dispatch.py::test_build_gate_chain_includes_plugin_gates tests/test_review_phase_dispatch.py::test_build_gate_chain_includes_cross_agent_verification_gates tests/test_review_phase_dispatch.py::test_build_gate_chain_filters_verification_pairs_by_phase tests/test_review_phase_dispatch.py::test_build_gate_chain_ordering tests/test_review_phase_dispatch.py::test_build_gate_chain_no_plugin_manager_backward_compatible tests/test_review_phase_dispatch.py::test_build_gate_chain_plugin_manager_exception_safe tests/test_review_phase_dispatch.py::test_save_sprint_state_helper_exists_iss09 -x -q 2>&1 | tail -5</automated>
+  </verify>
+  <acceptance_criteria>
+    - grep -q "plugin_manager=None" clawteam/sprint/conductor.py
+    - grep -q "self._plugin_manager" clawteam/sprint/conductor.py
+    - grep -q "get_plugin_gates" clawteam/sprint/conductor.py
+    - grep -q "get_verification_pairs" clawteam/sprint/conductor.py
+    - grep -q "CrossAgentVerificationGate" clawteam/sprint/conductor.py
+    - grep -q "def save_sprint_state" clawteam/sprint/state.py  # ISS-09: helper exists
+    - pytest tests/test_sprint_conductor.py -x -q stays green (Phase 2 BC — plugin_manager keyword has default None)
+    - pytest tests/test_review_phase_dispatch.py -x -q exits 0 (all Task 1/2/3 tests + ISS-09 assertion)
+    - wc -l clawteam/sprint/conductor.py stays under 700 (Task 3 adds ~40 LOC net)
+  </acceptance_criteria>
+  <done>Plugin-contributed gates + cross-agent verification gates reach the gate chain; ShipApprovalGate (Plan 11) and Phase 4 cross-verifiers are now production-reachable</done>
+</task>
 </tasks>
 
 <threat_model>
@@ -888,10 +1260,12 @@ def test_conductor_dispatch_wrapper_invokes_async(tmp_path, monkeypatch):
 </threat_model>
 
 <verification>
-- [ ] `pytest tests/test_review_phase_dispatch.py -x -q` exits 0 (19 tests)
-- [ ] `pytest tests/test_sprint_conductor.py -x -q` stays green
+- [ ] `pytest tests/test_review_phase_dispatch.py -x -q` exits 0 (26 tests: 19 Task 1/2 + 7 Task 3)
+- [ ] `pytest tests/test_sprint_conductor.py -x -q` stays green (BC — new plugin_manager kwarg defaults to None)
 - [ ] `wc -l clawteam/sprint/conductor.py` < 700
 - [ ] `grep -c "_dispatch_review_phase" clawteam/sprint/conductor.py` >= 1
+- [ ] `grep -c "plugin_manager" clawteam/sprint/conductor.py` >= 3 (kwarg + storage + usage in _build_gate_chain)
+- [ ] `grep -q "CrossAgentVerificationGate" clawteam/sprint/conductor.py` (Task 3 wiring)
 - [ ] No existing Phase 1/2/3 tests regress
 </verification>
 
@@ -901,8 +1275,11 @@ def test_conductor_dispatch_wrapper_invokes_async(tmp_path, monkeypatch):
 - [ ] MidReviewThrash emitted on HEAD advance post-gather
 - [ ] SycophancyCascadeDetected emitted when agreement-rate > threshold
 - [ ] SprintConductor._dispatch_review_phase thin wrapper exists
-- [ ] 18+ review_phase tests + 1 conductor wrapper test pass
+- [ ] 18+ review_phase tests + 1 conductor wrapper test + 7 Task 3 gate-chain tests pass (26+ total)
 - [ ] Conductor stays under 700 LOC
+- [ ] REVISION (Task 3): plugin_manager.get_plugin_gates + get_verification_pairs both consumed in _build_gate_chain
+- [ ] REVISION (Task 3): ShipApprovalGate (Plan 11) and CrossAgentVerificationGate (Plan 03 + Plan 11) are now production-reachable (closes ISS-03 + ISS-07)
+- [ ] ISS-09: save_sprint_state module-level helper asserted via new test
 </success_criteria>
 
 <output>

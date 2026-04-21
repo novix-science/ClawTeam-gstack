@@ -1249,7 +1249,7 @@ Items tagged `[ASSUMED]` in this research. Planner should verify or accept at pl
 | A7 | ReviewConfig default `sycophancy_threshold=0.9` is acceptable across all teams | D-09 / Pattern 2 | [ASSUMED] CONTEXT D-09 specifies default 0.9 but allows override via `[template.review] sycophancy_threshold`. Safe default. |
 | A8 | `approved_by` field in ship-approval.md may be any string (not restricted to git identity) | Example 4 | [ASSUMED] CONTEXT D-14 says `clawteam sprint approve` uses "current git user" — assumes git user is available. Planner handles `.gitconfig`-missing case via fallback to `$USER` or explicit `--approver` flag. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Split vs single-file for Review-phase orchestration.** CONTEXT "Claude's Discretion" #5 defers to planner. Recommendation: NEW `clawteam/sprint/review_phase.py` (contains `dispatch_review_phase` async fn); `SprintConductor` imports + invokes. Rationale: keeps conductor under ~700 LOC; test isolation easier. Alternative (extend conductor): simpler dependency graph but bloats conductor past 800 LOC with phase-specific orchestration code — violates single-responsibility convention Phase 2 established.
 

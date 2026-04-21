@@ -206,10 +206,23 @@ Plans:
 
 **Research flag**: HIGH. Depends on the Phase 3 research pass having settled: golden-trace sourcing; per-persona role-reassertion field schema; adversarial-diff handling rules. Re-run `/gsd-research-phase 4` if Phase 3's research outputs don't sufficiently cover the state-machine schema per interactive skill.
 
-**Plans**: TBD
+**Plans**: 14 plans
 
 Plans:
-- [ ] 04-01: TBD (outlined during `/gsd-plan-phase 4`)
+- [ ] 04-01-PLAN.md — Wave 0 prep: resolve research plan-prep verifications (A4/A5/A7/A9 + fnmatch glob + spawn bridge + D-18 baseline)
+- [ ] 04-02-PLAN.md — SprintState.review_sha field + MidReviewThrash + SycophancyCascadeDetected event types
+- [ ] 04-03-PLAN.md — CrossAgentVerificationGate base class + VerificationPair pydantic model
+- [ ] 04-04-PLAN.md — ShipApprovalGate (HumanApprovalGate variant — SPRINT-05 always-human)
+- [ ] 04-05-PLAN.md — HarnessPlugin.contribute_verification_pairs + contribute_gates hooks + PluginManager accessors (revised: Task 2 adds contribute_gates wiring)
+- [ ] 04-06-PLAN.md — GstackReviewRouter + [[template.review.rules]] TOML extension
+- [ ] 04-07-PLAN.md — OfficeHoursState machine (pm / /office-hours)
+- [ ] 04-08-PLAN.md — DesignConsultationState machine (designer / /design-consultation)
+- [ ] 04-09-PLAN.md — InvestigateState machine (reviewer / /investigate) + FreezeRegistry wiring
+- [ ] 04-10-PLAN.md — Review-phase dispatch: parallel reviewers + SHA-pin + thrash + sycophancy events (revised: Task 3 wires plugin gates + CrossAgentVerificationGate into _build_gate_chain)
+- [ ] 04-11-PLAN.md — GstackSprintPlugin extensions: contribute_review_routers + contribute_verification_pairs + contribute_gates + decorrelation prompts
+- [ ] 04-12-PLAN.md — clawteam sprint approve CLI subcommand (writes ship-approval.md)
+- [ ] 04-13-PLAN.md — Adversarial routing golden tests (8 fixture diffs) + consolidated state-machine goldens
+- [ ] 04-14-PLAN.md — REVISION: D-18 marker cleanup + mid-review-push integration (closes SC #4) + ISS-06 test tightening
 
 ---
 
