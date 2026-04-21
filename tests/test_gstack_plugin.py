@@ -280,6 +280,137 @@ def test_plugin_inert_for_non_gstack_team(tmp_path, monkeypatch):
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 4 Plan 11 — plugin extensions (contribute_review_routers,
+# contribute_verification_pairs, contribute_gates, decorrelation supplement)
+# ---------------------------------------------------------------------------
+
+
+def _fresh_plugin():
+    """Fresh GstackSprintPlugin with minimal ctx wiring for Phase 4 tests."""
+    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
+
+    plugin = GstackSprintPlugin()
+    plugin.on_register(
+        SimpleNamespace(bus=SimpleNamespace(subscribe=lambda *a, **k: None))
+    )
+    return plugin
+
+
+def test_contribute_review_routers_returns_gstack_router():
+    from clawteam.harness.gstack_review_router import GstackReviewRouter
+
+    plugin = _fresh_plugin()
+    routers = plugin.contribute_review_routers()
+    assert len(routers) == 1
+    assert isinstance(routers[0], GstackReviewRouter)
+
+
+def test_contribute_review_routers_router_loads_real_gstack_rules():
+    plugin = _fresh_plugin()
+    router = plugin.contribute_review_routers()[0]
+    # Smoke: match a UI file pulls designer + reviewer floor.
+    state = SimpleNamespace(workspace_branch="", review_sha="")
+    result = router.match(["src/components/Button.tsx"], state)
+    assert "reviewer" in result
+    assert "designer" in result
+
+
+def test_contribute_verification_pairs_returns_2_pairs():
+    plugin = _fresh_plugin()
+    pairs = plugin.contribute_verification_pairs()
+    assert len(pairs) == 2
+    phases = sorted(p.phase for p in pairs)
+    assert phases == ["review", "test"]
+
+
+def test_contribute_verification_pairs_qa_engineer_pair():
+    plugin = _fresh_plugin()
+    pairs = plugin.contribute_verification_pairs()
+    qa_pair = next(p for p in pairs if p.phase == "test")
+    assert qa_pair.source_artifact == "test-report.md"
+    assert qa_pair.target_artifact == "build-report.md"
+    assert "verify_test_report_matches_engineer_output" in qa_pair.verifier_dotted_path
+
+
+def test_contribute_verification_pairs_reviewer_designer_pair():
+    plugin = _fresh_plugin()
+    pairs = plugin.contribute_verification_pairs()
+    rev_pair = next(p for p in pairs if p.phase == "review")
+    assert rev_pair.source_artifact == "design-doc.md"
+    assert "verify_design_doc_covers_forcing_questions" in rev_pair.verifier_dotted_path
+
+
+def test_contribute_gates_attaches_ship_approval_gate():
+    from clawteam.harness.ship_approval_gate import ShipApprovalGate
+
+    plugin = _fresh_plugin()
+    gates = plugin.contribute_gates()
+    assert "ship" in gates
+    assert any(isinstance(g, ShipApprovalGate) for g in gates["ship"])
+
+
+def test_review_prompts_append_decorrelation_supplement():
+    plugin = _fresh_plugin()
+    supplemented = plugin.contribute_prompts(phase="review", role="designer")
+    # Should contain both base + supplement markers.
+    assert "rubric-first" in supplemented  # from review/designer.md
+    # Should also contain base designer content (SIGNATURE trailer).
+    assert "gstack-role:designer" in supplemented
+
+
+def test_review_prompts_no_supplement_for_non_decorrelation_role():
+    plugin = _fresh_plugin()
+    result = plugin.contribute_prompts(phase="review", role="pm")
+    # pm is not a decorrelation role — supplement not appended.
+    assert "PHASE 4 REVIEW DECORRELATION SUPPLEMENT" not in result
+
+
+def test_non_review_phase_no_supplement():
+    plugin = _fresh_plugin()
+    result = plugin.contribute_prompts(phase="think", role="designer")
+    # Base only.
+    assert "PHASE 4 REVIEW DECORRELATION SUPPLEMENT" not in result
+
+
+def test_review_prompts_all_decorrelation_roles_have_supplements():
+    plugin = _fresh_plugin()
+    for role in ("reviewer", "designer", "security", "dx-lead"):
+        r = plugin.contribute_prompts(phase="review", role=role)
+        assert "PHASE 4 REVIEW DECORRELATION SUPPLEMENT" in r, (
+            f"role={role} missing supplement"
+        )
+
+
+def test_decorrelation_file_budget_under_2kb():
+    """D-07: each prompts/review/<role>.md ≤ 2048 bytes."""
+    from pathlib import Path
+
+    prompts_dir = (
+        Path(__file__).resolve().parent.parent
+        / "clawteam"
+        / "templates"
+        / "gstack"
+        / "prompts"
+        / "review"
+    )
+    for role in ("reviewer", "designer", "security", "dx-lead"):
+        size = (prompts_dir / f"{role}.md").stat().st_size
+        assert size <= 2048, f"review/{role}.md is {size} bytes (budget 2048)"
+
+
+def test_verifier_dotted_paths_importable():
+    """Every VerificationPair.verifier_dotted_path resolves to a callable."""
+    import importlib
+
+    plugin = _fresh_plugin()
+    for pair in plugin.contribute_verification_pairs():
+        module_path, _, attr = pair.verifier_dotted_path.rpartition(".")
+        module = importlib.import_module(module_path)
+        verifier = getattr(module, attr, None)
+        assert callable(verifier), f"{pair.verifier_dotted_path} not importable"
+
+
 def test_non_gstack_template_does_not_load_gstack_plugin(tmp_path, monkeypatch):
     """Pitfall 14 cross-template: spawning non-gstack template doesn't trigger gstack hooks.
 
