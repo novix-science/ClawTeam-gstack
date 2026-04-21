@@ -5466,5 +5466,164 @@ def sprint_resume(
     _sprint_emit_ok(c.status_dict(new_state))
 
 
+@sprint_app.command("approve")
+def sprint_approve(
+    sprint_id: str = typer.Argument(
+        ..., help="Sprint id or unambiguous prefix."
+    ),
+    phase: str = typer.Option(
+        "ship",
+        "--phase",
+        help="Phase to approve (currently only 'ship' is supported).",
+    ),
+    team: str = typer.Option("", "--team", envvar="CLAWTEAM_TEAM"),
+    notes: str = typer.Option(
+        "",
+        "--notes",
+        help="Optional approval notes recorded in ship-approval.md frontmatter.",
+    ),
+    no_sign: bool = typer.Option(
+        False,
+        "--no-sign",
+        help="Skip git-commit signing (default: skip; real signing is v1.x).",
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit the written frontmatter as JSON."
+    ),
+) -> None:
+    """Write ship-approval.md artifact for the ship phase (§04-CONTEXT D-14 / SPRINT-05).
+
+    Writes a signed approval artifact that the ShipApprovalGate reads. The
+    ``--phase ship`` flag is reserved for forward-compat (e.g., future
+    ``--phase <other>`` approvals); currently only "ship" is accepted.
+    """
+    import os
+    import subprocess
+    from datetime import datetime, timezone
+
+    from clawteam.sprint.state import save_sprint_state
+
+    if phase != "ship":
+        _sprint_emit_err(
+            "APPROVE_PHASE_UNSUPPORTED",
+            f"Only --phase ship is supported (got {phase!r})",
+        )
+        return  # unreachable — _sprint_emit_err raises typer.Exit
+
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return  # err already emitted
+
+    # 1. Resolve approved_by: git user.name → $USER → "unknown".
+    approved_by = ""
+    try:
+        r = subprocess.run(
+            ["git", "config", "user.name"],
+            cwd=state.workspace_branch or ".",
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        approved_by = (r.stdout or "").strip()
+    except Exception:  # noqa: BLE001 — any git/OS failure falls through to env.
+        approved_by = ""
+    if not approved_by:
+        approved_by = os.environ.get("USER", "") or "unknown"
+
+    # 2. Resolve sha_at_approval: state.review_sha, else git HEAD, else fail.
+    sha_at_approval = state.review_sha or ""
+    if not sha_at_approval and state.workspace_branch:
+        try:
+            r = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=state.workspace_branch,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            sha_at_approval = (r.stdout or "").strip()
+        except Exception:  # noqa: BLE001 — fall through to error below.
+            sha_at_approval = ""
+
+    if not sha_at_approval:
+        _sprint_emit_err(
+            "APPROVE_NO_SHA",
+            (
+                "Cannot resolve sha_at_approval: state.review_sha is empty and "
+                "git rev-parse HEAD failed. Ensure workspace_branch points to a "
+                "git repo OR run Review-phase dispatch first to pin review_sha."
+            ),
+        )
+        return  # unreachable
+
+    # 3. Compose frontmatter + body.
+    # Canonical frontmatter shape (matches ShipApprovalGate._REQUIRED_FIELDS):
+    #   artifact_type: ship_approval
+    #   approved_by: <git user.name or $USER>
+    #   approved_at: <ISO-8601 UTC>
+    #   sha_at_approval: <40-char git SHA>
+    #   sprint_id: <sprint id>
+    #   approval_notes: <optional, only when --notes given>
+    approved_at = datetime.now(timezone.utc).isoformat()
+    frontmatter = {
+        "artifact_type": "ship_approval",
+        "approved_by": approved_by,
+        "approved_at": approved_at,
+        "sha_at_approval": sha_at_approval,
+        "sprint_id": state.sprint_id,
+    }
+    if notes:
+        frontmatter["approval_notes"] = notes
+
+    yaml_lines = ["---"]
+    for key, value in frontmatter.items():
+        yaml_lines.append(f"{key}: {value}")
+    yaml_lines.append("---")
+    yaml_lines.append("")
+    yaml_lines.append("# Ship approval")
+    yaml_lines.append("")
+    yaml_lines.append(
+        f"Approved by {approved_by} for sprint {state.sprint_id} "
+        f"at sha {sha_at_approval[:12]}."
+    )
+    if notes:
+        yaml_lines.append("")
+        yaml_lines.append(notes)
+    artifact_body = "\n".join(yaml_lines) + "\n"
+
+    # 4. Persist: write into state.artifacts + save_sprint_state.
+    state.artifacts["ship-approval.md"] = artifact_body
+    try:
+        save_sprint_state(state)
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("APPROVE_SAVE_FAILED", str(exc))
+        return  # unreachable
+
+    # no_sign is a forward-compat no-op in Phase 4 — real git-signed approval
+    # commits are v1.x (T-04-39 accept disposition).
+    _ = no_sign
+
+    # 5. Emit output.
+    if json_output:
+        print(json.dumps({"status": "approved", **frontmatter}))
+    else:
+        _sprint_emit_ok(
+            {
+                "status": "approved",
+                "sprint_id": state.sprint_id,
+                "approved_by": approved_by,
+                "approved_at": approved_at,
+                "sha_at_approval": sha_at_approval[:12],
+            }
+        )
+
+
 if __name__ == "__main__":
     app()
