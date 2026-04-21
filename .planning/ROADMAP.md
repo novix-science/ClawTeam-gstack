@@ -255,7 +255,7 @@ Plans:
 **Plans**: 10 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Wave 0 substrate: SkillRegistration + SkillDispatcher + contribute_skills hook + invoke_native_cli wrapper + 5 doctor entries + TemplateDef [ship]/[deploy]/[canary]/[benchmark] blocks
+- [x] 05-01-PLAN.md — Wave 0 substrate: SkillRegistration + SkillDispatcher + contribute_skills hook + invoke_native_cli wrapper + 5 doctor entries + TemplateDef [ship]/[deploy]/[canary]/[benchmark] blocks — completed 2026-04-21 (see 05-01-SUMMARY.md)
 - [ ] 05-02-PLAN.md — Wave 1 schemas + events: DeployNotes + CanaryReport + BenchmarkReport + CodexReview pydantic schemas + ShipNotes Phase 5 extension + 2 HarnessEvent dataclasses (DeployRegressionDetected, WebVitalRegressionDetected)
 - [ ] 05-03-PLAN.md — Wave 2 /codex skill (SKILL-13): engineer/reviewer, 3 modes, adversarial-input safety via shell=False + list argv
 - [ ] 05-04-PLAN.md — Wave 2 /ship skill (SKILL-14): shipper, 5-step pipeline (sync_main → run_tests → audit_coverage → push → open_pr) + test bootstrap on missing tests

@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 4 executing (wave 4 complete)
-stopped_at: Completed 04-14 (d18-cleanup-thrash-integration-gate-wiring landed)
-last_updated: "2026-04-21T11:00:00Z"
+status: Phase 5 executing (wave 0 substrate complete)
+stopped_at: Completed 05-01 (wave0-substrate landed — skill dispatch + invoke_native_cli + doctor + TemplateDef sub-blocks)
+last_updated: "2026-04-21T12:05:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 4
-Plan: 14 complete (wave 4 landed — both 13 + 14 done)
+Phase: 5
+Plan: 01 complete (wave 0 substrate landed)
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Plan: 14 complete (wave 4 landed — both 13 + 14 done)
 | Phase 04 P10 | 18min | 3 tasks | 3 files |
 | Phase 04 P13 | 10min | 3 tasks | 12 files |
 | Phase 04 P14 | 10min | 3 tasks | 5 files |
+| Phase 05 P01 | 35min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,11 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-10: Cross-executor stash interaction noted — Task 3 conductor.py edits landed as part of commit 5902ede docs(04-12) rather than its own feat(04-10) commit due to sibling-executor working-tree snapshot timing. Functional correctness preserved (87 tests green); future audits grep `plugin_manager` across wave-3 commit range to see Task 3 wiring.
 - [Phase 04]: 04-13: Ship 8 adversarial diff fixtures (renamed_ui / crypto_test / whitespace_only / package_json_dep_bump / auth_middleware_rewrite / cross_cutting_refactor / mixed_ui_and_api / generated_migration) + expected_routing.json oracle + parametrized golden test (12 tests) over GstackReviewRouter using load_template('gstack') real rules; plus consolidated state-machine golden harness (10 tests = 3x3 bijective parametrized + 1 coverage meta) asserting in-code _TRANSITIONS / TURN_BUDGET / _FINAL_STATES match fixtures exactly. ISS-06 tightening applied: removed soft-bound monologue-collapse test in favor of strict TURN_BUDGET equality per fixture. 22/22 green; 71/71 Plan 06/07/08/09 scoped regression green. SPRINT-03 + QUALITY-07 closed.
 - [Phase 04]: 04-14: Remove 4 D-18 deferral markers (INTERACTIVE-RUNTIME-DEFERRED x3 in pm/designer/reviewer + SHA-PIN-DEFERRED x1 in reviewer) now that Plans 07/08/09/10 shipped the actual runtime; invert 4 existing test assertions + add inverse-runtime-present safety net (test_markers_removed_and_runtime_present asserts skill state.py + fixture JSON exist for every removed marker). Ship tests/test_mid_review_push_integration.py (329 LOC, 3 tests) exercising dispatch_review_phase against a REAL tmp_path git repo (no subprocess mocks) — asserts MidReviewThrash payload (review_sha/new_sha/diff_paths_added) + reviewer report's thrash_decision field per D-19; closes ROADMAP Phase 4 Success Criterion #4. Task 3 ISS-06 skipped as no-op per plan's own pre-check (Plan 13 never shipped test_monologue_collapse_detector; test_turn_budget_matches_fixture equality already absorbs the mandate). 68/68 plan-scoped tests green.
+- [Phase 05]: 05-01: Wave 0 substrate — close four CONTEXT inaccuracies surfaced by 05-RESEARCH (A1/A3/A5/A2+A8). Ship SkillRegistration frozen dataclass + SkillError hierarchy + SkillDispatcher + contribute_skills hook on HarnessPlugin base + PluginManager.get_plugin_skills aggregator with duplicate-name ValueError; invoke_native_cli wrapper at clawteam/spawn/invoke.py (shell=False hard-coded, scrub_env default, caller-env opt-out); extend _DOCTOR_TOOLS + _doctor_install_hint with gh/lighthouse/vercel/netlify/flyctl per-platform; add ShipConfig/DeployConfig/CanaryConfig/BenchmarkConfig pydantic models + four optional fields on TemplateDef with _parse_toml reading TOP-LEVEL [ship]/[deploy]/[canary]/[benchmark] blocks. Zero skill implementations — all 7 Phase 5 skills will plug in via Waves 2-4. 62 new tests pass (18 skill substrate + 27 invoke/doctor + 17 template); all 239 pre-existing plugin/template/doctor/cli/spawn tests still green in isolation.
+- [Phase 05]: 05-01: Roles on SkillRegistration are frozenset[str] (not list) — signals set semantics + hashability for future indexing; dispatcher raises bare SkillError (not subclass) for unknown-skill so surfaces that only want generic "skill failed" can catch base without hierarchy discriminator.
+- [Phase 05]: 05-01: invoke_native_cli scrub_env is default, NOT required preprocessor — callers passing explicit env={...} bypass scrub_env (explicit opt-out) so Phase 5 skill handlers can legitimately reach subprocess with provider auth tokens when needed.
+- [Phase 05]: 05-01: TemplateDef sub-blocks live at TOP LEVEL of the TOML (NOT under [template]) per CONTEXT.md example `[ship] coverage_threshold = 0.7`. All four default to None so gstack + 6 bundled templates parse unchanged; DeployConfig.provider is Literal['vercel','netlify','fly','custom'] — pydantic enforces enum at parse time (T-05-01-07).
+- [Phase 05]: 05-01 defers test-cross-contamination (evidence_schemas._registry process-global) to future hygiene plan — pre-existing on ed8c32a, unrelated to Plan 05-01; logged at .planning/phases/05-tool-heavy-skills-ship-sre-codex/deferred-items.md.
 
 ### Pending Todos
 
@@ -149,11 +155,12 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T11:00:00Z
-Stopped at: Completed 04-14 (d18-cleanup-thrash-integration-gate-wiring landed)
+Last session: 2026-04-21T12:05:00Z
+Stopped at: Completed 05-01 (wave0-substrate landed)
 Resume files:
 
-  - Phase 4 (executing wave 4): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md
+  - Phase 5 (executing wave 0): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 Plan 01 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-01-SUMMARY.md
 
 ## Recent Activity
 
