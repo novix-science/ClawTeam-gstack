@@ -226,8 +226,8 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SPRINT-01 | Phase 2 | Pending |
 | SPRINT-02 | Phase 2 | Pending |
 | SPRINT-03 | Phase 4 | Complete (04-06: router + rules shipped; 04-10 wires dispatch; 04-11: plugin glue shipped; 04-13: 8-fixture adversarial golden test + oracle JSON verifies SC #3) |
-| SPRINT-04 | Phase 4 | Complete |
-| SPRINT-05 | Phase 4 | Complete |
+| SPRINT-04 | Phase 4 | Complete (04-10: parallel dispatch + aggregator; 04-14: end-to-end mid-review-push integration test closes ROADMAP SC #4) |
+| SPRINT-05 | Phase 4 | Complete (04-12: clawteam sprint approve CLI; 04-14: ship-approval contract cross-referenced in integration test) |
 | SPRINT-06 | Phase 3 | Complete |
 | SKILL-01 | Phase 3 | Complete |
 | SKILL-02 | Phase 3 | Complete |
@@ -259,13 +259,13 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-04 | Phase 7 | Pending |
 | QUALITY-05 | Phase 7 | Pending |
 | QUALITY-06 | Phase 2 | Pending |
-| QUALITY-07 | Phase 4 | Complete |
+| QUALITY-07 | Phase 4 | Complete (04-13: state-machine goldens; 04-14: inverse-assertion safety net test_markers_removed_and_runtime_present locks runtime-landed invariant) |
 | QUALITY-08 | Phase 2 | Pending |
-| QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event) |
+| QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event; 04-14: end-to-end integration test asserts D-19 thrash_decision frontmatter contract on reviewer report) |
 | QUALITY-10 | Phase 6 | Pending |
 | QUALITY-11 | Phase 2 | Pending |
 | QUALITY-12 | Phase 7 | Pending |
-| QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook) |
+| QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook; 04-14: D-18 deferral markers removed from reviewer.md — SHA-pinning now framed as canonical, not deferral) |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
 | UX-01 | Phase 3 | Complete |

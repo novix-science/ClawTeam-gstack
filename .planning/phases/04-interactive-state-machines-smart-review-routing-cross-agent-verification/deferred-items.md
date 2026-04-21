@@ -76,3 +76,29 @@ changes). Re-evaluate at Phase 4 close or defer to v1.x.
   commit will resolve. Plan 04-13 ships green for its own 22 tests.
 - **Proposed owner:** Plan 04-14 (will land the marker-removal + runtime-
   stub GREEN).
+
+## 04-14 Observations
+
+### Full-suite ordering flake still unresolved at phase close
+
+- **Tests:**
+  - `tests/test_gstack_plugin.py::test_six_evidence_schemas_registered`
+  - `tests/test_plugin_hooks.py::test_evidence_schema_collision_when_registry_present`
+- **Symptom:** `ValueError: Duplicate evidence-schema registration: 'design-doc'`
+  when running the full `pytest tests/` suite in alphabetical order. Both tests
+  pass in isolation and in scoped invocations.
+- **Scope:** Pre-existing at the Plan 04-14 baseline (`0a411ef docs(04): capture
+  phase plans`) — confirmed by bisection. Same flake noted in the 04-06 / 04-11
+  observations above; not introduced by Plan 04-14.
+- **Plan 04-14 scoped verification:** 97/97 tests green across
+  `test_gstack_role_prompts.py` (15), `test_mid_review_push_integration.py` (3),
+  `test_review_phase_dispatch.py` (28), `test_office_hours_state_machine.py`,
+  `test_design_consultation_state_machine.py`, `test_investigate_state_machine.py`
+  (combined 51). ISS-06 Task 3 was a no-op: `test_monologue_collapse_detector`
+  never shipped (Plan 04-13 consolidated goldens already use equality-only
+  `test_turn_budget_matches_fixture`), so the redundancy ISS-06 flagged
+  cannot materialize.
+- **Scope decision (2026-04-21):** Remains out-of-scope. Phase-4 close should
+  schedule a dedicated cleanup (module-scope fixture that clears `_REGISTERED`
+  between tests, or lazy registration inside function bodies) before Phase 5.
+- **Proposed owner:** Phase 4 verifier / Phase 5 infrastructure cleanup.

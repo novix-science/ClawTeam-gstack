@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 4 executing (wave 4 in progress)
-stopped_at: Completed 04-13 (adversarial-routing-golden-tests landed)
-last_updated: "2026-04-21T10:51:24Z"
+status: Phase 4 executing (wave 4 complete)
+stopped_at: Completed 04-14 (d18-cleanup-thrash-integration-gate-wiring landed)
+last_updated: "2026-04-21T11:00:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 4
-Plan: 13 complete (wave 4 parallel with 14 in flight)
+Plan: 14 complete (wave 4 landed — both 13 + 14 done)
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Plan: 13 complete (wave 4 parallel with 14 in flight)
 | Phase 04 P12 | 4min | 1 task | 2 files |
 | Phase 04 P10 | 18min | 3 tasks | 3 files |
 | Phase 04 P13 | 10min | 3 tasks | 12 files |
+| Phase 04 P14 | 10min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,7 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-10 Task 3: SprintConductor._build_gate_chain gains plugin_manager kwarg + self._plugin_manager storage; chain order now EvidenceGate → forced_progress_gate → [CrossAgentVerificationGate per pair whose phase==current_phase] → [plugin gates from get_plugin_gates(phase)] → (InteractionGate?). Both plugin-manager accessors try/except'd with logged warning — gate chain never crashes on broken plugin (T-04-17 posture). Closes ISS-03 (ShipApprovalGate unreachable) + ISS-07 (CrossAgentVerificationGate unreachable); ShipApprovalGate + cross-verify pairs from Plan 04-11 now actually execute in production.
 - [Phase 04]: 04-10: Cross-executor stash interaction noted — Task 3 conductor.py edits landed as part of commit 5902ede docs(04-12) rather than its own feat(04-10) commit due to sibling-executor working-tree snapshot timing. Functional correctness preserved (87 tests green); future audits grep `plugin_manager` across wave-3 commit range to see Task 3 wiring.
 - [Phase 04]: 04-13: Ship 8 adversarial diff fixtures (renamed_ui / crypto_test / whitespace_only / package_json_dep_bump / auth_middleware_rewrite / cross_cutting_refactor / mixed_ui_and_api / generated_migration) + expected_routing.json oracle + parametrized golden test (12 tests) over GstackReviewRouter using load_template('gstack') real rules; plus consolidated state-machine golden harness (10 tests = 3x3 bijective parametrized + 1 coverage meta) asserting in-code _TRANSITIONS / TURN_BUDGET / _FINAL_STATES match fixtures exactly. ISS-06 tightening applied: removed soft-bound monologue-collapse test in favor of strict TURN_BUDGET equality per fixture. 22/22 green; 71/71 Plan 06/07/08/09 scoped regression green. SPRINT-03 + QUALITY-07 closed.
+- [Phase 04]: 04-14: Remove 4 D-18 deferral markers (INTERACTIVE-RUNTIME-DEFERRED x3 in pm/designer/reviewer + SHA-PIN-DEFERRED x1 in reviewer) now that Plans 07/08/09/10 shipped the actual runtime; invert 4 existing test assertions + add inverse-runtime-present safety net (test_markers_removed_and_runtime_present asserts skill state.py + fixture JSON exist for every removed marker). Ship tests/test_mid_review_push_integration.py (329 LOC, 3 tests) exercising dispatch_review_phase against a REAL tmp_path git repo (no subprocess mocks) — asserts MidReviewThrash payload (review_sha/new_sha/diff_paths_added) + reviewer report's thrash_decision field per D-19; closes ROADMAP Phase 4 Success Criterion #4. Task 3 ISS-06 skipped as no-op per plan's own pre-check (Plan 13 never shipped test_monologue_collapse_detector; test_turn_budget_matches_fixture equality already absorbs the mandate). 68/68 plan-scoped tests green.
 
 ### Pending Todos
 
@@ -147,8 +149,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T10:51:24Z
-Stopped at: Completed 04-13 (adversarial-routing-golden-tests landed)
+Last session: 2026-04-21T11:00:00Z
+Stopped at: Completed 04-14 (d18-cleanup-thrash-integration-gate-wiring landed)
 Resume files:
 
   - Phase 4 (executing wave 4): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md

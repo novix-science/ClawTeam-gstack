@@ -222,7 +222,7 @@ Plans:
 - [ ] 04-11-PLAN.md — GstackSprintPlugin extensions: contribute_review_routers + contribute_verification_pairs + contribute_gates + decorrelation prompts
 - [x] 04-12-PLAN.md — clawteam sprint approve CLI subcommand (writes ship-approval.md) (completed 2026-04-21)
 - [x] 04-13-PLAN.md — Adversarial routing golden tests (8 fixture diffs) + consolidated state-machine goldens (completed 2026-04-21)
-- [ ] 04-14-PLAN.md — REVISION: D-18 marker cleanup + mid-review-push integration (closes SC #4) + ISS-06 test tightening
+- [x] 04-14-PLAN.md — REVISION: D-18 marker cleanup + mid-review-push integration (closes SC #4) + ISS-06 test tightening (completed 2026-04-21)
 
 ---
 
