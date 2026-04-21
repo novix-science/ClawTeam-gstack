@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import sys
 from typing import Any
 
 from clawteam.plugins.base import HarnessPlugin
+
+_logger = logging.getLogger(__name__)
 
 
 class PluginManager:
@@ -15,6 +18,9 @@ class PluginManager:
 
     def __init__(self) -> None:
         self._loaded: dict[str, HarnessPlugin] = {}
+        # Phase 4 Plan 05 additive: resolved (VerificationPair, callable) tuples.
+        # Populated by _instantiate_and_register from plugin.contribute_verification_pairs.
+        self._verification_pairs: list[tuple[Any, Any]] = []
 
     # ── Discovery ─────────────────────────────────────────────────────
 
@@ -164,6 +170,34 @@ class PluginManager:
             if _es is not None:
                 for schema_name, schema_cls in schemas.items():
                     _es.register_schema(schema_name, schema_cls)
+        # Phase 4 / Plan 04-05 Task 1: resolve verification pairs.
+        # Each plugin-contributed VerificationPair carries a dotted path to
+        # a verifier callable; we resolve it now so the gate chain consumer
+        # (SprintConductor._build_gate_chain, Plan 10) can construct
+        # CrossAgentVerificationGate instances without doing module imports.
+        pairs = plugin.contribute_verification_pairs() or []
+        for pair in pairs:
+            try:
+                module_path, _, attr = pair.verifier_dotted_path.rpartition(".")
+                if not module_path or not attr:
+                    raise ValueError(
+                        f"invalid verifier_dotted_path {pair.verifier_dotted_path!r}"
+                    )
+                module = importlib.import_module(module_path)
+                verifier = getattr(module, attr, None)
+                if verifier is None or not callable(verifier):
+                    raise AttributeError(
+                        f"verifier {attr!r} in {module_path!r} not found or not callable"
+                    )
+                self._verification_pairs.append((pair, verifier))
+            except Exception as exc:  # noqa: BLE001 — plugin load must not crash
+                _logger.warning(
+                    "Plugin %s: could not resolve verifier %s: %s",
+                    plugin.name,
+                    pair.verifier_dotted_path,
+                    exc,
+                )
+                continue
         self._loaded[plugin.name] = plugin
         return plugin
 
@@ -174,6 +208,14 @@ class PluginManager:
         return HarnessContext(bus=get_event_bus())
 
     # ── Introspection ─────────────────────────────────────────────────
+
+    def get_verification_pairs(self) -> list[tuple[Any, Any]]:
+        """Return resolved [(VerificationPair, verifier_callable), ...] (§04-CONTEXT D-12).
+
+        Consumed by SprintConductor._build_gate_chain (Plan 04-10) when
+        constructing CrossAgentVerificationGate instances per phase.
+        """
+        return list(self._verification_pairs)
 
     def loaded_plugins(self) -> dict[str, HarnessPlugin]:
         return dict(self._loaded)

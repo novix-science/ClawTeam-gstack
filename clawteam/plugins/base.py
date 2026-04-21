@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
+    from clawteam.harness.cross_agent_verification_gate import VerificationPair
     from clawteam.harness.phases import Phase, PhaseGate
     from clawteam.harness.review_router import ReviewRouter
 
@@ -91,3 +92,26 @@ class HarnessPlugin(ABC):
         ShipNotes, Retro).
         """
         return {}
+
+    # ── Phase 4 / Plan 04-05 hook ─────────────────────────────────────
+
+    def contribute_verification_pairs(self) -> list[VerificationPair]:
+        """Contribute cross-agent verification pairs (§04-CONTEXT D-12).
+
+        Returns a list of :class:`VerificationPair` describing which artifact
+        pairs should be cross-verified at which phase by which verifier
+        function (dotted-path indexed). ``PluginManager`` resolves each
+        ``verifier_dotted_path`` to a callable at plugin-load time and wires
+        them into the gate chain consumed by SprintConductor (Plan 04-10
+        _dispatch_review_phase + Plan 04-11 GstackSprintPlugin).
+
+        Empty-list default means the plugin contributes no cross-verification
+        gates. Phase 4's GstackSprintPlugin returns two pairs:
+          - test-report.md ↔ build-report.md  (qa verifies engineer's output)
+          - design-doc.md  ↔ office-hours-answers  (reviewer verifies designer)
+
+        Hook is optional; existing plugins (software-dev, hedge-fund, code-review,
+        harness-default, research-paper, strategy-room, ralph-loop) inherit the
+        empty-list default and are unaffected.
+        """
+        return []
