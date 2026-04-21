@@ -583,3 +583,165 @@ def test_run_cli_resume_reuses_existing_leader_and_session(monkeypatch, tmp_path
     assert captured["agent_name"] == "leader"
     assert captured["agent_id"] == "leader001"
     assert captured["command"] == ["claude", "--resume", "sess-123"]
+
+
+# ---------------------------------------------------------------------------
+# UX-07: `clawteam team show` dashboard (Phase 3 Plan 03-08)
+# ---------------------------------------------------------------------------
+
+_GSTACK_ROLES = [
+    "pm", "ceo", "eng-mgr", "designer", "dx-lead",
+    "engineer", "reviewer", "qa", "security", "shipper", "sre",
+]
+
+
+def _spawn_gstack_team_for_show(name: str = "myteam") -> None:
+    """Helper: create a gstack-templated team with all 11 roles as members.
+
+    Mirrors what `clawteam team spawn gstack --name <name>` does so
+    `team show` has a realistic roster + template + leader_role on disk.
+    """
+    TeamManager.create_team(
+        name=name,
+        leader_name="ceo",
+        leader_id="ceo-1",
+        description="gstack test team",
+        leader_agent_type="strategic-leader",
+        roles=_GSTACK_ROLES,
+        leader_role="ceo",
+        template="gstack",
+    )
+    # ceo is the leader — add the other 10 specialists.
+    for role in _GSTACK_ROLES:
+        if role == "ceo":
+            continue
+        TeamManager.add_member(
+            team_name=name,
+            member_name=role,
+            agent_id=f"{role}-1",
+            agent_type="general-purpose",
+        )
+
+
+def test_team_show_gstack_dashboard_renders_11_roles_and_placeholders(tmp_path):
+    """UX-07 happy path: gstack team surfaces 11 roles + Phase 6/7 placeholders."""
+    runner = CliRunner()
+    data_dir = tmp_path / ".clawteam"
+    env = {
+        "HOME": str(tmp_path),
+        "CLAWTEAM_DATA_DIR": str(data_dir),
+    }
+
+    _spawn_gstack_team_for_show("myteam")
+
+    # Drop 2 `_phase6_pending/` placeholder files so the dashboard
+    # memory row reports a non-zero count.
+    pending = data_dir / "teams" / "myteam" / "_phase6_pending"
+    pending.mkdir(parents=True)
+    (pending / "sprint-001-retro.json").write_text(
+        '{"feature_flag":"phase6_learn_pending"}'
+    )
+    (pending / "sprint-002-retro.json").write_text(
+        '{"feature_flag":"phase6_learn_pending"}'
+    )
+
+    result = runner.invoke(app, ["team", "show", "myteam"], env=env)
+
+    assert result.exit_code == 0, result.output
+    # Header carries the template + leader chip.
+    assert "Template:" in result.output
+    assert "gstack" in result.output
+    assert "leader:" in result.output
+    assert "ceo" in result.output
+    # All 11 gstack roles appear in the rendered roster.
+    for role in _GSTACK_ROLES:
+        assert role in result.output, f"role {role!r} missing from dashboard"
+    # Memory placeholder: Phase 6 pending + count of 2.
+    assert "Phase 6 pending" in result.output
+    assert "2 entries" in result.output
+    # Cost rollup placeholder: Phase 7 deferred.
+    assert "Phase 7" in result.output
+
+
+def test_team_show_not_found_returns_exit_code_1(tmp_path):
+    """Unknown team name returns typer.Exit(1) with human-readable error."""
+    runner = CliRunner()
+    env = {
+        "HOME": str(tmp_path),
+        "CLAWTEAM_DATA_DIR": str(tmp_path / ".clawteam"),
+    }
+
+    result = runner.invoke(app, ["team", "show", "nonexistent"], env=env)
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+    assert "nonexistent" in result.output
+
+
+def test_team_show_non_gstack_team_shows_na_memory_row(tmp_path):
+    """Non-gstack template renders roster; memory row shows N/A (CORE-03 BC)."""
+    runner = CliRunner()
+    env = {
+        "HOME": str(tmp_path),
+        "CLAWTEAM_DATA_DIR": str(tmp_path / ".clawteam"),
+    }
+
+    # Create a non-gstack team: template="software-dev" triggers the N/A path.
+    TeamManager.create_team(
+        name="legacy-team",
+        leader_name="lead",
+        leader_id="lead-1",
+        description="software-dev team",
+        leader_agent_type="leader",
+        roles=["lead", "eng"],
+        leader_role="",
+        template="software-dev",
+    )
+    TeamManager.add_member(
+        team_name="legacy-team",
+        member_name="eng",
+        agent_id="eng-1",
+        agent_type="general-purpose",
+    )
+
+    result = runner.invoke(app, ["team", "show", "legacy-team"], env=env)
+
+    assert result.exit_code == 0, result.output
+    assert "software-dev" in result.output
+    # Memory row shows N/A for non-gstack templates.
+    assert "N/A" in result.output
+    # No gstack-specific placeholder chatter leaks into the output.
+    assert "_phase6_pending" not in result.output
+    assert "Phase 6 pending" not in result.output
+
+
+def test_team_show_json_output_shape_matches_contract(tmp_path):
+    """--json output shape: all documented keys present with correct statuses."""
+    import json as _json
+
+    runner = CliRunner()
+    env = {
+        "HOME": str(tmp_path),
+        "CLAWTEAM_DATA_DIR": str(tmp_path / ".clawteam"),
+    }
+
+    _spawn_gstack_team_for_show("json-team")
+
+    result = runner.invoke(app, ["--json", "team", "show", "json-team"], env=env)
+
+    assert result.exit_code == 0, result.output
+    # --json prints the whole dict as one JSON document; parse the full body.
+    data = _json.loads(result.output)
+
+    assert data["name"] == "json-team"
+    assert data["template"] == "gstack"
+    assert data["leaderRole"] == "ceo"
+    assert isinstance(data["members"], list)
+    assert len(data["members"]) == 11  # ceo + 10 specialists
+    assert "activeSprint" in data  # None is OK — no sprint started
+    assert data["memory"]["status"] == "pending_phase_6"
+    assert data["memory"]["placeholderEntries"] == 0
+    assert data["costRollup"]["status"] == "pending_phase_7"
+    assert data["costRollup"]["perAgent"] == []
+    assert data["costRollup"]["totalTokens"] is None
+    assert data["costRollup"]["totalUsd"] is None
