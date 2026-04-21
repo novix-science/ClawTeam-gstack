@@ -362,3 +362,42 @@ def test_dispatch_returns_result_dict(monkeypatch, tmp_path):
     assert set(result.keys()) == {
         "review_sha", "participants", "peer_reports", "reviewer_report", "agreement_rate",
     }
+
+
+# ── SprintConductor._dispatch_review_phase thin wrapper ──────────────
+
+
+def test_conductor_dispatch_wrapper_invokes_async(tmp_path, monkeypatch):
+    """Smoke test the conductor wrapper calls the async dispatcher."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.sprint.state import SprintState, save_sprint_state
+
+    state = SprintState(
+        team="t1",
+        sprint_id="xyz12345",
+        goal="g",
+        current_phase="review",
+        workspace_branch=str(tmp_path),
+        review_sha="n" * 40,
+    )
+    save_sprint_state(state)
+
+    c = SprintConductor(team_name="t1")
+    runner = _mock_subprocess(head_sequence=["n" * 40, "n" * 40])
+
+    async def fake_spawn(role, state, review_sha, peer_reports=None):
+        return {"role": role, "findings": []}
+
+    # Monkeypatch subprocess.run for the dispatcher's git calls so the sync
+    # wrapper's inner asyncio.run picks up the fake runner at call time.
+    import clawteam.sprint.review_phase as rp
+
+    # The _current_head / _diff_paths helpers default to subprocess.run — patch
+    # that attribute on the module so the wrapper's asyncio.run picks it up.
+    monkeypatch.setattr(rp.subprocess, "run", runner)
+
+    pm = _FakePluginManager([_Router(["designer"])])
+    result = c._dispatch_review_phase("xyz12345", plugin_manager=pm, spawn_fn=fake_spawn)
+    assert result["review_sha"] == "n" * 40
+    assert "designer" in result["participants"]

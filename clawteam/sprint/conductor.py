@@ -31,6 +31,7 @@ conductor, so existing Phase 0 templates keep their Before* events as no-ops
 
 from __future__ import annotations
 
+import asyncio as _asyncio
 import os
 import uuid
 from datetime import datetime, timezone
@@ -513,6 +514,49 @@ class SprintConductor:
             return load_sprint_state(self.team_name, sprint_id)
         except FileNotFoundError:
             return self.resolve_sprint(sprint_id)
+
+    def _dispatch_review_phase(
+        self,
+        sprint_id: str,
+        *,
+        plugin_manager=None,
+        bus=None,
+        spawn_fn=None,
+    ) -> dict:
+        """Run Review-phase orchestration: pin review_sha + parallel reviewers + events.
+
+        §04-CONTEXT D-05/D-06/D-08. Thin sync wrapper over the async dispatcher
+        in ``clawteam/sprint/review_phase.py`` (RESEARCH Open Question 1 decision —
+        keeps conductor.py under ~700 LOC). Caller is the existing advance_phase
+        turn hook OR a direct invocation from CLI/orchestrator.
+
+        Safe to call whether or not ``plugin_manager`` / ``bus`` are supplied:
+        the bus defaults to ``self.bus``; ``plugin_manager`` defaults to
+        ``self._plugin_manager`` (may still be None for legacy Phase 2 callers —
+        in that case no routers contribute and the chain ships with just the
+        reviewer floor).
+        """
+        from clawteam.sprint.review_phase import dispatch_review_phase
+
+        with self._lock:
+            state = self._load_by_id(sprint_id)
+
+        # Use the conductor's existing bus + plugin_manager if caller does not override.
+        resolved_bus = bus if bus is not None else self.bus
+        # _plugin_manager is Phase 4 Plan 04-10 Task 3 storage — legacy Phase 2
+        # callers that don't pass plugin_manager get getattr(...) None fallback
+        # so this wrapper also functions before Task 3's ctor update lands.
+        resolved_pm = plugin_manager if plugin_manager is not None else getattr(self, "_plugin_manager", None)
+
+        # Run the async dispatcher sync via asyncio.run.
+        return _asyncio.run(
+            dispatch_review_phase(
+                state,
+                resolved_pm,
+                resolved_bus,
+                spawn_fn=spawn_fn,
+            )
+        )
 
     def _build_gate_chain(self, state: SprintState) -> list:
         """Compose EvidenceGate → forced_progress_gate → (InteractionGate?).
