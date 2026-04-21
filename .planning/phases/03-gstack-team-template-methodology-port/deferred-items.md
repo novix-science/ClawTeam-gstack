@@ -83,3 +83,43 @@ D-01/D-02/D-03 + D-14 budget gate + cross-file presence). Zero xfails.
 All 11 prompt files present.
 
 - Pre-existing: tests/test_sprint_conductor.py::test_resume_after_process_restart fails via subprocess env isolation (not touched by 03-07; discovered during targeted regression run)
+
+## From 03-09 Execution (2026-04-21)
+
+Plan 03-09 (e2e-cross-template-regression) is limited by its parallel_execution
+scope to `tests/test_gstack_team_spawn.py` + `tests/test_template_regression_matrix.py`
+only. Another Wave 4 agent owns CLI + test_cli_commands changes.
+
+**Pre-existing failure observed when running full suite; NOT caused by 03-09
+changes (confirmed via `git stash` baseline run):**
+
+- `tests/test_gstack_plugin.py::test_six_evidence_schemas_registered` —
+  fails with `Duplicate evidence-schema registration: 'design-doc'` due to
+  test ordering: some earlier test module registers `design-doc` on the
+  module-global `EvidenceSchemaRegistry` without tearing down, then
+  `test_six_evidence_schemas_registered` constructs a fresh
+  `PluginManager()._instantiate_and_register(GstackSprintPlugin)` which
+  fails the duplicate-registration check. Reproduces on `git stash`
+  baseline — not 03-09-caused. Passes when `tests/test_gstack_plugin.py`
+  is run in isolation. Owned by 03-07 (the plugin + its test setup/teardown).
+  Out of 03-09 scope because 03-09 is test-only + limited to two files.
+
+- `tests/test_plugin_hooks.py::test_evidence_schema_collision_when_registry_present` —
+  same root cause as the gstack_plugin failure above: shared module-global
+  `EvidenceSchemaRegistry` state leaks between test modules under full-suite
+  collection order. Reproduces on `git stash` baseline; passes in isolation.
+  Owned by Phase 1/2 plugin substrate; out of 03-09 scope.
+
+- `tests/test_sprint_conductor.py::test_resume_after_process_restart` —
+  same pre-existing subprocess-env-isolation flake already logged under
+  03-02 / 03-05 / 03-06 / 03-07. Confirmed still failing on `git stash`
+  baseline; not 03-09-caused. Out of scope.
+
+**03-09 full-suite result after changes:** 971 passed, 3 failed (same 3
+pre-existing failures). Baseline: 958 passed, 3 failed. Delta: **+13 new
+passing tests** (3 from test_gstack_team_spawn un-xfail + 6+6+1 = 13 from
+test_template_regression_matrix cross-template isolation). Zero new
+failures introduced by 03-09.
+
+**03-09 scope-only suite result:** 28 passed (test_gstack_team_spawn:
+3 + test_template_regression_matrix: 25).

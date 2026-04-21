@@ -125,7 +125,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 
 CLI and dashboard surfaces.
 
-- [ ] **UX-01**: `clawteam team spawn gstack --name <name>` hires a new 11-agent team.
+- [x] **UX-01**: `clawteam team spawn gstack --name <name>` hires a new 11-agent team.
 - [ ] **UX-02**: `clawteam sprint start --team <name> --goal "..."` dispatches a new sprint onto an existing team.
 - [ ] **UX-03**: `clawteam sprint status <id>` shows current phase, active participants, pending-questions count, recent artifacts.
 - [ ] **UX-04**: `clawteam sprint list --team <name>` lists all sprints with phase + status.
@@ -266,7 +266,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-13 | Phase 4 | Pending |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
-| UX-01 | Phase 3 | Pending |
+| UX-01 | Phase 3 | Complete |
 | UX-02 | Phase 2 | Pending |
 | UX-03 | Phase 2 | Pending |
 | UX-04 | Phase 2 | Pending |
