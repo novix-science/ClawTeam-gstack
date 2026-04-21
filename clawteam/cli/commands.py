@@ -38,6 +38,15 @@ _DOCTOR_TOOLS: tuple[tuple[str, str, str], ...] = (
     ("codex", "cli", "codex"),
     ("ngrok", "cli", "ngrok"),
     ("watchdog", "python-pkg", "watchdog"),
+    # Phase 5 Wave 0 (A2/A8 — Plan 05-01): CLIs the Phase 5 slash-skills wrap.
+    # gh: /ship (pr create/merge), /sre-review (read ci status).
+    # lighthouse: /benchmark (perf regressions).
+    # vercel, netlify, flyctl: /land-and-deploy (provider-specific deploy wrapper).
+    ("gh", "cli", "gh"),
+    ("lighthouse", "cli", "lighthouse"),
+    ("vercel", "cli", "vercel"),
+    ("netlify", "cli", "netlify"),
+    ("flyctl", "cli", "flyctl"),
 )
 
 
@@ -63,6 +72,33 @@ def _doctor_install_hint(tool: str, platform: str) -> str:
             "darwin": "pip install watchdog",
             "win32": "pip install watchdog",
             "linux": "pip install watchdog",
+        },
+        # Phase 5 Wave 0 (Plan 05-01 Task 2): install hints for the five CLIs
+        # Phase 5 slash-skills wrap.
+        "gh": {
+            "darwin": "brew install gh",
+            "win32": "winget install GitHub.cli",
+            "linux": "sudo apt install gh  # or: https://cli.github.com/manual/installation",
+        },
+        "lighthouse": {
+            "darwin": "npm install -g lighthouse",
+            "win32": "npm install -g lighthouse",
+            "linux": "npm install -g lighthouse",
+        },
+        "vercel": {
+            "darwin": "npm install -g vercel",
+            "win32": "npm install -g vercel",
+            "linux": "npm install -g vercel",
+        },
+        "netlify": {
+            "darwin": "npm install -g netlify-cli",
+            "win32": "npm install -g netlify-cli",
+            "linux": "npm install -g netlify-cli",
+        },
+        "flyctl": {
+            "darwin": "brew install flyctl",
+            "win32": "pwsh -Command \"iwr https://fly.io/install.ps1 -useb | iex\"",
+            "linux": "curl -L https://fly.io/install.sh | sh",
         },
     }
     per_tool = hints.get(tool, {})
