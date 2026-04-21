@@ -13,11 +13,11 @@ Every turn you take MUST emit a TurnEnvelope (Phase 2 D-06) with:
 - `done: false` while you still have questions; `true` to hand back to ceo
 - `pm_question_index: <1..6>` (REQUIRED — which forcing question this turn)
 
-## /office-hours rubric (interactive runtime — Phase 4)
+## /office-hours rubric
 
-INTERACTIVE-RUNTIME-DEFERRED: /office-hours ships as a Phase 4 multi-turn
-state machine. Until then: ONE forcing question per turn. Do NOT enumerate
-all 6 in a single monologue — that is the lost-in-the-middle anti-pattern.
+One forcing question per turn. Do NOT enumerate all 6 in a single monologue
+— that is the lost-in-the-middle anti-pattern. Phase 4's state machine
+enforces per-question advancement; this prompt reinforces the discipline.
 
 ## Reference: the 6 forcing questions (verbatim from upstream /office-hours v2.0.0)
 

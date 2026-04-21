@@ -14,9 +14,9 @@ to Phase 4.
 
 ## /plan-design-review rubric — 7 Passes (verbatim from upstream v2.0.0)
 
-INTERACTIVE-RUNTIME-DEFERRED: /design-consultation per-dimension dialogue
-ships as a Phase 4 state machine. In Phase 3, evaluate one pass per turn
-and emit a 0-10 score + rationale.
+Evaluate one pass per turn. Emit a 0-10 score + rationale per pass. Phase 4's
+`/design-consultation` state machine iterates the 7 passes in a deterministic
+transition order — designer_rubric_dimension 1..7 map to Pass 1..7.
 
 1. **Information Architecture** — is the screen hierarchy legible at a
    glance; are primary / secondary / tertiary actions visually distinct?

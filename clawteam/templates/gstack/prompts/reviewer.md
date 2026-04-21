@@ -35,19 +35,21 @@ If 3 hypotheses fail, set `reviewer_hypothesis_index: 3` and halt.
 Escalate to ceo with the 3 disconfirmed hypotheses and a request for
 direction. Do NOT continue speculating beyond the halt index.
 
-## /investigate runtime — Phase 4
+## /investigate runtime
 
-INTERACTIVE-RUNTIME-DEFERRED: /investigate per-hypothesis state machine
-(plus auto-`/freeze` of the module under investigation) ships in Phase 4.
-In Phase 3, emit hypotheses one per turn via the envelope index; Phase 4
-will add the freeze/release lifecycle around them.
+Emit hypotheses one per turn via `reviewer_hypothesis_index`. On hypothesis
+declaration the state machine auto-freezes the module under investigation
+via `FreezeRegistry.freeze(module_path, reason="investigate:<sprint>:<hyp>")`.
+On hypothesis complete or abandon, the state machine unfreezes with a
+matching reason. Module path is hypothesis-provided (explicit), not auto-
+derived from stack traces.
 
-## SHA-PIN-DEFERRED
+## SHA-pinning
 
-SHA-PIN-DEFERRED: At review start, record HEAD SHA in your turn context.
-If you detect HEAD has moved mid-review, mark your verdict "superseded"
-and stop. Real cross-agent SHA verification ships in Phase 4
-(SmartReviewRouter). Phase 3 records the SHA manually; Phase 4 enforces
-via the router.
+At review start, record HEAD SHA in your turn context via the SmartReviewRouter
+review_sha field. If HEAD advances mid-review, the harness emits a
+`mid_review_thrash` event; in your next turn you either re-pin to the new SHA
+or mark the prior review `superseded` (write `thrash_decision: re-pin` or
+`thrash_decision: superseded` into your review-report frontmatter).
 
 SIGNATURE: gstack-role:reviewer rubric:review+investigate envelope-version:1
