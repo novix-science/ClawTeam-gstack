@@ -40,8 +40,10 @@ def _read(p: Path) -> str:
 
 def test_pm_office_hours_rubric():
     """SKILL-01: pm.md contains all 6 forcing questions (Q1-Q6 names from
-    office-hours.md CONTENT-DRIFT-NOTE) + challenge-framing +
-    INTERACTIVE-RUNTIME-DEFERRED marker.
+    office-hours.md CONTENT-DRIFT-NOTE) + challenge-framing.
+
+    Plan 04-14 (D-18): INTERACTIVE-RUNTIME-DEFERRED marker MUST be absent
+    (Phase 4 owns /office-hours runtime — marker served its Phase-3 purpose).
     """
     prompt = _read(PROMPTS_DIR / "pm.md")
     fixture = _read(FIXTURES_DIR / "office-hours.md")
@@ -51,8 +53,10 @@ def test_pm_office_hours_rubric():
         "SIGNATURE: gstack-role:pm rubric:office-hours envelope-version:1" in prompt
     )
 
-    # Pitfall 7 partition
-    assert "INTERACTIVE-RUNTIME-DEFERRED" in prompt
+    # D-18: marker removed post-Phase 4 (inverted — was "in prompt" in Phase 3)
+    assert "INTERACTIVE-RUNTIME-DEFERRED" not in prompt, (
+        "D-18: marker must be removed post-Phase 4"
+    )
 
     # Envelope reference (PMEnvelope.pm_question_index)
     assert "pm_question_index" in prompt
@@ -145,8 +149,10 @@ def test_eng_mgr_plan_review_and_retro():
 def test_designer_rubric():
     """SKILL-04: designer.md contains the 7 plan-design-review passes
     (upstream drift from D-13's stated 10 — see fixtures/gstack_skills/
-    plan-design-review.md CONTENT-DRIFT-NOTE) + AI-slop checklist +
-    INTERACTIVE-RUNTIME-DEFERRED marker for /design-consultation.
+    plan-design-review.md CONTENT-DRIFT-NOTE) + AI-slop checklist.
+
+    Plan 04-14 (D-18): INTERACTIVE-RUNTIME-DEFERRED marker MUST be absent
+    (Phase 4 owns /design-consultation runtime).
     """
     prompt = _read(PROMPTS_DIR / "designer.md")
     fixture = _read(FIXTURES_DIR / "plan-design-review.md")
@@ -155,7 +161,9 @@ def test_designer_rubric():
         "SIGNATURE: gstack-role:designer "
         "rubric:plan-design-review+design-review envelope-version:1" in prompt
     )
-    assert "INTERACTIVE-RUNTIME-DEFERRED" in prompt
+    assert "INTERACTIVE-RUNTIME-DEFERRED" not in prompt, (
+        "D-18: marker must be removed post-Phase 4"
+    )
     assert "designer_rubric_dimension" in prompt  # envelope reference
 
     # 7 numbered passes (drift-adjusted per plan-design-review.md
@@ -223,8 +231,11 @@ def test_dx_lead_devex_review():
 
 
 def test_reviewer_review_and_investigate():
-    """SKILL-06: reviewer.md contains iron-law + halt-after-3 + SHA-PIN-DEFERRED
-    + INTERACTIVE-RUNTIME-DEFERRED for /investigate.
+    """SKILL-06: reviewer.md contains iron-law + halt-after-3.
+
+    Plan 04-14 (D-18): INTERACTIVE-RUNTIME-DEFERRED + SHA-PIN-DEFERRED markers
+    MUST be absent (Phase 4 owns /investigate runtime + cross-agent SHA
+    verification via SmartReviewRouter).
     """
     prompt = _read(PROMPTS_DIR / "reviewer.md")
 
@@ -235,8 +246,12 @@ def test_reviewer_review_and_investigate():
     assert "iron-law" in prompt.lower() or "iron law" in prompt.lower()
     assert "halt" in prompt.lower()
     assert "3" in prompt  # halt-after-3 reference
-    assert "INTERACTIVE-RUNTIME-DEFERRED" in prompt
-    assert "SHA-PIN-DEFERRED" in prompt
+    assert "INTERACTIVE-RUNTIME-DEFERRED" not in prompt, (
+        "D-18: marker must be removed post-Phase 4"
+    )
+    assert "SHA-PIN-DEFERRED" not in prompt, (
+        "D-18: marker must be removed post-Phase 4"
+    )
     assert "reviewer_hypothesis_index" in prompt  # envelope reference
 
 
@@ -470,3 +485,67 @@ def test_all_eleven_prompt_files_present():
     assert present == expected, (
         f"missing: {expected - present}; extra: {present - expected}"
     )
+
+
+# ---------------------------------------------------------------------------
+# D-18 regression (Plan 04-14 — marker cleanup + runtime-present inverse assertion)
+# ---------------------------------------------------------------------------
+
+
+def test_markers_removed():
+    """D-18 rule (b): INTERACTIVE-RUNTIME-DEFERRED / SHA-PIN-DEFERRED markers
+    are removed from all prompt files (Phase 4 owns the runtime).
+
+    This test enforces a global grep-zero over clawteam/templates/gstack/prompts/
+    so no future prompt author accidentally reintroduces a deferral marker.
+    Covers pm.md, designer.md, reviewer.md, AND Plan 11's review/<role>.md
+    supplements.
+    """
+    root = PROMPTS_DIR
+    # All .md files under prompts/ (top level AND review/ subdir)
+    prompt_files = list(root.rglob("*.md"))
+    assert len(prompt_files) >= 11, (
+        f"expected at least 11 prompts, got {len(prompt_files)}"
+    )
+
+    offenders = []
+    for p in prompt_files:
+        content = p.read_text(encoding="utf-8")
+        if "INTERACTIVE-RUNTIME-DEFERRED:" in content:
+            offenders.append((str(p.relative_to(root)), "INTERACTIVE-RUNTIME-DEFERRED"))
+        if "SHA-PIN-DEFERRED:" in content:
+            offenders.append((str(p.relative_to(root)), "SHA-PIN-DEFERRED"))
+    assert offenders == [], (
+        f"D-18 regression: deferral markers found in {offenders}. "
+        "Phase 4 owns the runtime — these markers must stay removed."
+    )
+
+
+def test_markers_removed_and_runtime_present():
+    """D-18 inverse assertion: markers gone AND corresponding runtime shipped.
+
+    For each skill where a deferral marker was removed, assert the Phase 4
+    state-machine module file + transition fixture exist. Prevents the "markers
+    removed but runtime didn't ship" failure mode.
+    """
+    repo_root = PROMPTS_DIR.parent.parent.parent.parent  # …/gstack/prompts → repo root
+    skills = [
+        ("office-hours", "office_hours", "office-hours.transitions.json"),
+        ("design-consultation", "design_consultation", "design-consultation.transitions.json"),
+        ("investigate", "investigate", "investigate.transitions.json"),
+    ]
+    for display_name, module_slug, fixture_name in skills:
+        state_module = (
+            repo_root
+            / "clawteam" / "templates" / "gstack" / "skills"
+            / module_slug / "state.py"
+        )
+        fixture_file = (
+            repo_root / "tests" / "fixtures" / "gstack_state_machines" / fixture_name
+        )
+        assert state_module.exists(), (
+            f"D-18 runtime missing: skill={display_name} state.py not at {state_module}"
+        )
+        assert fixture_file.exists(), (
+            f"D-18 runtime missing: skill={display_name} fixture not at {fixture_file}"
+        )
