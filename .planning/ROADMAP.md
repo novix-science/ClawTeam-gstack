@@ -252,10 +252,19 @@ Plans:
 
 **Research flag**: LOW. Each skill has a clear gstack-native behavior reference; porting is implementation work, not new design.
 
-**Plans**: TBD
+**Plans**: 10 plans
 
 Plans:
-- [ ] 05-01: TBD (outlined during `/gsd-plan-phase 5`)
+- [ ] 05-01-PLAN.md — Wave 0 substrate: SkillRegistration + SkillDispatcher + contribute_skills hook + invoke_native_cli wrapper + 5 doctor entries + TemplateDef [ship]/[deploy]/[canary]/[benchmark] blocks
+- [ ] 05-02-PLAN.md — Wave 1 schemas + events: DeployNotes + CanaryReport + BenchmarkReport + CodexReview pydantic schemas + ShipNotes Phase 5 extension + 2 HarnessEvent dataclasses (DeployRegressionDetected, WebVitalRegressionDetected)
+- [ ] 05-03-PLAN.md — Wave 2 /codex skill (SKILL-13): engineer/reviewer, 3 modes, adversarial-input safety via shell=False + list argv
+- [ ] 05-04-PLAN.md — Wave 2 /ship skill (SKILL-14): shipper, 5-step pipeline (sync_main → run_tests → audit_coverage → push → open_pr) + test bootstrap on missing tests
+- [ ] 05-05-PLAN.md — Wave 2 /setup-deploy wizard (SKILL-19): sre, questionary-backed interactive wizard with shell-metachar input validation + idempotent gstack.toml [deploy] block write
+- [ ] 05-06-PLAN.md — Wave 3 /land-and-deploy (SKILL-15): shipper, CI wait + provider deploy (vercel/netlify/fly/custom) + health probe with exponential backoff
+- [ ] 05-07-PLAN.md — Wave 3 /document-release (SKILL-16) + /ship auto-invoke wiring: shipper, diff-vs-docs stale-ref detector with InteractionGate human-gate for non-trivial writes
+- [ ] 05-08-PLAN.md — Wave 4 /canary skill (SKILL-17): sre, HTTP polling + regression evaluation + DeployRegressionDetected event emit + Playwright lazy-import
+- [ ] 05-09-PLAN.md — Wave 4 /benchmark skill (SKILL-18): sre, Lighthouse primary + curl fallback + baseline JSON write + WebVitalRegressionDetected event emit
+- [ ] 05-10-PLAN.md — Wave 5 integration: end-to-end /ship→/land-and-deploy→/canary artifact chain + 21-ID D-15 adversarial matrix + 7-skill registration coverage assertion
 
 ---
 
