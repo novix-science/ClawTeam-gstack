@@ -40,3 +40,17 @@ class ShipNotes(BaseModel):
     notes: str = Field(..., min_length=20)
     sprint_id: str
     created_at: str
+
+    # ── Phase 5 Plan 05-02 additions (SKILL-14 D-05 failure accounting) ──
+    # All fields optional with backward-compatible defaults so Phase 3 callers
+    # continue to validate unchanged. The /ship handler (Plan 05-04) populates
+    # these; EvidenceGate sees a Phase 3-shaped artifact when no Phase 5 data
+    # is available.
+    ship_status: Literal["succeeded", "failed", "partial"] | None = None
+    steps_completed: list[str] = Field(default_factory=list)
+    coverage: float | None = Field(default=None, ge=0.0, le=1.0)
+    coverage_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    failure_step: str | None = None
+    failure_reason: str | None = None
+    branch: str | None = None
+    auto_invoked_skills: list[str] = Field(default_factory=list)
