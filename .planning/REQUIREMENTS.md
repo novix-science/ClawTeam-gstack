@@ -85,7 +85,7 @@ Methodology as role prompts (baked-in) + tool-heavy skills as invokable ClawTeam
 - [ ] **SKILL-12**: `/design-html` — Pretext-pattern production HTML generation with framework detection (React/Svelte/Vue).
 - [ ] **SKILL-13**: `/codex` — independent OpenAI Codex CLI second opinion via existing `NativeCliAdapter`. Three modes: review (pass/fail gate), adversarial, consultation.
 - [ ] **SKILL-14**: `/ship` — sync main + run tests + audit coverage + push + open PR. Bootstraps a test framework if none exists.
-- [ ] **SKILL-15**: `/land-and-deploy` — merge PR + wait for CI + deploy + verify production health. Human-gated.
+- [x] **SKILL-15**: `/land-and-deploy` — merge PR + wait for CI + deploy + verify production health. Human-gated.
 - [ ] **SKILL-16**: `/document-release` — cross-reference diff against all doc files, update stale ones. Auto-invoked by `/ship`.
 - [ ] **SKILL-17**: `/canary` — post-deploy monitoring loop (console errors, perf regressions).
 - [ ] **SKILL-18**: `/benchmark` — Core Web Vitals + page load baselines with before/after on every PR.
@@ -243,7 +243,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SKILL-12 | Phase 6 | Pending |
 | SKILL-13 | Phase 5 | Pending |
 | SKILL-14 | Phase 5 | Pending |
-| SKILL-15 | Phase 5 | Pending |
+| SKILL-15 | Phase 5 | Complete (05-06) |
 | SKILL-16 | Phase 5 | Pending |
 | SKILL-17 | Phase 5 | Pending |
 | SKILL-18 | Phase 5 | Pending |

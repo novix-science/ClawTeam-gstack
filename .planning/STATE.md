@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 5 executing (wave 2 — /codex + /setup-deploy skills landed)
-stopped_at: Completed 05-05 (setup-deploy-wizard landed — questionary wizard + atomic TOML [deploy] block write + shell-injection hardening + 11 tests)
-last_updated: "2026-04-21T14:30:48Z"
+status: Phase 5 executing (wave 3 — /land-and-deploy landed)
+stopped_at: Completed 05-06 (/land-and-deploy skill landed — 4-phase pipeline precondition→CI-wait→deploy→health-probe + DeployNotes artifact + 13 tests)
+last_updated: "2026-04-21T15:00:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 5
-Plan: 05 complete (wave 2 — /setup-deploy skill landed)
+Plan: 06 complete (wave 3 — /land-and-deploy skill landed)
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Plan: 05 complete (wave 2 — /setup-deploy skill landed)
 | Phase 05 P02 | 80min | 3 tasks | 12 files |
 | Phase 05 P03 | 25min | 2 tasks | 7 files |
 | Phase 05 P05 | 20min | 1 task  | 4 files |
+| Phase 05 P06 | 25min | 1 task  | 4 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,8 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-05: [deploy] block write uses regex-splice (_DEPLOY_BLOCK_RE with negative-lookahead (?!^\\[)) NOT full tomllib serialize — preserves comments, blank lines, and key ordering in gstack.toml. Post-render tomllib.loads round-trip is a HARD assertion (raises RuntimeError if splice malformed) so a bug in _render_block cannot corrupt the user's config. args['_skip_confirm'] underscore-prefixed test/CLI bypass flag — not part of agent-facing dispatch contract.
 - [Phase 05]: 05-05: Wave 2 parallel execution caused cross-attribution between 05-03/05-04/05-05 commits (three-way concurrent index writes) — git blame lines are shuffled but on-disk content correct, all tests green, acceptance criteria met. Symmetrically acknowledged in 05-03 and 05-05 SUMMARYs.
 - [Phase 05]: 05-03: Cross-executor stash interaction (recurrence of Plan 04-10 Task 3 pattern): parallel executors for Plans 05-04 + 05-05 committed my staged test/handler/plugin files under their own commit hashes (f3113d8 / 0b52021 / a991ea8) rather than a standalone feat(05-03). Functional correctness preserved (9/9 codex tests green + plugin returns /codex entry). Audit via `git blame clawteam/plugins/gstack_sprint_plugin.py | grep /codex` still surfaces the wiring. NO feat(05-03) commit exists in the log — tree content is intact and correct.
+- [Phase 05]: 05-06: Ship /land-and-deploy at clawteam/templates/gstack/skills/land_and_deploy/ as 4-phase pipeline (precondition ship_status=succeeded → gh pr checks --watch ci_timeout → provider deploy cmd → exponential-backoff HEAD probe with deploy_verify_timeout_seconds deadline → always write deploy.md). Provider dispatch table {vercel, netlify, fly, custom} via _build_deploy_cmd; custom uses shlex.split (POSIX) + invoke_native_cli(shell=False) — double-layer shell-injection defense proven by test_shell_injection_via_custom_cmd_safe that ["echo","foo;","rm","-rf","/"] stays as literal argv. Handler's own poll precedes EvidenceGate's 10s HEAD (Pitfall 3 closure). Missing or failed ship-notes.md → SkillPreconditionError with hint "Run /ship first" (D-12). No [deploy] block → deploy.md pending + question artifact prompting /setup-deploy. 13 tests green; plugin now registers 4 skills.
+- [Phase 05]: 05-06: Parallel wave-3 execution surfaced the same cross-executor stash pattern as 04-10 / 05-03 — an intermediate linter/editor pre-populated gstack_sprint_plugin.py with Plan 05-07's /document-release registration during my 05-06 execution. Resolved by scoping `git add` to 05-06 content only: built a 05-06-only plugin.py variant via regex-delete of 05-07 hunks, staged + committed, then restored the 05-07 WIP to working copy for 05-07 executor to land atomically with its own handler.py. No 05-07 files committed by this plan.
 
 ### Pending Todos
 
@@ -170,14 +173,14 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T14:30:48Z
-Stopped at: Completed 05-05 (setup-deploy-wizard landed — /setup-deploy SkillRegistration + wizard.py + handler.py + 11 tests)
+Last session: 2026-04-21T15:00:00Z
+Stopped at: Completed 05-06 (/land-and-deploy landed — SKILL-15: 4-phase pipeline + DeployNotes artifact + 13 tests + frontmatter precondition check + exponential-backoff HEAD probe)
 Resume files:
 
-  - Phase 5 (executing wave 2 -> wave 3): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
-  - Phase 5 Plan 05 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-05-SUMMARY.md
-  - Phase 5 Plan 06 (Wave 3, /land-and-deploy): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-06-PLAN.md
-  - Phase 5 Plan 04 (Wave 2, /ship): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-04-PLAN.md
+  - Phase 5 (executing wave 3): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 Plan 06 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-06-SUMMARY.md
+  - Phase 5 Plan 07 (Wave 3 parallel, /document-release): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-07-PLAN.md
+  - Phase 5 Plan 08 (Wave 4, /canary): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-08-PLAN.md
 
 ## Recent Activity
 
