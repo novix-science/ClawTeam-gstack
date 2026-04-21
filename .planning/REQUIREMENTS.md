@@ -259,7 +259,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-04 | Phase 7 | Pending |
 | QUALITY-05 | Phase 7 | Pending |
 | QUALITY-06 | Phase 2 | Pending |
-| QUALITY-07 | Phase 4 | Pending |
+| QUALITY-07 | Phase 4 | Complete |
 | QUALITY-08 | Phase 2 | Pending |
 | QUALITY-09 | Phase 4 | Partial (04-06: schema substrate; 04-10 wires SHA pinning) |
 | QUALITY-10 | Phase 6 | Pending |
