@@ -315,20 +315,130 @@ def test_security_cso_full_rubric():
 
 
 # ---------------------------------------------------------------------------
-# D-14 budget gate (preserved from Wave 0)
+# D-01: engineer (implementation-discipline rubric, no upstream skill fixture)
+# ---------------------------------------------------------------------------
+
+
+def test_engineer_implementation_discipline_rubric():
+    """D-01: engineer.md ships the canonical implementation-discipline rubric.
+
+    No upstream gstack skill file owns this content — it is canonical to
+    gstack's Build phase per CONTEXT.md D-01. Grep-verifiable content list:
+    read-first-before-write, atomic-commit, SHA-pin awareness,
+    engineer_diff_summary envelope assertion, no-fix-without-investigation
+    deferral (routes to reviewer iron-law), Phase-5 /codex + /ship stub.
+    """
+    prompt = _read(PROMPTS_DIR / "engineer.md")
+
+    # Signature
+    assert (
+        "SIGNATURE: gstack-role:engineer rubric:implementation-discipline envelope-version:1"
+        in prompt
+    )
+
+    # D-01 grep-verifiable content list (CONTEXT.md lines 34-42)
+    assert "read-first" in prompt.lower(), "engineer.md missing read-first-before-write"
+    assert (
+        "atomic-commit" in prompt.lower()
+        or "atomic commit" in prompt.lower()
+        or "one logical change per commit" in prompt.lower()
+    ), "engineer.md missing atomic-commit discipline"
+    assert "SHA" in prompt and "HEAD" in prompt, (
+        "engineer.md missing SHA-pin awareness at Build-phase start"
+    )
+    assert "engineer_diff_summary" in prompt, (
+        "engineer.md missing engineer_diff_summary envelope assertion"
+    )
+    assert (
+        "no fix without investigation" in prompt.lower()
+        or "no-fix-without-investigation" in prompt.lower()
+        or ("investigate" in prompt.lower() and "iron-law" in prompt.lower())
+    ), "engineer.md missing no-fix-without-investigation deferral"
+
+    # Phase-5 tool-availability stub
+    assert "/codex" in prompt, "engineer.md missing /codex Phase-5 stub reference"
+    assert "/ship" in prompt, "engineer.md missing /ship Phase-5 stub reference"
+    assert "phase 5" in prompt.lower() or "until" in prompt.lower(), (
+        "engineer.md missing Phase-5 deferral framing"
+    )
+
+
+# ---------------------------------------------------------------------------
+# D-02: shipper (minimal Phase-5-deferred stub, no upstream skill fixture)
+# ---------------------------------------------------------------------------
+
+
+def test_shipper_minimal_stub():
+    """D-02: shipper.md ships an honest Phase-5-deferred stub.
+
+    The SIGNATURE's `rubric:none` flag is intentional and grep-asserted — it
+    is the unambiguous marker Phase 5's plan task uses to identify this file
+    as a stub needing replacement with /ship + /land-and-deploy rubric content.
+    """
+    prompt = _read(PROMPTS_DIR / "shipper.md")
+
+    # Signature with rubric:none flag (Phase 5 swap target)
+    assert (
+        "SIGNATURE: gstack-role:shipper rubric:none envelope-version:1" in prompt
+    )
+
+    # Envelope reference + 6 Literal values (CONTEXT.md D-02)
+    assert "shipper_step" in prompt
+    for step in ("prep", "pushing", "pr-open", "merged", "deployed", "verified"):
+        assert step in prompt, f"shipper.md missing shipper_step Literal value '{step}'"
+
+    # Phase-5 tool-availability stub
+    assert "/ship" in prompt, "shipper.md missing /ship Phase-5 stub reference"
+    assert "/land-and-deploy" in prompt, (
+        "shipper.md missing /land-and-deploy Phase-5 stub reference"
+    )
+    assert "<pending>" in prompt, (
+        "shipper.md missing <pending> placeholder per D-02 + 03-03 ShipNotes carve-out"
+    )
+
+
+# ---------------------------------------------------------------------------
+# D-03: sre (minimal Phase-5-deferred stub, no upstream skill fixture)
+# ---------------------------------------------------------------------------
+
+
+def test_sre_minimal_stub():
+    """D-03: sre.md ships an honest Phase-5-deferred stub.
+
+    The SIGNATURE's `rubric:none` flag is intentional and grep-asserted — it
+    is the unambiguous marker Phase 5's plan task uses to identify this file
+    as a stub needing replacement with /canary + /benchmark + /setup-deploy
+    rubric content.
+    """
+    prompt = _read(PROMPTS_DIR / "sre.md")
+
+    # Signature with rubric:none flag (Phase 5 swap target)
+    assert "SIGNATURE: gstack-role:sre rubric:none envelope-version:1" in prompt
+
+    # Envelope reference + 4 Literal values (CONTEXT.md D-03)
+    assert "sre_signal" in prompt
+    for signal in ("nominal", "degraded", "regression", "outage"):
+        assert signal in prompt, f"sre.md missing sre_signal Literal value '{signal}'"
+
+    # Phase-5 tool-availability stub
+    for tool in ("/canary", "/benchmark", "/setup-deploy"):
+        assert tool in prompt, f"sre.md missing {tool} Phase-5 stub reference"
+
+
+# ---------------------------------------------------------------------------
+# D-14 budget gate (spans all 11 prompts after 03-06)
 # ---------------------------------------------------------------------------
 
 
 def test_role_prompt_size_budget():
     """D-14: every prompt <= 4 KB; average <= 3 KB.
 
-    Until 03-06 ships the 3 stub prompts (engineer, shipper, sre), only 8 of 11
-    prompts exist; assert the partial set is also under cap. The 11-prompt
-    cross-file test (test_all_eleven_prompt_files_present) handles the count.
+    All 11 prompts now exist (03-05 shipped 8 + 03-06 shipped 3). Both bounds
+    are HARD gates — Phase 6 memory-inclusion design must respect them.
     """
     sizes = {p.name: p.stat().st_size for p in PROMPTS_DIR.glob("*.md")}
-    assert len(sizes) >= 8, (
-        f"expected at least 8 prompt files (this plan), found {len(sizes)}: "
+    assert len(sizes) == 11, (
+        f"expected 11 prompt files (all 03-05 + 03-06 prompts), found {len(sizes)}: "
         f"{sorted(sizes)}"
     )
     for name, size in sizes.items():
@@ -338,14 +448,10 @@ def test_role_prompt_size_budget():
 
 
 # ---------------------------------------------------------------------------
-# Cross-file: 11 prompt files (xfails until 03-06 ships the 3 stubs)
+# Cross-file: all 11 prompt files present (un-xfailed after 03-06)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="03-06 ships engineer/shipper/sre stub prompts — un-xfail when 03-06 lands",
-    strict=False,
-)
 def test_all_eleven_prompt_files_present():
     expected = {
         "pm.md",

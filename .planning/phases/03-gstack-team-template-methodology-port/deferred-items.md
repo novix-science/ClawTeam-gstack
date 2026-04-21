@@ -63,3 +63,22 @@ changes (confirmed via `git stash` baseline run):**
 `tests/test_gstack_role_prompts.py`. Full suite: 939 passed, 8 skipped,
 1 xfailed, 1 pre-existing fail (above).
 
+## From 03-06 Execution (2026-04-21)
+
+Plan 03-06 (role-prompts-stubs) ships engineer.md + shipper.md + sre.md,
+un-xfails `test_all_eleven_prompt_files_present`, and tightens the D-14
+gate to `len(sizes) == 11`.
+
+**Pre-existing failure observed when running full suite; NOT caused by
+03-06 changes (confirmed via `git stash` baseline run):**
+
+- `tests/test_sprint_conductor.py::test_resume_after_process_restart` —
+  same pre-existing subprocess-based flake already logged under 03-02 and
+  03-05. Confirmed still failing with `git stash` applied (no local
+  changes), so it is not 03-06-caused. Out of 03-06 scope.
+
+**03-06 scope-only suite result:** 13 passed in
+`tests/test_gstack_role_prompts.py` (8 SKILL from 03-05 + 3 new
+D-01/D-02/D-03 + D-14 budget gate + cross-file presence). Zero xfails.
+All 11 prompt files present.
+
