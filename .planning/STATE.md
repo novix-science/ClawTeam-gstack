@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 4 executing (wave 2)
-stopped_at: Completed 04-09-investigate-state-machine-freeze-PLAN.md
-last_updated: "2026-04-21T10:28:09.014Z"
+stopped_at: Completed 04-08-design-consultation-state-machine-PLAN.md
+last_updated: "2026-04-21T10:29:14.300Z"
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 48
-  completed_plans: 42
-  percent: 88
+  completed_plans: 43
+  percent: 90
 ---
 
 # Project State
@@ -105,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-06: 4 decorrelation prompt supplements shipped under clawteam/templates/gstack/prompts/review/ (reviewer=staff-eng cross-cutting, designer=rubric-first, security=threat-model-first, dx-lead=friction-first); all under 2 KB budget (max 1760 B at 86% of budget); verbatim persona anchors from §04-CONTEXT specifics.
 - [Phase 04]: 04-06: gstack.toml ships 6 [[template.review.rules]] rows covering ui/crypto/api/package signals + sycophancy_threshold=0.9 (D-09/D-20 cascade alarm); SPRINT-03 / QUALITY-09 substrate / QUALITY-13 decorrelation prompts all satisfied.
 - [Phase 04]: 04-09: InvestigateState ships per-hypothesis state machine (290 LOC) with 8-transition bijective graph against fixture; auto-freeze/unfreeze wired via FreezeRegistry with reason='investigate:<sprint_id>:<hypothesis_id>' for grep-correlatable freeze_audit.jsonl; D-16 path validation rejects ** / * / ? / [ + out-of-workspace; 23 tests pass, Phase 2 FreezeRegistry unregressed
+- [Phase 04]: 04-08: Ship DesignConsultationState at clawteam/templates/gstack/skills/design_consultation/state.py with 15-entry _TRANSITIONS bijective to fixture JSON; 7 rubric dimensions verbatim from plan-design-review.md; TURN_BUDGET=15 as plain assignment; mirrors OfficeHoursState shape for Plan 07 cross-consistency; 14/14 tests green including restart-survival (CORE-07).
+- [Phase 04]: 04-08: _state_path is @staticmethod so path-validation tests can reject bad identifiers without constructing a state instance; _sync_pending_dimension() derives pending_dimension_id from current_state after every handle() call (single source of truth).
 
 ### Pending Todos
 
@@ -136,8 +138,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T10:27:42.150Z
-Stopped at: Completed 04-09-investigate-state-machine-freeze-PLAN.md
+Last session: 2026-04-21T10:28:19.140Z
+Stopped at: Completed 04-08-design-consultation-state-machine-PLAN.md
 Resume files:
 
   - Phase 4 (executing wave 1): .planning/phases/04-interactive-state-machines-smart-review-routing-cross-agent-verification/04-CONTEXT.md
