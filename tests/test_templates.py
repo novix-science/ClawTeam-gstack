@@ -4,6 +4,8 @@ import pytest
 
 from clawteam.templates import (
     AgentDef,
+    ReviewConfig,
+    ReviewRule,
     TaskDef,
     TemplateDef,
     _SafeDict,
@@ -311,3 +313,126 @@ class TestListTemplates:
             assert "description" in t
             assert "source" in t
             assert t["source"] in ("builtin", "user")
+
+
+# ── Phase 4 Plan 04-06 tests: TemplateDef review-config extension ─────────
+# Source: §04-CONTEXT D-04 / A5. Covers ReviewRule / ReviewConfig pydantic
+# models, _parse_toml extension, BC preservation across 6 non-gstack
+# templates, and the 6+ rule rows shipped by gstack.toml in Task 3.
+
+
+class TestReviewConfigModels:
+    def test_review_config_default_empty(self):
+        leader = AgentDef(name="x", role="x")
+        t = TemplateDef(name="t", leader=leader)
+        assert isinstance(t.review, ReviewConfig)
+        assert t.review.rules == []
+        assert t.review.sycophancy_threshold == 0.9
+
+    def test_review_rule_pattern_required(self):
+        with pytest.raises(Exception):  # noqa: B017 — pydantic ValidationError
+            ReviewRule(pattern="", reviewers=["designer"])
+
+    def test_review_rule_reviewers_default_empty(self):
+        r = ReviewRule(pattern="x")
+        assert r.reviewers == []
+        assert r.signal == ""
+
+    def test_review_rule_fields_populated(self):
+        r = ReviewRule(
+            pattern="src/components/**/*.tsx",
+            reviewers=["designer"],
+            signal="ui",
+        )
+        assert r.pattern == "src/components/**/*.tsx"
+        assert r.reviewers == ["designer"]
+        assert r.signal == "ui"
+
+    def test_review_config_sycophancy_threshold_range(self):
+        with pytest.raises(Exception):  # noqa: B017
+            ReviewConfig(sycophancy_threshold=1.5)
+        with pytest.raises(Exception):  # noqa: B017
+            ReviewConfig(sycophancy_threshold=-0.1)
+
+
+class TestReviewConfigParsingBC:
+    """BC: the 6 existing non-gstack templates declare no [template.review]
+    block; they must parse without error and carry an empty ReviewConfig."""
+
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "software-dev",
+            "hedge-fund",
+            "code-review",
+            "harness-default",
+            "research-paper",
+            "strategy-room",
+        ],
+    )
+    def test_existing_template_parses_without_review_block(self, template_name):
+        t = load_template(template_name)
+        assert isinstance(t.review, ReviewConfig)
+        assert t.review.rules == []
+        assert t.review.sycophancy_threshold == 0.9
+
+
+class TestReviewConfigParsingExplicit:
+    def test_parse_toml_reads_review_block(self, tmp_path, monkeypatch):
+        user_tpl_dir = tmp_path / ".clawteam" / "templates"
+        user_tpl_dir.mkdir(parents=True)
+
+        toml_content = """\
+[template]
+name = "review-probe"
+description = "Probes review-config parsing"
+
+[template.leader]
+name = "lead"
+type = "x"
+role = "lead"
+
+[template.review]
+sycophancy_threshold = 0.85
+
+[[template.review.rules]]
+pattern = "src/components/**/*.tsx"
+reviewers = ["designer"]
+signal = "ui"
+
+[[template.review.rules]]
+pattern = "**/crypto/**"
+reviewers = ["security"]
+signal = "crypto"
+"""
+        (user_tpl_dir / "review-probe.toml").write_text(toml_content)
+
+        import clawteam.templates as tmod
+        monkeypatch.setattr(tmod, "_USER_DIR", user_tpl_dir)
+
+        tmpl = load_template("review-probe")
+        assert tmpl.review.sycophancy_threshold == 0.85
+        assert len(tmpl.review.rules) == 2
+        assert tmpl.review.rules[0].pattern == "src/components/**/*.tsx"
+        assert tmpl.review.rules[0].reviewers == ["designer"]
+        assert tmpl.review.rules[0].signal == "ui"
+        assert tmpl.review.rules[1].pattern == "**/crypto/**"
+        assert tmpl.review.rules[1].reviewers == ["security"]
+        assert tmpl.review.rules[1].signal == "crypto"
+
+
+class TestGstackTemplateReview:
+    """Gstack template ships with 6+ [[template.review.rules]] rows.
+
+    This test hinges on Task 3 having extended gstack.toml; when running
+    Task 1 TDD in isolation it will fail (acceptable intermediate state
+    per <acceptance_criteria>). Re-checked in Task 3 verify block.
+    """
+
+    def test_gstack_template_has_review_rules(self):
+        t = load_template("gstack")
+        assert len(t.review.rules) >= 6
+        # Floor check: rules must name at least one of the decorrelation
+        # roles so the router has something to accumulate.
+        all_reviewers = {r for rule in t.review.rules for r in rule.reviewers}
+        assert {"designer", "security", "dx-lead"}.issubset(all_reviewers)
