@@ -488,3 +488,121 @@ def test_gh_tool_available_detection(monkeypatch):
 
     monkeypatch.setattr(handler.shutil, "which", lambda name: "/usr/bin/gh")
     assert handler.gh_available() is True
+
+
+# ─────────────────── Plan 05-07: /document-release auto-invoke chain ─────
+
+
+def test_ship_handler_auto_invokes_document_release(tmp_path, monkeypatch):
+    """D-11: successful ship auto-invokes /document-release; artifact name
+    appears in ship-notes.md's auto_invoked_skills list."""
+    from clawteam.templates.gstack.skills.ship import handler
+    from clawteam.templates.gstack.skills.document_release import (
+        handler as dr_handler,
+    )
+
+    monkeypatch.setattr(handler, "gh_available", lambda: True)
+    _install_happy_path(monkeypatch, handler)
+
+    dr_calls: list[dict] = []
+
+    def _fake_dr(ctx, *, role, args):
+        dr_calls.append({"role": role, "args": args})
+        return {"status": "ok", "patches_emitted": 0}
+
+    monkeypatch.setattr(
+        dr_handler, "document_release_handler", _fake_dr,
+    )
+
+    sprint_dir = tmp_path / "sprint-001"
+    sprint_dir.mkdir()
+    ctx = _Ctx(sprint_dir=sprint_dir, workspace_dir=tmp_path)
+
+    out = handler.ship_handler(
+        ctx, role="shipper",
+        args={"title": "Feat", "body": "b", "branch": "feature/x"},
+    )
+    assert out["ship_status"] == "succeeded"
+    assert len(dr_calls) == 1
+
+    body = (sprint_dir / "ship-notes.md").read_text()
+    assert "ship_status: 'succeeded'" in body
+    # /document-release artifact name appears in auto_invoked_skills list
+    assert "/document-release" in body
+
+
+def test_ship_handler_continues_when_document_release_fails(
+    tmp_path, monkeypatch,
+):
+    """/document-release failure MUST NOT fail /ship; auto_invoked_skills
+    records the failure marker but ship_status remains 'succeeded'."""
+    from clawteam.templates.gstack.skills.ship import handler
+    from clawteam.templates.gstack.skills.document_release import (
+        handler as dr_handler,
+    )
+
+    monkeypatch.setattr(handler, "gh_available", lambda: True)
+    _install_happy_path(monkeypatch, handler)
+
+    def _boom(ctx, *, role, args):
+        raise RuntimeError("git diff failed")
+
+    monkeypatch.setattr(dr_handler, "document_release_handler", _boom)
+
+    sprint_dir = tmp_path / "sprint-001"
+    sprint_dir.mkdir()
+    ctx = _Ctx(sprint_dir=sprint_dir, workspace_dir=tmp_path)
+
+    out = handler.ship_handler(
+        ctx, role="shipper",
+        args={"title": "Feat", "body": "b", "branch": "feature/x"},
+    )
+    # Ship still succeeded despite /document-release raising.
+    assert out["ship_status"] == "succeeded"
+
+    body = (sprint_dir / "ship-notes.md").read_text()
+    assert "ship_status: 'succeeded'" in body
+    # auto_invoked_skills entry carries the failure marker.
+    assert "/document-release:failed:" in body
+    assert "git diff failed" in body
+
+
+def test_ship_handler_skips_autorelease_on_failure(tmp_path, monkeypatch):
+    """When /ship fails (e.g., sync_main), /document-release is never
+    invoked; auto_invoked_skills is empty."""
+    from clawteam.templates.gstack.skills.ship import handler
+    from clawteam.templates.gstack.skills.ship.steps import StepResult
+    from clawteam.templates.gstack.skills.document_release import (
+        handler as dr_handler,
+    )
+
+    monkeypatch.setattr(handler, "gh_available", lambda: True)
+
+    monkeypatch.setattr(
+        handler, "sync_main",
+        lambda cwd, branch, **kw: StepResult(False, {"conflict": True}),
+    )
+
+    dr_called = {"n": 0}
+
+    def _never(ctx, *, role, args):
+        dr_called["n"] += 1
+        return {"status": "ok"}
+
+    monkeypatch.setattr(dr_handler, "document_release_handler", _never)
+
+    sprint_dir = tmp_path / "sprint-001"
+    sprint_dir.mkdir()
+    ctx = _Ctx(sprint_dir=sprint_dir, workspace_dir=tmp_path)
+
+    out = handler.ship_handler(
+        ctx, role="shipper",
+        args={"title": "Feat", "body": "b", "branch": "feature/x"},
+    )
+    assert out["ship_status"] == "failed"
+    assert out["failure_step"] == "sync"
+    assert dr_called["n"] == 0
+
+    body = (sprint_dir / "ship-notes.md").read_text()
+    # auto_invoked_skills: [] on failure path
+    assert "auto_invoked_skills: []" in body
