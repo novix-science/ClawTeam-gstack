@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from clawteam.plugins.base import HarnessPlugin
+from clawteam.plugins.skill_registration import SkillRegistration
 from clawteam.templates.gstack.schemas import (
     BenchmarkReport,
     CanaryReport,
@@ -31,6 +32,17 @@ from clawteam.templates.gstack.schemas import (
     ReviewReport,
     ShipNotes,
     TestReport,
+)
+from clawteam.templates.gstack.skills.codex.handler import (
+    codex_handler as _codex_handler,
+    tool_available as _codex_tool_available,
+)
+from clawteam.templates.gstack.skills.ship.handler import (
+    gh_available as _ship_gh_available,
+    ship_handler as _ship_handler,
+)
+from clawteam.templates.gstack.skills.setup_deploy.handler import (
+    setup_deploy_handler as _setup_deploy_handler,
 )
 
 if TYPE_CHECKING:
@@ -124,6 +136,55 @@ class GstackSprintPlugin(HarnessPlugin):
             "benchmark-report": BenchmarkReport,
             "codex-review": CodexReview,
         }
+
+    # -- Phase 5 / Plan 05-03+ hooks (skill registrations) -------------
+
+    def contribute_skills(self) -> list[SkillRegistration]:
+        """Return the Phase 5 skill registrations contributed by gstack.
+
+        Each Wave 2-4 plan appends exactly one new SkillRegistration to this
+        list. Plan 05-03 lands /codex; subsequent plans add /ship,
+        /land-and-deploy, /canary, /benchmark, /rollback, /sre-review.
+
+        /codex — cross-model independent second opinion (SKILL-13).
+            roles={engineer, reviewer}: engineer self-invokes for
+            independent review; reviewer invokes for adversarial critique.
+            install_hint mirrors what clawteam doctor prints.
+        /ship — Build-phase-complete 5-step sprint action (SKILL-14, Plan 05-04).
+            roles={shipper}: shipper-only — engineer / reviewer invoking
+            gets SkillNotPermitted. install_hint matches doctor's gh entry.
+        /setup-deploy — one-time deploy-config wizard (SKILL-19, Plan 05-05).
+            roles={sre}: SRE-only. questionary is a hard dep (already in
+            clawteam/cli) so no tool_available probe; install_hint empty.
+        """
+        return [
+            SkillRegistration(
+                name="/codex",
+                roles=frozenset({"engineer", "reviewer"}),
+                handler=_codex_handler,
+                tool_available=_codex_tool_available,
+                install_hint="npm install -g @openai/codex",
+            ),
+            # Plan 05-04:
+            SkillRegistration(
+                name="/ship",
+                roles=frozenset({"shipper"}),
+                handler=_ship_handler,
+                tool_available=_ship_gh_available,
+                install_hint=(
+                    "apt install gh | brew install gh | "
+                    "winget install GitHub.cli"
+                ),
+            ),
+            # Plan 05-05:
+            SkillRegistration(
+                name="/setup-deploy",
+                roles=frozenset({"sre"}),
+                handler=_setup_deploy_handler,
+                tool_available=None,
+                install_hint="",
+            ),
+        ]
 
     # -- Per-role prompt resolution (T-07-02 + T-07-04 mitigations) ----
 
