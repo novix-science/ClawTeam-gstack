@@ -1,0 +1,31 @@
+{
+  "skill": "office-hours",
+  "role": "pm",
+  "initial_state": "start",
+  "final_states": ["summary_written", "abandoned"],
+  "turn_budget": 13,
+  "transitions": [
+    {"from": "start",       "event": "begin",         "to": "q1_asked"},
+    {"from": "q1_asked",    "event": "answered",      "to": "q1_answered"},
+    {"from": "q1_answered", "event": "advance",       "to": "q2_asked"},
+    {"from": "q2_asked",    "event": "answered",      "to": "q2_answered"},
+    {"from": "q2_answered", "event": "advance",       "to": "q3_asked"},
+    {"from": "q3_asked",    "event": "answered",      "to": "q3_answered"},
+    {"from": "q3_answered", "event": "advance",       "to": "q4_asked"},
+    {"from": "q4_asked",    "event": "answered",      "to": "q4_answered"},
+    {"from": "q4_answered", "event": "advance",       "to": "q5_asked"},
+    {"from": "q5_asked",    "event": "answered",      "to": "q5_answered"},
+    {"from": "q5_answered", "event": "advance",       "to": "q6_asked"},
+    {"from": "q6_asked",    "event": "answered",      "to": "q6_answered"},
+    {"from": "q6_answered", "event": "write_summary", "to": "summary_written"}
+  ],
+  "abandon_event": "abandon",
+  "forcing_questions": [
+    {"id": "Q1", "name": "Demand Reality"},
+    {"id": "Q2", "name": "Status Quo"},
+    {"id": "Q3", "name": "Desperate Specificity"},
+    {"id": "Q4", "name": "Narrowest Wedge"},
+    {"id": "Q5", "name": "Observation & Surprise"},
+    {"id": "Q6", "name": "Future-Fit"}
+  ]
+}
