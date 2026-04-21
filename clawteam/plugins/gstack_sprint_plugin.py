@@ -50,6 +50,9 @@ from clawteam.templates.gstack.skills.land_and_deploy.handler import (
 from clawteam.templates.gstack.skills.document_release.handler import (
     document_release_handler as _document_release_handler,
 )
+from clawteam.templates.gstack.skills.benchmark.handler import (
+    benchmark_handler as _benchmark_handler,
+)
 
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
@@ -170,6 +173,12 @@ class GstackSprintPlugin(HarnessPlugin):
             roles={shipper}: shipper-only. Auto-invoked by /ship on success
             per D-11; pure-git baseline so no tool_available probe needed
             (git is always present in a ClawTeam checkout).
+        /benchmark — Core Web Vitals + page-load baselines (SKILL-18, Plan 05-09).
+            roles={sre}: SRE-only. Lighthouse primary with curl -w fallback
+            when the npm binary is missing (D-10). Writes benchmark-report.md
+            and an optional pre-deploy baseline JSON (consumed by /canary).
+            Emits WebVitalRegressionDetected when a vital exceeds
+            regression_threshold_ratio * baseline (default 1.5×).
         """
         return [
             SkillRegistration(
@@ -216,6 +225,17 @@ class GstackSprintPlugin(HarnessPlugin):
                 handler=_document_release_handler,
                 tool_available=None,  # git is baseline — no probe needed
                 install_hint="",
+            ),
+            # Plan 05-09:
+            SkillRegistration(
+                name="/benchmark",
+                roles=frozenset({"sre"}),
+                handler=_benchmark_handler,
+                tool_available=None,  # lighthouse-or-curl fallback; never unavailable
+                install_hint=(
+                    "npm install -g lighthouse  "
+                    "(optional — curl fallback measures ttfb/dom_loaded without it)"
+                ),
             ),
         ]
 
