@@ -1,0 +1,34 @@
+{
+  "skill": "design-consultation",
+  "role": "designer",
+  "initial_state": "start",
+  "final_states": ["summary_written", "abandoned"],
+  "turn_budget": 15,
+  "dimensions": [
+    {"id": 1, "name": "Information Architecture"},
+    {"id": 2, "name": "Interaction State Coverage"},
+    {"id": 3, "name": "User Journey & Emotional Arc"},
+    {"id": 4, "name": "AI Slop Risk"},
+    {"id": 5, "name": "Design System Alignment"},
+    {"id": 6, "name": "Responsive & Accessibility"},
+    {"id": 7, "name": "Unresolved Design Decisions"}
+  ],
+  "transitions": [
+    {"from": "start",         "event": "begin",         "to": "pass1_scoring"},
+    {"from": "pass1_scoring", "event": "scored",        "to": "pass1_scored"},
+    {"from": "pass1_scored",  "event": "advance",       "to": "pass2_scoring"},
+    {"from": "pass2_scoring", "event": "scored",        "to": "pass2_scored"},
+    {"from": "pass2_scored",  "event": "advance",       "to": "pass3_scoring"},
+    {"from": "pass3_scoring", "event": "scored",        "to": "pass3_scored"},
+    {"from": "pass3_scored",  "event": "advance",       "to": "pass4_scoring"},
+    {"from": "pass4_scoring", "event": "scored",        "to": "pass4_scored"},
+    {"from": "pass4_scored",  "event": "advance",       "to": "pass5_scoring"},
+    {"from": "pass5_scoring", "event": "scored",        "to": "pass5_scored"},
+    {"from": "pass5_scored",  "event": "advance",       "to": "pass6_scoring"},
+    {"from": "pass6_scoring", "event": "scored",        "to": "pass6_scored"},
+    {"from": "pass6_scored",  "event": "advance",       "to": "pass7_scoring"},
+    {"from": "pass7_scoring", "event": "scored",        "to": "pass7_scored"},
+    {"from": "pass7_scored",  "event": "write_summary", "to": "summary_written"}
+  ],
+  "abandon_event": "abandon"
+}
