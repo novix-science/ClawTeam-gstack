@@ -401,9 +401,9 @@ def test_handler_role_gated():
         tool_available=None,
         install_hint="",
     )
-    dispatcher = SkillDispatcher([reg])
+    dispatcher = SkillDispatcher({"/canary": reg})
     with pytest.raises(SkillNotPermitted):
-        dispatcher.dispatch("/canary", role="engineer", ctx=None, args={})
+        dispatcher.dispatch(None, skill_name="/canary", role="engineer", args={})
 
 
 def test_registered_in_plugin():

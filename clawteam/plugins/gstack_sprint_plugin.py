@@ -53,6 +53,9 @@ from clawteam.templates.gstack.skills.document_release.handler import (
 from clawteam.templates.gstack.skills.benchmark.handler import (
     benchmark_handler as _benchmark_handler,
 )
+from clawteam.templates.gstack.skills.canary.handler import (
+    canary_handler as _canary_handler,
+)
 
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
@@ -173,6 +176,12 @@ class GstackSprintPlugin(HarnessPlugin):
             roles={shipper}: shipper-only. Auto-invoked by /ship on success
             per D-11; pure-git baseline so no tool_available probe needed
             (git is always present in a ClawTeam checkout).
+        /canary — post-deploy HTTP polling monitor (SKILL-17, Plan 05-08).
+            roles={sre}: SRE-only. Polls deploy.md's deploy_url for window_seconds
+            (default 300 from gstack.toml [canary]) and emits canary-report.md
+            + DeployRegressionDetected when thresholds breached. Playwright is
+            lazy-imported per Pitfall 5 so tool_available probe stays None
+            (stdlib urllib is baseline; Playwright is optional browser mode).
         /benchmark — Core Web Vitals + page-load baselines (SKILL-18, Plan 05-09).
             roles={sre}: SRE-only. Lighthouse primary with curl -w fallback
             when the npm binary is missing (D-10). Writes benchmark-report.md
@@ -224,6 +233,14 @@ class GstackSprintPlugin(HarnessPlugin):
                 roles=frozenset({"shipper"}),
                 handler=_document_release_handler,
                 tool_available=None,  # git is baseline — no probe needed
+                install_hint="",
+            ),
+            # Plan 05-08:
+            SkillRegistration(
+                name="/canary",
+                roles=frozenset({"sre"}),
+                handler=_canary_handler,
+                tool_available=None,  # stdlib urllib baseline; Playwright lazy + optional
                 install_hint="",
             ),
             # Plan 05-09:
