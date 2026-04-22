@@ -50,6 +50,11 @@ p2p = [
 browser = [
     "playwright>=1.58,<2",
 ]
+# Phase 7 Wave 0 (D-06): optional watchdog for AttentionQueue FS auto-refresh.
+# Without watchdog, clawteam attend falls back to 2-second polling.
+attend = [
+    "watchdog>=3,<4",
+]
 
 [project.scripts]
 clawteam = "clawteam.cli.commands:app"
