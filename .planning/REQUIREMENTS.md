@@ -82,7 +82,7 @@ Methodology as role prompts (baked-in) + tool-heavy skills as invokable ClawTeam
 **Invokable ClawTeam skills (tool-heavy):**
 - [x] **SKILL-10
 **: `/browse` + `/open-gstack-browser` + `/setup-browser-cookies` — real-Chromium browser via Playwright (optional `clawteam[browser]` extra). Owned by engineer, qa, dx-lead. Feature-detected; useful error on missing dep.
-- [ ] **SKILL-11**: `/design-shotgun` — mockup variant generation + comparison board + iterative refinement with taste memory under designer's per-agent memory.
+- [x] **SKILL-11**: `/design-shotgun` — mockup variant generation + comparison board + iterative refinement with taste memory under designer's per-agent memory. — Complete 2026-04-22 (Phase 6 Plan 06-08: 19 tests; plugin-registered across 06-01/04-07)
 - [x] **SKILL-12**: `/design-html` — Pretext-pattern production HTML generation with framework detection (React/Svelte/Vue).
 - [x] **SKILL-13**: `/codex` — independent OpenAI Codex CLI second opinion via existing `NativeCliAdapter`. Three modes: review (pass/fail gate), adversarial, consultation.
 - [x] **SKILL-14**: `/ship` — sync main + run tests + audit coverage + push + open PR. Bootstraps a test framework if none exists.
@@ -239,8 +239,8 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SKILL-07 | Phase 3 | Complete |
 | SKILL-08 | Phase 3 | Complete |
 | SKILL-09 | Phase 2 | Pending |
-| SKILL-10 | Phase 6 | Pending |
-| SKILL-11 | Phase 6 | Pending |
+| SKILL-10 | Phase 6 | Complete (Plan 06-01/04/05/06/07: /browse + /open-gstack-browser + /setup-browser-cookies — real Chromium via Playwright under `clawteam[browser]` extra; feature-detected with install hint) |
+| SKILL-11 | Phase 6 | Complete (Plan 06-08: /design-shotgun — 19 tests; mockup variant generation + comparison board + taste-memory backed by designer per-agent memory) |
 | SKILL-12 | Phase 6 | Complete (06-09) |
 | SKILL-13 | Phase 5 | Complete (05-03) |
 | SKILL-14 | Phase 5 | Complete (05-04) |
@@ -265,7 +265,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event; 04-14: end-to-end integration test asserts D-19 thrash_decision frontmatter contract on reviewer report) |
 | QUALITY-10 | Phase 6 | Complete |
 | QUALITY-11 | Phase 2 | Pending |
-| QUALITY-12 | Phase 7 | Complete (07-05: MODEL_PRICING + CostRollup + CostTracker with exactly-once 50/80/100 alarms + pricing backstop; 07-06: apply_fallback ladder + CacheTracker; 07-07: render_team + team show cost panel; 07-09: 6-test integration suite locks 100-event rollup + alarm crossings + fallback activation + render_team snapshots + cache-hit-rate + integrated flow) |
+| QUALITY-12 | Phase 7 | Partial (infra complete, emit-path gap): accounting + UI + dashboard + fallback all shipped with 58+ tests, but CostTracker/CacheTracker subscribe to ClaudeApiResponse + ToolCallCompleted events that the claude-CLI + tmux spawn path never emits. Fix deferred to v1.x (backlog 999.x) — wire stream-json parser from claude CLI output to event bus. |
 | QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook; 04-14: D-18 deferral markers removed from reviewer.md — SHA-pinning now framed as canonical, not deferral) |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
