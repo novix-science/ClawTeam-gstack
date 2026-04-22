@@ -285,3 +285,89 @@ def test_learn_write_confidence_out_of_range(runner, env):
         env=env,
     )
     assert res.exit_code != 0, res.output
+
+
+# ---------------------------------------------------------------------------
+# WR-04 regression: _invoke_learn splits ValueError (quiet) vs. unexpected
+#                   programmer errors (logged + traceback preserved).
+# ---------------------------------------------------------------------------
+
+
+def test_invoke_learn_value_error_quiet_exit(
+    runner, env, monkeypatch, caplog,
+):
+    """ValueError path: structured 'error' payload, exit 1, no traceback log."""
+    import logging
+
+    from clawteam.cli import commands as cmds
+    from clawteam.templates.gstack.skills.learn import handler as learn_mod
+
+    def _raise_ve(*a, **kw):
+        raise ValueError("bad input from user")
+
+    monkeypatch.setattr(learn_mod, "learn_handler", _raise_ve)
+    # The CLI imports learn_handler lazily inside _invoke_learn — patch
+    # the source module so the re-import picks up the replacement.
+
+    with caplog.at_level(logging.ERROR, logger=cmds.__name__):
+        res = runner.invoke(
+            cmds.app,
+            [
+                "--json",
+                "learn", "write",
+                "--team", "demo", "--scope", "team",
+                "--title", "T", "--tags", "pattern",
+                "--evidence", "src/x.py:1",
+                "body",
+            ],
+            env=env,
+        )
+
+    assert res.exit_code == 1, res.output
+    payload = json.loads(res.output)
+    assert payload == {"error": "bad input from user"}
+    # ValueError path must NOT log the full traceback (it's expected).
+    assert not any(
+        rec.levelno >= logging.ERROR for rec in caplog.records
+    ), [r.message for r in caplog.records]
+
+
+def test_invoke_learn_unexpected_error_logs_traceback(
+    runner, env, monkeypatch, caplog,
+):
+    """Non-ValueError path: logs traceback via logger.exception + re-raises."""
+    import logging
+
+    from clawteam.cli import commands as cmds
+    from clawteam.templates.gstack.skills.learn import handler as learn_mod
+
+    def _raise_runtime(*a, **kw):
+        raise RuntimeError("boom: programmer error")
+
+    monkeypatch.setattr(learn_mod, "learn_handler", _raise_runtime)
+
+    with caplog.at_level(logging.ERROR, logger=cmds.__name__):
+        res = runner.invoke(
+            cmds.app,
+            [
+                "--json",
+                "learn", "write",
+                "--team", "demo", "--scope", "team",
+                "--title", "T", "--tags", "pattern",
+                "--evidence", "src/x.py:1",
+                "body",
+            ],
+            env=env,
+        )
+
+    # Re-raise means the CLI exits non-zero (Typer converts the uncaught
+    # exception to exit_code=1 and stashes .exception).
+    assert res.exit_code != 0, res.output
+    # Traceback logged at ERROR level via logger.exception.
+    assert any(
+        "unexpected error" in rec.message.lower()
+        and rec.exc_info is not None
+        for rec in caplog.records
+    ), [
+        (r.message, r.exc_info) for r in caplog.records
+    ]

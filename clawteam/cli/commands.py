@@ -5814,17 +5814,38 @@ def _learn_ctx(team_name: str):
 def _invoke_learn(team: str, args: dict) -> dict:
     """Dispatch to learn_handler and return the result dict.
 
-    Exceptions surface as typer.Exit(code=1) with a structured error payload
-    so --json consumers can distinguish success from failure.
+    WR-04: splits expected validation errors (``ValueError`` — quiet exit 1
+    with a structured error payload) from unexpected programmer errors
+    (``Exception`` — logs full traceback via ``logger.exception`` and
+    re-raises so operators running without ``--json`` see the traceback).
     """
+    import logging
+
     from clawteam.templates.gstack.skills.learn.handler import learn_handler
+
+    _log = logging.getLogger(__name__)
     try:
         return learn_handler(_learn_ctx(team), role="cli", args=args)
-    except (ValueError, Exception) as exc:
-        _output({"error": str(exc)}, lambda d: console.print(
-            f"[red]Error:[/red] {d['error']}"
-        ))
+    except ValueError as exc:
+        # Expected validation surface (bad impact, missing role, pydantic
+        # constraint violation, etc.). Surface a clean error payload.
+        _output(
+            {"error": str(exc)},
+            lambda d: console.print(f"[red]Error:[/red] {d['error']}"),
+        )
         raise typer.Exit(code=1)
+    except Exception as exc:
+        # Unexpected: preserve the type name in the structured payload,
+        # log the full traceback (exc_info is implicit for .exception),
+        # then re-raise so Typer prints the traceback in dev usage.
+        _log.exception("_invoke_learn: unexpected error (team=%s)", team)
+        _output(
+            {"error": f"Unexpected: {type(exc).__name__}: {exc}"},
+            lambda d: console.print(
+                f"[red]Unexpected:[/red] {d['error']}"
+            ),
+        )
+        raise
 
 
 @learn_app.command("write")
