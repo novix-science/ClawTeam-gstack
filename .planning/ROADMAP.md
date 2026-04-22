@@ -355,7 +355,7 @@ Plans:
 - [x] 07-04-attend-cli: clawteam attend + watchdog auto-refresh + digest mode — completed 2026-04-22 (see 07-04-SUMMARY.md)
 - [x] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission — completed 2026-04-22 (see 07-05-SUMMARY.md)
 - [x] 07-06-cost-fallback-cache: model fallback ladder + cache tracker — completed 2026-04-22 (see 07-06-SUMMARY.md)
-- [ ] 07-07-dashboard-team-show: cost dashboard in clawteam team show
+- [x] 07-07-dashboard-team-show: cost dashboard in clawteam team show — completed 2026-04-22 (see 07-07-SUMMARY.md)
 - [ ] 07-08-zombie-worktree-gc: doctor --gc + disk-budget alarms
 - [ ] 07-09-integration-ten-sprint-load: 10-sprint load test
 
