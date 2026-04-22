@@ -16,7 +16,7 @@ Generic, upstream-PR-friendly additions to ClawTeam's harness. No gstack-specifi
 - [ ] **CORE-03**: Existing templates (`software-dev`, `hedge-fund`, `code-review`, `harness-default`, `research-paper`, `strategy-room`) continue to spawn, advance phases, and pass all existing tests with no code changes.
 - [ ] **CORE-04**: `SprintState` exists as a pydantic model capturing: sprint id, goal, phase_state, owning team, workspace branch, artifacts, participants, pending-questions ids. Persisted via existing file-locked JSON machinery under `~/.clawteam/teams/<team>/sprints/<id>/state.json`.
 - [ ] **CORE-05**: `SprintConductor` manages one team's N concurrent sprints — enumerates active sprints, dispatches phase-advance events, coordinates per-sprint artifact stores.
-- [~] **CORE-06**: One team can hold ≥10 concurrent sprints without race conditions on the team-level task store or memory store (verified by integration test). — Substrate complete 2026-04-22 (07-02: 3 asyncio.Semaphore caps + start_sprint_async + RateLimitMonitor + thread-safe active-agents set under threading.RLock; dual-lock pattern prevents coroutine/thread races on shared state). Integration test pending Plan 07-09.
+- [x] **CORE-06**: One team can hold ≥10 concurrent sprints without race conditions on the team-level task store or memory store (verified by integration test). — Complete 2026-04-22 (07-02: 3 asyncio.Semaphore caps + start_sprint_async + RateLimitMonitor + thread-safe active-agents set under threading.RLock; 07-09: tests/integration/test_phase7_ten_sprint_load.py ships 7 tests — 10 concurrent sprints via asyncio.gather all produce distinct uuid4[:8] ids and queue_status=''; 11th over max=10 cap persisted with queue_status='queued_capacity'; no data races on 10 concurrent state.json writes).
 - [ ] **CORE-07**: Sprint pause / resume: `clawteam sprint pause <id>` checkpoints state; `clawteam sprint resume <id>` rehydrates and re-emits the last pending gate event. Sprints survive a full `HarnessOrchestrator` restart.
 
 ### Human Interaction (INT)
@@ -25,7 +25,7 @@ Cross-sprint human-in-loop, preserving gstack's taste-decision essence.
 
 - [ ] **INT-01**: `InteractionGate` exists as a `PhaseGate` subclass. Blocks phase transition until a companion `answers/<N>.md` is written for each `questions/<N>.md` artifact.
 - [ ] **INT-02**: Phase agents write structured questions.md markdown (per-question H3 headings + numbered choices or freeform fields). Answers.md supports both selected-option and freeform reply per question.
-- [ ] **INT-03**: `AttentionQueue` exists as a cross-sprint priority-sorted queue of pending questions. Priority formula is configurable; default combines URGENCY tag + BLOCKING flag + AGE (oldest floats up).
+- [x] **INT-03**: `AttentionQueue` exists as a cross-sprint priority-sorted queue of pending questions. Priority formula is configurable; default combines URGENCY tag + BLOCKING flag + AGE (oldest floats up). — Complete 2026-04-22 (07-03: AttentionQueue stateless read-side + compute_priority pure function with D-05 formula (urgency*weight + blocking? + age_hours + tag_weights); 07-09: tests/integration/test_phase7_attention_ranking.py ships 5 tests — 30-fixture monotonic ranking across 5x3 sprints/teams; cross-team aggregation; D-15 adversarial fixture critical@30s beats normal@8h by 12-pt spread; tag_weights reorders; per-item score matches pure compute_priority).
 - [x] **INT-04**: `clawteam attend` CLI: prints the top-N pending questions across all teams' sprints; opens the chosen question's markdown in `$EDITOR`; on save, gate unblocks. Works for 1 sprint and scales to ≥10 parallel sprints with the same command. — Complete 2026-04-22 (07-04: attend_app typer group + invoke_without_command root callback with --top/-n, --summary, --auto-accept-reversible, --yes/-y flags; attend pick <qid> subcommand launches $EDITOR via subprocess.run(shell=False); answer-file presence re-checked on editor exit).
 - [ ] **INT-05**: Question visibility: the attention queue auto-refreshes on `watchdog` filesystem events when the optional `watchdog` package is installed; falls back to polling on 2-second intervals otherwise. No hard dep.
 - [ ] **INT-06**: Auto-advance toggle: per-sprint config `auto_advance: true|false` decides whether `InteractionGate` is inserted on every transition or only when a phase agent explicitly writes a question artifact.
@@ -119,7 +119,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 - [x] **QUALITY-09**: `SmartReviewRouter` pins to a commit SHA — routing decision is made on the SHA that will be reviewed, not the HEAD that might have moved (PITFALLS #9 thrashing prevention).
 - [x] **QUALITY-10**: Memory provenance + decay + human gate on high-impact (covered by MEM-05, MEM-06, MEM-07) (PITFALLS #10).
 - [ ] **QUALITY-11**: Progress-on-artifact rule: an agent's turn is "progress" only if it produced new artifact content or an AttentionQueue entry. Consecutive no-progress turns trigger human escalation (theater prevention per PITFALLS #11).
-- [ ] **QUALITY-12**: Cost observability: `clawteam team show` displays per-agent token usage and estimated cost; sprint-level cost rollups. Advisor pattern reserves expensive model calls for critical gates. Cache hit rate surfaced (PITFALLS #12).
+- [x] **QUALITY-12**: Cost observability: `clawteam team show` displays per-agent token usage and estimated cost; sprint-level cost rollups. Advisor pattern reserves expensive model calls for critical gates. Cache hit rate surfaced (PITFALLS #12). — Complete 2026-04-22 (07-05: MODEL_PRICING table + CostRollup 9-field dataclass + CostTracker event subscriber with exactly-once 50/80/100 BudgetAlarmReached emission + pricing backstop for cost_usd<=0.0; 07-06: apply_fallback ladder opus→sonnet→haiku + CacheTracker ClaudeApiResponse subscriber with HEALTHY_THRESHOLD=0.5; 07-07: render_team pure function + `clawteam team show` cost panel with per-agent breakdown + budget bar + alarms banner; 07-09: tests/integration/test_phase7_cost_dashboard.py ships 6 tests — 100-event rollup correctness, 50/80/100 alarm crossings fire exactly once, fallback activation at 80%, render_team snapshot reflects alarms, cache-hit-rate arithmetic, integrated flow with pricing backstop).
 - [x] **QUALITY-13**: Reviewer decorrelation: parallel reviewers receive different system prompts optimized for their persona (reviewer=staff-eng-cross-cutting, security=threat-model-first, designer=rubric-first, dx-lead=friction-first) so their findings diverge rather than mirror each other (PITFALLS #13).
 - [ ] **QUALITY-14**: Backwards-compatibility regression matrix in CI: every existing template (software-dev, hedge-fund, etc.) spawns + runs + passes existing tests after every gstack-related change (PITFALLS #14).
 - [ ] **QUALITY-15**: Env deny-filter: `_env()` helpers never surface secret-shaped values (API keys, tokens) into logs, board views, or memory (PITFALLS #17).
@@ -203,11 +203,11 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | CORE-03 | Phase 0 | Pending |
 | CORE-04 | Phase 1 | Pending |
 | CORE-05 | Phase 2 | Pending |
-| CORE-06 | Phase 7 | Substrate complete (07-02: semaphores + thread-safe set); integration test pending 07-09 |
+| CORE-06 | Phase 7 | Complete (07-02: semaphores + thread-safe set; 07-09: 7-test integration suite locks 10-sprint load — distinct ids + queued_capacity persistence + no data races) |
 | CORE-07 | Phase 2 | Pending |
 | INT-01 | Phase 1 | Pending |
 | INT-02 | Phase 1 | Pending |
-| INT-03 | Phase 7 | Pending |
+| INT-03 | Phase 7 | Complete (07-03: AttentionQueue + compute_priority D-05 formula; 07-09: 5-test integration suite locks 30-fixture ranking, cross-team aggregation, D-15 adversarial critical@30s > normal@8h, tag_weights reorders) |
 | INT-04 | Phase 7 | Complete (07-04: `clawteam attend` typer subcommand group — default top-N rich table + --summary digest dispatch + --auto-accept-reversible preview-and-apply + `attend pick <qid>` $EDITOR launch + answer-file presence re-check) |
 | INT-05 | Phase 7 | Pending |
 | INT-06 | Phase 2 | Pending |
@@ -265,7 +265,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event; 04-14: end-to-end integration test asserts D-19 thrash_decision frontmatter contract on reviewer report) |
 | QUALITY-10 | Phase 6 | Complete |
 | QUALITY-11 | Phase 2 | Pending |
-| QUALITY-12 | Phase 7 | In Progress (07-05: cost-accounting half — MODEL_PRICING table + CostRollup 9-field frozen dataclass + CostTracker event subscriber with exactly-once 50/80/100 BudgetAlarmReached emission + pricing backstop for cost_usd<=0.0; 07-06: fallback.py apply_fallback pure function opus->sonnet->haiku + cache_tracker.py CacheTracker ClaudeApiResponse subscriber with HEALTHY_THRESHOLD=0.5; rendering half pending in 07-07 clawteam team show dashboard) |
+| QUALITY-12 | Phase 7 | Complete (07-05: MODEL_PRICING + CostRollup + CostTracker with exactly-once 50/80/100 alarms + pricing backstop; 07-06: apply_fallback ladder + CacheTracker; 07-07: render_team + team show cost panel; 07-09: 6-test integration suite locks 100-event rollup + alarm crossings + fallback activation + render_team snapshots + cache-hit-rate + integrated flow) |
 | QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook; 04-14: D-18 deferral markers removed from reviewer.md — SHA-pinning now framed as canonical, not deferral) |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |
