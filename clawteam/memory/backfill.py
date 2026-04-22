@@ -30,6 +30,7 @@ are also swallowed so a single poisoned file does not abort the scan.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,6 +39,8 @@ from clawteam.memory.store import TeamMemoryStore
 
 _PENDING_DIR_NAME = "_phase6_pending"
 _SENTINEL_DIR_NAME = ".processed"
+
+_LOG = logging.getLogger(__name__)
 
 
 def _gen_retro_entry_id(store: TeamMemoryStore, stem: str) -> str:
@@ -116,6 +119,13 @@ def backfill_scan(*, team: str, root: Path) -> int:
             store.write(entry)
         except Exception:
             # Bad data / path escape / validation error — skip + continue.
+            # WR-03: log for observability; backfill stays advisory.
+            _LOG.warning(
+                "backfill_scan: swallowed exception promoting %s for team=%s",
+                retro_path,
+                team,
+                exc_info=True,
+            )
             continue
 
         sentinel.write_text("processed", encoding="utf-8")

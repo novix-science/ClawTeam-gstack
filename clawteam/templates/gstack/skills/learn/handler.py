@@ -28,6 +28,7 @@ derive the default ``author`` field when the caller does not supply one.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from clawteam.memory import MemoryEntry, TeamMemoryStore
@@ -39,6 +40,8 @@ from clawteam.team.models import get_data_dir
 
 _VALID_ACTIONS = frozenset({"write", "list", "search", "prune"})
 _VALID_IMPACT = frozenset({"low", "medium", "high"})
+
+_LOG = logging.getLogger(__name__)
 
 # Plan 06-11 D-11: per-process sentinel — first /learn invocation per team
 # triggers backfill_scan once. Reset in tests via `_backfilled_teams.clear()`.
@@ -59,7 +62,12 @@ def _ensure_backfilled(team_name: str) -> None:
         backfill_scan(team=team_name, root=get_data_dir())
     except Exception:
         # Never let the backfill scanner break /learn dispatch.
-        pass
+        # WR-03: log so advisory-path breakage is discoverable.
+        _LOG.warning(
+            "backfill_scan swallowed exception for team=%s",
+            team_name,
+            exc_info=True,
+        )
 
 
 def _resolve_team_name(ctx: Any) -> str:
@@ -186,10 +194,22 @@ def _emit_conflict_events(
         from clawteam.events.global_bus import get_event_bus
         from clawteam.events.types import ConflictDetected
     except Exception:
+        # WR-03: events module unavailable — log for observability.
+        _LOG.warning(
+            "ConflictDetected import failed; skipping emission for team=%s",
+            team_name,
+            exc_info=True,
+        )
         return
     try:
         bus = get_event_bus()
     except Exception:
+        # WR-03: bus unavailable — advisory-only, but worth logging.
+        _LOG.warning(
+            "event bus unavailable; skipping conflict emission for team=%s",
+            team_name,
+            exc_info=True,
+        )
         return
     for m in conflicts:
         try:
@@ -204,6 +224,15 @@ def _emit_conflict_events(
                 )
             )
         except Exception:
+            # WR-03: per-conflict emit failure — log + continue so one
+            # poisoned conflict does not block others.
+            _LOG.warning(
+                "ConflictDetected emit failed team=%s new_id=%s other_id=%s",
+                team_name,
+                new_entry.id,
+                m.other_id,
+                exc_info=True,
+            )
             continue
 
 
