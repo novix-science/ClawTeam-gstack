@@ -82,6 +82,15 @@ from clawteam.templates.gstack.skills.setup_browser_cookies.handler import (
     setup_cookies_handler as _setup_cookies_handler,
 )
 
+# Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per D-07).
+# No tool_available probe — handler is pure Python (JSONL + regex), always
+# available. install_hint intentionally empty. Roles = frozenset(GSTACK_ROLES)
+# is the single role-enforcement point for /learn; the handler itself does
+# not gate on role.
+from clawteam.templates.gstack.skills.learn.handler import (
+    learn_handler as _learn_handler,
+)
+
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
 
@@ -333,6 +342,17 @@ class GstackSprintPlugin(HarnessPlugin):
                     "pip install 'clawteam[browser]' && "
                     "playwright install chromium"
                 ),
+            ),
+            # Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per
+            # D-07). Any GSTACK_ROLE can invoke write/list/search/prune on
+            # team or role-scoped memory. No tool_available probe — pure
+            # Python JSONL + regex, always available. install_hint empty.
+            SkillRegistration(
+                name="/learn",
+                roles=frozenset(GSTACK_ROLES),
+                handler=_learn_handler,
+                tool_available=None,
+                install_hint="",
             ),
         ]
 
