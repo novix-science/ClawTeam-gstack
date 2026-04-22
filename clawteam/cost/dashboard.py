@@ -98,12 +98,12 @@ def render_text(data: dict[str, Any]) -> str:
     active_count = data.get("active_agent_count", 0)
     if budget > 0:
         return (
-            f"Cost - ${cost:.2f} / ${budget:.2f} ({pct:.0f}%) | "
+            f"${cost:.2f} / ${budget:.2f} ({pct:.0f}%) | "
             f"cache hit: {cache_rate * 100:.0f}% | "
             f"active agents: {active_count}"
         )
     return (
-        f"Cost - ${cost:.2f} (no budget) | "
+        f"${cost:.2f} (no budget) | "
         f"cache hit: {cache_rate * 100:.0f}% | "
         f"active agents: {active_count}"
     )
