@@ -346,10 +346,18 @@ Plans:
 
 **Research flag**: MEDIUM. Anthropic prompt-caching + rate-limit backoff have clear docs; attention-queue digest-mode UX benefits from a quick iteration with real users (post-Phase 3 dogfooding).
 
-**Plans**: TBD
+**Plans**: 9 plans
 
 Plans:
-- [ ] 07-01: TBD (outlined during `/gsd-plan-phase 7`)
+- [x] 07-01-wave0-substrate: pyproject [attend] + attention/cost/rate_limit packages + 6 events + SprintState.queue_status + TemplateDef sub-blocks
+- [ ] 07-02-conductor-concurrency: SprintConductor semaphores + queue_status gate + RateLimitMonitor
+- [ ] 07-03-attention-queue: AttentionQueue + AttentionItem + priority scoring
+- [ ] 07-04-attend-cli: clawteam attend + watchdog auto-refresh + digest mode
+- [ ] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission
+- [ ] 07-06-cost-fallback-cache: model fallback ladder + prompt caching
+- [ ] 07-07-dashboard-team-show: cost dashboard in clawteam team show
+- [ ] 07-08-zombie-worktree-gc: doctor --gc + disk-budget alarms
+- [ ] 07-09-integration-ten-sprint-load: 10-sprint load test
 
 **UI hint**: yes
 
@@ -369,7 +377,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
 | 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
 | 6. Browser Skills, Design Pipeline & Team Memory | 8/10 | In Progress (Wave 3) | - |
-| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 0/TBD | Not started | - |
+| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 1/9 | In Progress (Wave 0 complete) | - |
 
 ## Critical Path
 

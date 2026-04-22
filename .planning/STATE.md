@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 Wave 3 IN PROGRESS (06-08 /design-shotgun + 06-09 /design-html + 06-10 /learn + CLI COMPLETE — 13 skills registered; Cluster B design pipeline complete; MEM-03/04 + D-07/08 + SKILL-12 + D-13 closed)
-stopped_at: Completed 06-09 (Wave 3 — /design-html designer-only skill: framework detection from package.json (react/svelte/vue/plain) + source emission at framework root OR question.md on multi-framework ambiguity per D-13; 14 new tests green; SKILL-12 + D-13 closed; Cluster B design pipeline (/design-shotgun + /design-html) complete)
-last_updated: "2026-04-22T20:02:00Z"
+status: Phase 7 Wave 0 COMPLETE (07-01 substrate landed — [attend] extra + 3 packages + 6 events + queue_status + 3 TemplateDef sub-blocks; Waves 1-5 unblocked)
+stopped_at: Completed 07-01 (Phase 7 Wave 0 substrate — pyproject [attend]/watchdog extra, 3 new top-level packages (attention/cost/rate_limit), 6 new HarnessEvent dataclasses (ToolCallCompleted/ClaudeApiResponse/BudgetAlarmReached/RateLimitSaturated/ZombieWorktreeGced/DormancyTransition), SprintState.queue_status additive field, 3 new TemplateDef sub-blocks (ConductorConfig/AttentionConfig/CostConfig); 41 new tests + 180 BC regression green; 8 commits with strict TDD RED→GREEN gates per task)
+last_updated: "2026-04-22T20:35:00Z"
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 68
-  completed_plans: 66
-  percent: 97
+  total_plans: 77
+  completed_plans: 67
+  percent: 87
 ---
 
 # Project State
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 6 Wave 3 IN PROGRESS (design + memory — /design-shotgun + /learn + CLI COMPLETE)
-Plan: 06-10 complete (Wave 3 — /learn skill role-agnostic (roles=frozenset(GSTACK_ROLES) per D-07) + clawteam learn Typer subcommand group {write,list,search,prune} sharing learn_handler per D-08 — CLI synthesizes SimpleNamespace(team_name) ctx and dispatches to same handler as the skill layer). MemoryEntry construction validates scope+role coupling; impact=="high" auto-appends impact:high tag for Plan 06-11 gate; empty evidence flagged (MEM-05) but never blocked. 20 new tests (11 handler + 9 CLI) all green. Plugin now 13 skills: Phase-5 baseline 7 + 3 browser + /design-shotgun + /design-html + /learn. Commits: 8038d28 (test RED Task 1) + 9624ad3 (feat GREEN Task 1) + 84a54ea (test RED Task 2) + 788347f (feat GREEN Task 2). Cross-executor stash with 06-08 + 06-09 handled idempotently (3 races during execution). MEM-03 + MEM-04 + D-07 + D-08 closed. Next: 06-11 (high-impact gate + conflict detection + backfill scanner wrapping 06-10's write path).
+Phase: 7 Wave 0 COMPLETE (substrate — attention/cost/rate_limit substrate laid; Waves 1-5 unblocked)
+Plan: 07-01 complete (Wave 0 — pyproject [attend]/watchdog extra; 3 new top-level packages clawteam/attention + clawteam/cost + clawteam/rate_limit with empty __all__; 6 new HarnessEvent dataclasses registered via register_event_type at module bottom (ToolCallCompleted D-09, ClaudeApiResponse D-12, BudgetAlarmReached D-10, RateLimitSaturated D-13, ZombieWorktreeGced SC#10, DormancyTransition QUALITY-04); SprintState.queue_status additive open-str field ("", "queued_capacity", "rate_limit_saturated") round-tripping through existing file_locked+atomic_write_text path, legacy state.json files load with default; ConductorConfig (max_concurrent_sprints=10/max_tasks_per_agent=1/max_active_agents=6/acquire_timeout=60s), AttentionConfig (urgency_weight=10/blocking_weight=5/tag_weights={}), CostConfig (budget_usd=100/fallback_at_percent=80/alarm_percent=[50,80,100]) as top-level TOML sub-blocks; gstack.toml + 6 packaged templates parse unchanged (parametrized BC lock). 41 new tests (5 pyproject + 14 events + 5 sprint-state + 17 template) all green; 180 BC regression tests unchanged. TDD RED→GREEN gates preserved per task — 8 commits: 88c4bca/b8e06f3 Task 1; f610a3c/9b34c22 Task 2; 7ed0900/b7732db Task 3; 6249f02/3defade Task 4. Next: 07-02 (SprintConductor concurrency — consumes queue_status + ConductorConfig + RateLimitSaturated).
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Plan: 06-10 complete (Wave 3 — /learn skill role-agnostic (roles=frozenset(GST
 | Phase 06 P08 | 12min | 2 tasks | 9 files |
 | Phase 06 P10 | 45min | 2 tasks | 5 files |
 | Phase 06 P09 | 11min | 1 task  | 5 files |
+| Phase 07 P01 | 25min | 4 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -186,6 +187,7 @@ Recent decisions affecting current work:
 - [Phase 06]: 06-10: Wave-3 cross-executor stash interaction (recurring 04-10 / 05-03 / 05-06 / 05-09 / 06-07 / 06-08 pattern) — parallel Wave-3 executors for 06-08 (/design-shotgun) and 06-09 (/design-html) raced on clawteam/plugins/gstack_sprint_plugin.py three separate times during my execution (Task 1 GREEN stage commit, Task 2 GREEN stage commit, and post-stash restore). Resolved idempotently by re-applying only the /learn hunks each time and verifying each feat(06-10) commit's staged diff contains /learn additions only. Sibling plans' content was committed under their own feat hashes (a5dfcd9 for /design-shotgun, sibling commit for /design-html). Final plugin.py has all 13 registrations co-existing; no work lost on any side.
 - [Phase 06]: 06-10: Test-file location deviation — plan specifies tests/cli/test_learn_cli.py but that subdir does not exist; repo convention is tests/test_cli_commands.py at repo root. Placed the 9 CLI tests at tests/test_learn_cli.py (Rule 3 — auto-fixed blocking path mismatch; same precedent as Plan 05-07's test_ship_skill.py placement).
 - [Phase 06]: 06-10: test_registered_in_plugin uses subset-on-count (len(regs) >= 11) rather than strict == 13 so Wave-3 parallel plans (06-08 / 06-09 / 06-10) commute under any commit ordering. Explicit /learn presence + role-agnostic role-set assertion is strict; post-wave strict == 13 invariant enforced by the Phase-6 close-out integration test (Plan 06-11 surface).
+- [Phase 07]: 07-01: Wave 0 substrate — 4 tasks strict-additive. pyproject [attend]=[watchdog>=3,<4] + 3 new top-level packages (clawteam/{attention,cost,rate_limit}/__init__.py with empty __all__, package markers only — Waves 1-5 append public API). 6 new HarnessEvent dataclasses registered via register_event_type at module bottom AFTER the Phase 6 block. Phase 6 events still resolvable (BC lock). SprintState.queue_status: str = "" open-str type (NOT Literal) — future queue reasons ('queued_disk_budget' etc.) don't require schema migration. TemplateDef sub-blocks at TOP LEVEL of TOML (matches Phase 5/6 precedent — NOT under [template]): ConductorConfig (4 caps), AttentionConfig (3 priority knobs), CostConfig (3 budget knobs). All 3 TemplateDef fields default to None so gstack.toml + 6 packaged templates parse unchanged (parametrized BC test locks for all 6 names). [attention.tag_weights] uses TOML subtable syntax (not inline dict) because inline {...} dicts only support literal values; subtable tested in test_attention_block_parsed.
 
 ### Pending Todos
 
@@ -217,10 +219,11 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T20:00:00Z
-Stopped at: Completed 06-10 (/learn skill + clawteam learn CLI — 20 tests green, 13 skills registered incl. Wave-3 siblings, MEM-03 + MEM-04 + D-07 + D-08 closed)
+Last session: 2026-04-22T20:35:00Z
+Stopped at: Completed 07-01 (Phase 7 Wave 0 substrate — [attend] extra + 3 packages + 6 events + queue_status + 3 TemplateDef sub-blocks; 41 new tests + 180 BC green; Waves 1-5 unblocked)
 Resume files:
 
+  - Phase 7 Wave 0 07-01 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-01-SUMMARY.md
   - Phase 6 Wave 3 06-10 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-10-SUMMARY.md
   - Phase 6 Wave 3 06-09 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-09-SUMMARY.md
   - Phase 6 Wave 3 06-08 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-08-SUMMARY.md
