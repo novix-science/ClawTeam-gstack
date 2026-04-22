@@ -144,6 +144,87 @@ def test_approve_with_notes_flag(setup_team_and_sprint, runner):
     assert "LGTM by QA" in approval
 
 
+# ── WR-04-02 regressions: --notes with YAML metacharacters ──
+#
+# Before the fix, `yaml_lines.append(f"{key}: {value}")` interpolated user
+# text directly into the frontmatter. Notes containing a colon, newline,
+# leading whitespace, or `---` corrupted the envelope and either
+# - made ShipApprovalGate reject the artifact ("malformed frontmatter"),
+# - or silently reshuffled structure (embedded newline absorbs next key).
+#
+# The fix routes frontmatter through yaml.safe_dump; these tests lock the
+# behaviour in by parsing the written artifact and asserting round-trip.
+
+
+def _parse_ship_approval(team, sid):
+    """Load the artifact and return (meta_dict, body_string) via parse_frontmatter."""
+    from clawteam.sprint.state import load_sprint_state
+    from clawteam.team.envelope import parse_frontmatter
+
+    raw = load_sprint_state(team, sid).artifacts["ship-approval.md"]
+    return parse_frontmatter(raw), raw
+
+
+@pytest.mark.parametrize(
+    "note,desc",
+    [
+        ("line1\nline2: with colon", "newline + colon"),
+        ("severity: blocker -- see thread", "colon at top level"),
+        ("value with # not-a-comment", "hash character"),
+        ("---\nmasquerading as frontmatter", "--- sequence"),
+        ("  leading whitespace note", "leading whitespace"),
+        ("quote'and\"double", "mixed quotes"),
+        ("\t", "tab only"),
+    ],
+)
+def test_approve_notes_with_yaml_metacharacters_round_trip(
+    setup_team_and_sprint, runner, note, desc
+):
+    """Notes containing YAML metacharacters must round-trip losslessly.
+
+    Parses the written artifact with the same yaml.safe_load path that
+    ShipApprovalGate uses and asserts `meta["approval_notes"] == note`.
+    """
+    team, sid = setup_team_and_sprint
+    from clawteam.cli.commands import app
+
+    result = runner.invoke(
+        app, ["sprint", "approve", sid, "--team", team, "--notes", note]
+    )
+    assert result.exit_code == 0, f"[{desc}] exit nonzero: {result.output}"
+
+    (meta, _body), raw = _parse_ship_approval(team, sid)
+    assert meta.get("approval_notes") == note, (
+        f"[{desc}] round-trip failed: wrote={note!r} read={meta.get('approval_notes')!r}\n"
+        f"raw artifact:\n{raw}"
+    )
+    # All required fields still present — the note did not corrupt the envelope.
+    for field in ("artifact_type", "approved_by", "approved_at", "sha_at_approval"):
+        assert meta.get(field), f"[{desc}] missing required field {field!r} after notes"
+
+
+def test_approve_notes_with_metacharacters_passes_ship_approval_gate(
+    setup_team_and_sprint, runner
+):
+    """End-to-end: the written artifact survives ShipApprovalGate when
+    the note contains colons + newlines + `---`."""
+    team, sid = setup_team_and_sprint
+    from clawteam.cli.commands import app
+
+    tricky = "line1: colon\nline2\n---\nnot-frontmatter"
+    result = runner.invoke(
+        app, ["sprint", "approve", sid, "--team", team, "--notes", tricky]
+    )
+    assert result.exit_code == 0, result.output
+
+    from clawteam.harness.ship_approval_gate import ShipApprovalGate
+    from clawteam.sprint.state import load_sprint_state
+
+    state = load_sprint_state(team, sid)
+    ok, reason = ShipApprovalGate().check(state)
+    assert ok is True, f"Gate rejected artifact with tricky notes: {reason}"
+
+
 def test_approve_unsupported_phase_exits_nonzero(setup_team_and_sprint, runner):
     team, sid = setup_team_and_sprint
     from clawteam.cli.commands import app

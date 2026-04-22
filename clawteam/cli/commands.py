@@ -5616,11 +5616,20 @@ def sprint_approve(
     if notes:
         frontmatter["approval_notes"] = notes
 
-    yaml_lines = ["---"]
-    for key, value in frontmatter.items():
-        yaml_lines.append(f"{key}: {value}")
-    yaml_lines.append("---")
-    yaml_lines.append("")
+    # WR-04-02: serialize frontmatter through yaml.safe_dump so --notes
+    # values containing newlines, colons, quotes, leading whitespace, or
+    # `---` don't corrupt the YAML envelope (ShipApprovalGate parses the
+    # written artifact with yaml.safe_load via parse_frontmatter). PyYAML
+    # is already a ClawTeam dependency — see clawteam/team/envelope.py.
+    import yaml
+
+    frontmatter_yaml = yaml.safe_dump(
+        frontmatter,
+        sort_keys=False,
+        allow_unicode=True,
+        default_flow_style=False,
+    )
+    yaml_lines = ["---", frontmatter_yaml.rstrip("\n"), "---", ""]
     yaml_lines.append("# Ship approval")
     yaml_lines.append("")
     yaml_lines.append(
@@ -5629,6 +5638,10 @@ def sprint_approve(
     )
     if notes:
         yaml_lines.append("")
+        # Body note: keep as free-form markdown. Blank-line separator above
+        # prevents the note from being absorbed into the preceding paragraph,
+        # and we intentionally do not re-escape here — the frontmatter copy
+        # is the source of truth for machine parsing.
         yaml_lines.append(notes)
     artifact_body = "\n".join(yaml_lines) + "\n"
 
