@@ -368,6 +368,57 @@ class WebVitalRegressionDetected(HarnessEvent):
     ratio: float = 0.0
 
 
+# ── Phase 6 Wave 0 / Plan 06-01: team memory substrate events ─────────
+
+
+@dataclass
+class MemoryWritePersisted(HarnessEvent):
+    """A new MemoryEntry was appended to JSONL (D-04, MEM-02).
+
+    Advisory — emitted on every committed write (both direct writes and
+    promotions from ``memory/<scope>/pending/``). Phase 7 cost dashboard
+    aggregates ``high_impact=True`` counts; Phase 6 only emits + logs.
+    """
+
+    entry_id: str = ""
+    scope: str = ""  # "team" or "role"
+    role: str = ""
+    tags: list[str] = field(default_factory=list)
+    high_impact: bool = False
+
+
+@dataclass
+class ConflictDetected(HarnessEvent):
+    """Two entries contradict on same tag (D-10).
+
+    Advisory-only — the write is NOT blocked (D-10 explicit). Emitted by
+    ``TeamMemoryStore.write`` when the new entry's body cosine-similarity
+    against an existing entry's body exceeds ``gstack.toml [memory]
+    conflict_threshold`` (default 0.75) AND sentiment-opposition fires.
+    """
+
+    new_entry_id: str = ""
+    conflicting_entry_id: str = ""
+    similarity: float = 0.0
+    shared_tags: list[str] = field(default_factory=list)
+    scope: str = ""
+
+
+@dataclass
+class MemoryBackfillComplete(HarnessEvent):
+    """Backfill scanner finished promoting _phase6_pending/ entries (D-11).
+
+    First ``/learn`` invocation per team runs ``backfill_scan(team)``; this
+    event fires once at end of scan with counts populated. Idempotent:
+    re-runs fire with ``entries_promoted=0,
+    entries_skipped_already_processed=<previous>``.
+    """
+
+    team: str = ""
+    entries_promoted: int = 0
+    entries_skipped_already_processed: int = 0
+
+
 # Late import to avoid the clawteam.events.bus <-> clawteam.events.types
 # circular dependency: bus.py imports HarnessEvent from this module at top
 # level, so we MUST not import from bus.py until after HarnessEvent is
@@ -376,3 +427,7 @@ from clawteam.events.bus import register_event_type  # noqa: E402
 
 register_event_type(DeployRegressionDetected)
 register_event_type(WebVitalRegressionDetected)
+# Phase 6 Wave 0 / Plan 06-01
+register_event_type(MemoryWritePersisted)
+register_event_type(ConflictDetected)
+register_event_type(MemoryBackfillComplete)
