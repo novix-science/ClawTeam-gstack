@@ -7,6 +7,7 @@ Plan 07-07 wires the dashboard into ``clawteam team show``.
 from __future__ import annotations
 
 from clawteam.cost.cache_tracker import HEALTHY_THRESHOLD, CacheTracker
+from clawteam.cost.dashboard import render_team, render_text
 from clawteam.cost.fallback import (
     FALLBACK_LADDER,
     TIER_TO_CANONICAL,
@@ -34,4 +35,7 @@ __all__ = [
     "TIER_TO_CANONICAL",
     "CacheTracker",
     "HEALTHY_THRESHOLD",
+    # Plan 07-07 additions:
+    "render_team",
+    "render_text",
 ]
