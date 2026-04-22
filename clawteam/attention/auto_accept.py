@@ -11,6 +11,7 @@ land in the ``skipped`` bucket of the returned dict.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
@@ -82,7 +83,16 @@ def apply_auto_accept(
             f"against a question tagged `reversibility: easy`. "
             f"TTL = {ttl_minutes} minutes."
         )
-        answer_path.write_text(frontmatter + body, encoding="utf-8")
+        # WR-05: atomic write-then-rename so a crash between open-
+        # truncate and close never leaves a zero-byte or partially-
+        # written answer.md on disk. The idempotency check above trusts
+        # ``answer_path.exists()`` — a half-written file there would be
+        # interpreted as "already handled" and InteractionGate would
+        # subsequently unblock on an empty selection (effectively
+        # auto-accepting a blank default).
+        tmp_path = answer_path.with_suffix(answer_path.suffix + ".tmp")
+        tmp_path.write_text(frontmatter + body, encoding="utf-8")
+        os.replace(tmp_path, answer_path)
         applied.append(item.question_id)
     return {"applied": applied, "skipped": skipped}
 
