@@ -1740,6 +1740,80 @@ def _team_show_active_sprint(team: str) -> dict | None:
         return None
 
 
+def _team_show_cost_panel(team: str) -> dict:
+    """Build the cost panel for ``clawteam team show <team>`` (Plan 07-07).
+
+    Best-effort: any failure falls back to a neutral ``status='unavailable'``
+    shape so the command never crashes when cost substrate is absent
+    (e.g. non-gstack template, corrupt events bus, missing CostConfig).
+
+    Returns a dict with the same key set as
+    :func:`clawteam.cost.dashboard.render_team` plus a ``status`` field
+    that callers can branch on (``ok`` = live render, ``unavailable`` =
+    fallback).
+    """
+    try:
+        from clawteam.cost import CacheTracker, CostTracker, render_team
+        from clawteam.events.global_bus import get_event_bus
+        from clawteam.team.manager import TeamManager
+        from clawteam.templates import load_template
+
+        cfg = TeamManager.get_team(team)
+        budget_usd = 100.0
+        alarm_percent: list[float] = [50.0, 80.0, 100.0]
+        if cfg and getattr(cfg, "template", None):
+            try:
+                tmpl = load_template(cfg.template)
+                if getattr(tmpl, "cost", None) is not None:
+                    budget_usd = tmpl.cost.budget_usd
+                    alarm_percent = list(tmpl.cost.alarm_percent)
+            except Exception:
+                # Template load failure is fine — defaults preserved.
+                pass
+
+        bus = get_event_bus()
+        tracker = CostTracker(
+            team=team,
+            bus=bus,
+            budget_usd=budget_usd,
+            alarm_percent=alarm_percent,
+        )
+        cache_tracker = CacheTracker(team=team, bus=bus)
+
+        # Best-effort: fetch active agents from the team's conductor.
+        actives: list[str] = []
+        try:
+            from clawteam.sprint.conductor import SprintConductor
+
+            conductor = SprintConductor(team_name=team)
+            actives = conductor.active_agents()
+        except Exception:
+            # Conductor unavailable (no sprint substrate, broken state) —
+            # fall through with empty active list; panel still renders.
+            pass
+
+        return render_team(
+            team, tracker, cache_tracker, active_agents=actives,
+        )
+    except Exception:
+        return {
+            "status": "unavailable",
+            "cost_usd": 0.0,
+            "budget_usd": 0.0,
+            "spend_percent": 0.0,
+            "per_agent": {},
+            "per_sprint": {},
+            "tokens_opus": 0,
+            "tokens_sonnet": 0,
+            "tokens_haiku": 0,
+            "cache_hit_rate": 0.0,
+            "cache_healthy": False,
+            "alarms_fired": [],
+            "active_agents": [],
+            "active_agent_count": 0,
+        }
+
+
 def _team_show_phases_for_template(team: str) -> list[str]:
     """Return the declared phase order for this team's template (empty on miss).
 
@@ -1820,12 +1894,11 @@ def team_show(
             ),
             "placeholderEntries": memory_placeholder_count,
         },
-        "costRollup": {
-            "status": "pending_phase_7",
-            "perAgent": [],
-            "totalTokens": None,
-            "totalUsd": None,
-        },
+        # Phase 7 Plan 07-07: real cost dashboard replaces the earlier
+        # Phase 3 placeholder. Best-effort helper — on any failure the
+        # panel's ``status`` field is ``unavailable`` and shape stays
+        # stable so JSON consumers never crash.
+        "costRollup": _team_show_cost_panel(team),
     }
 
     def _human(d):
@@ -1892,10 +1965,39 @@ def team_show(
                 "\nMemory: [dim]N/A (non-gstack template)[/dim]"
             )
 
-        # Cost rollup placeholder row (Phase 7 deferred)
-        console.print(
-            "Cost rollup: [dim]pending Phase 7 observability[/dim]"
-        )
+        # Cost rollup panel (Phase 7 Plan 07-07)
+        cost = d.get("costRollup", {})
+        if cost.get("status") == "ok":
+            from clawteam.cost.dashboard import render_text
+
+            console.print(f"\nCost: {render_text(cost)}")
+            per_agent = cost.get("per_agent", {})
+            if per_agent:
+                cost_table = Table(title="Cost by Agent")
+                cost_table.add_column("Agent", style="cyan")
+                cost_table.add_column("USD", justify="right", style="green")
+                for a, usd in sorted(per_agent.items(), key=lambda kv: -kv[1]):
+                    cost_table.add_row(a, f"${usd:.4f}")
+                console.print(cost_table)
+            alarms = cost.get("alarms_fired", [])
+            if alarms:
+                alarm_style = (
+                    "red" if 100 in alarms
+                    else ("yellow" if 80 in alarms else "green")
+                )
+                console.print(
+                    f"[{alarm_style}]Budget alarms fired: "
+                    + ", ".join(f"{int(p)}%" for p in alarms)
+                    + f"[/{alarm_style}]"
+                )
+            actives = cost.get("active_agents", [])
+            if actives:
+                console.print(
+                    f"Active agents ({cost.get('active_agent_count', 0)}): "
+                    + ", ".join(actives)
+                )
+        else:
+            console.print("\nCost: [dim]unavailable[/dim]")
 
     _output(data, _human)
 
