@@ -62,3 +62,62 @@ def test_existing_extras_unchanged():
     p2p = extras["p2p"]
     assert len(p2p) == 1
     assert p2p[0].startswith("pyzmq>=25.0.0")
+
+
+# ── Phase 7 Wave 0 / Plan 07-01 Task 1 ──────────────────────────────────
+
+
+def test_attend_extra_present():
+    """Phase 7 Wave 0: [attend] optional extra must declare watchdog>=3,<4."""
+    raw = _load_pyproject()
+    extras = raw["project"]["optional-dependencies"]
+    assert "attend" in extras, (
+        "Plan 07-01 Task 1 requires [project.optional-dependencies].attend"
+    )
+    assert extras["attend"] == ["watchdog>=3,<4"], (
+        f"attend extra should be exactly ['watchdog>=3,<4']; got {extras['attend']!r}"
+    )
+
+
+def test_existing_extras_unchanged_phase7():
+    """Plan 07-01 Task 1: pre-Phase-7 extras (dev/p2p/browser) must not reshape."""
+    raw = _load_pyproject()
+    extras = raw["project"]["optional-dependencies"]
+
+    # dev
+    assert "dev" in extras
+    dev = extras["dev"]
+    assert len(dev) == 3, f"dev extra length changed: {dev!r}"
+    joined = " ".join(dev)
+    assert "pytest>=9.0.0" in joined
+    assert "ruff>=0.1.0" in joined
+    assert "pyyaml" in joined
+
+    # p2p
+    assert "p2p" in extras
+    p2p = extras["p2p"]
+    assert len(p2p) == 1
+    assert p2p[0].startswith("pyzmq>=25.0.0")
+
+    # browser (Phase 6 substrate)
+    assert "browser" in extras
+    assert extras["browser"] == ["playwright>=1.58,<2"]
+
+
+def test_three_new_packages_importable():
+    """Plan 07-01 Task 1: clawteam.attention / clawteam.cost / clawteam.rate_limit
+    are importable as packages (no playwright/watchdog import side-effects)."""
+    import clawteam.attention  # noqa: F401
+    import clawteam.cost  # noqa: F401
+    import clawteam.rate_limit  # noqa: F401
+
+    import clawteam.attention as _att
+    import clawteam.cost as _cost
+    import clawteam.rate_limit as _rl
+
+    assert hasattr(_att, "__path__"), "clawteam.attention must be a package"
+    assert hasattr(_cost, "__path__"), "clawteam.cost must be a package"
+    assert hasattr(_rl, "__path__"), "clawteam.rate_limit must be a package"
+    assert _att.__all__ == []
+    assert _cost.__all__ == []
+    assert _rl.__all__ == []
