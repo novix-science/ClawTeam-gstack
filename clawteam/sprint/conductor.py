@@ -32,6 +32,7 @@ conductor, so existing Phase 0 templates keep their Before* events as no-ops
 from __future__ import annotations
 
 import asyncio as _asyncio
+import contextlib
 import os
 import uuid
 from datetime import datetime, timezone
@@ -51,6 +52,8 @@ from clawteam.team.models import get_data_dir
 
 if TYPE_CHECKING:  # pragma: no cover — type-check only
     from clawteam.events.bus import EventBus
+    from clawteam.rate_limit import RateLimitMonitor
+    from clawteam.templates import ConductorConfig
 
 
 # ── Error types ────────────────────────────────────────────────────────────
@@ -242,6 +245,8 @@ class SprintConductor:
         phase_artifact_cap_bytes: int | None = None,
         bus: "EventBus | None" = None,
         plugin_manager=None,
+        conductor_config: "ConductorConfig | None" = None,
+        rate_limit_monitor: "RateLimitMonitor | None" = None,
     ) -> None:
         if not team_name:
             raise MissingTeamError()
@@ -279,6 +284,40 @@ class SprintConductor:
             default_bytes=500 * 1024,
         )
 
+        # ── Phase 7 Plan 07-02: concurrency caps + rate-limit monitor ──
+        # Lazy imports to avoid tightening module-load ordering for legacy
+        # Phase 2-6 callers that never touch the async path.
+        from clawteam.rate_limit import RateLimitMonitor as _RateLimitMonitor
+        from clawteam.templates import ConductorConfig as _ConductorConfig
+
+        if conductor_config is None:
+            conductor_config = self._resolve_conductor_config()
+        self._conductor_config = conductor_config
+        self._sprint_sem = _asyncio.Semaphore(conductor_config.max_concurrent_sprints)
+        self._active_agent_sem = _asyncio.Semaphore(conductor_config.max_active_agents)
+        self._per_agent_sems: dict[str, _asyncio.Semaphore] = {}
+        self._active_agents_set: set[str] = set()
+        self._active_agents_lock = RLock()
+        self._rate_limit_monitor = rate_limit_monitor or _RateLimitMonitor(
+            team_name=team_name,
+            bus=self.bus,
+        )
+
+    def _resolve_conductor_config(self):
+        """Load ConductorConfig from the team's template; default if missing."""
+        from clawteam.templates import ConductorConfig
+        try:
+            from clawteam.team.manager import TeamManager
+            from clawteam.templates import load_template
+            cfg = TeamManager.get_team(self.team_name)
+            if cfg and getattr(cfg, "template", ""):
+                tmpl = load_template(cfg.template)
+                if getattr(tmpl, "conductor", None) is not None:
+                    return tmpl.conductor
+        except Exception:  # pragma: no cover — defensive; fall through to defaults
+            pass
+        return ConductorConfig()
+
     # ─────────────────── lifecycle ───────────────────
 
     def start_sprint(
@@ -307,6 +346,114 @@ class SprintConductor:
             save_sprint_state(state)
             self._emit_phase_transition(from_phase="", to_phase=first, state=state)
             return state
+
+    # ── Phase 7 Plan 07-02: async concurrency entry points ──────────────────
+
+    async def start_sprint_async(
+        self, goal: str, auto_advance: bool = True
+    ) -> SprintState:
+        """Async entry point — consults rate-limit + acquires sprint semaphore.
+
+        On :class:`RateLimitMonitor` saturation OR sprint-semaphore acquire
+        timeout, writes ``queue_status`` to the newly-created SprintState and
+        returns without holding the semaphore. The existing sync
+        :meth:`start_sprint` remains untouched for Phase 2-6 callers (BC).
+        """
+        if self._rate_limit_monitor.is_saturated():
+            state = self.start_sprint(goal, auto_advance=auto_advance)
+            state.queue_status = "rate_limit_saturated"
+            save_sprint_state(state)
+            return state
+        try:
+            await _asyncio.wait_for(
+                self._sprint_sem.acquire(),
+                timeout=self._conductor_config.acquire_timeout_seconds,
+            )
+        except _asyncio.TimeoutError:
+            state = self.start_sprint(goal, auto_advance=auto_advance)
+            state.queue_status = "queued_capacity"
+            save_sprint_state(state)
+            return state
+        try:
+            return self.start_sprint(goal, auto_advance=auto_advance)
+        except Exception:
+            self._sprint_sem.release()
+            raise
+
+    def release_sprint_slot(self, sprint_id: str) -> None:
+        """Release the sprint semaphore when a sprint completes or is paused.
+
+        Idempotent — repeat calls after the semaphore is already at its cap
+        are silently absorbed so callers don't have to track ownership.
+        """
+        try:
+            self._sprint_sem.release()
+        except ValueError:
+            pass  # asyncio.Semaphore.release never raises; kept for API parity.
+
+    def _get_agent_sem(self, role: str) -> _asyncio.Semaphore:
+        if role not in self._per_agent_sems:
+            self._per_agent_sems[role] = _asyncio.Semaphore(
+                self._conductor_config.max_tasks_per_agent
+            )
+        return self._per_agent_sems[role]
+
+    @contextlib.asynccontextmanager
+    async def dispatch_turn(self, agent_role: str, agent_name: str = ""):
+        """Async context manager — acquires per-agent + active-agent slots.
+
+        Usage::
+
+            async with conductor.dispatch_turn("pm", "pm"):
+                ... do agent work ...
+
+        Emits :class:`DormancyTransition` on enter (dormant→active) and
+        exit (active→dormant). Release order mirrors acquire order in
+        reverse so a blocked dispatch on ``active_agent_sem`` frees its
+        ``per_agent`` slot promptly on cancellation.
+        """
+        per_agent = self._get_agent_sem(agent_role)
+        await per_agent.acquire()
+        try:
+            await self._active_agent_sem.acquire()
+        except BaseException:
+            per_agent.release()
+            raise
+        name = agent_name or agent_role
+        with self._active_agents_lock:
+            self._active_agents_set.add(name)
+        self._emit_dormancy(name, agent_role, "dormant", "active")
+        try:
+            yield
+        finally:
+            with self._active_agents_lock:
+                self._active_agents_set.discard(name)
+            self._active_agent_sem.release()
+            per_agent.release()
+            self._emit_dormancy(name, agent_role, "active", "dormant")
+
+    def active_agents(self) -> list[str]:
+        """Return the list of currently-active agent names (QUALITY-04)."""
+        with self._active_agents_lock:
+            return sorted(self._active_agents_set)
+
+    def _emit_dormancy(
+        self, agent: str, role: str, from_state: str, to_state: str
+    ) -> None:
+        try:
+            from clawteam.events.types import DormancyTransition
+
+            self.bus.emit(
+                DormancyTransition(
+                    team_name=self.team_name,
+                    agent=agent,
+                    role=role,
+                    from_state=from_state,
+                    to_state=to_state,
+                )
+            )
+        except Exception:  # pragma: no cover — emit must never crash the loop
+            pass
 
     def advance_phase(
         self,

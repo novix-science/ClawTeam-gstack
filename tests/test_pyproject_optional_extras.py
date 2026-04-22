@@ -120,4 +120,6 @@ def test_three_new_packages_importable():
     assert hasattr(_rl, "__path__"), "clawteam.rate_limit must be a package"
     assert _att.__all__ == []
     assert _cost.__all__ == []
-    assert _rl.__all__ == []
+    # Plan 07-02 landed RateLimitMonitor; attention and cost remain empty
+    # placeholders for their respective Wave 1/2 plans.
+    assert _rl.__all__ == ["RateLimitMonitor"]
