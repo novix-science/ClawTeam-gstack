@@ -82,13 +82,15 @@ from clawteam.templates.gstack.skills.setup_browser_cookies.handler import (
     setup_cookies_handler as _setup_cookies_handler,
 )
 
-# Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per D-07).
-# No tool_available probe — handler is pure Python (JSONL + regex), always
-# available. install_hint intentionally empty. Roles = frozenset(GSTACK_ROLES)
-# is the single role-enforcement point for /learn; the handler itself does
-# not gate on role.
-from clawteam.templates.gstack.skills.learn.handler import (
-    learn_handler as _learn_handler,
+# Phase 6 Plan 06-08: /design-shotgun (SKILL-11, designer-only).
+# Multi-turn state machine (INITIALIZED → VARIANTS_GENERATING →
+# BOARD_RENDERED → USER_PICKING → REFINING → CONVERGED|ABANDONED) that
+# generates N variants (default 4 per D-12), writes a comparison board,
+# captures the user's pick as a taste-observation MemoryEntry in the
+# designer's per-role memory scope, then optionally loops for refinement.
+# Pure Python — no external CLI / Playwright — so tool_available is None.
+from clawteam.templates.gstack.skills.design_shotgun.handler import (
+    shotgun_handler as _shotgun_handler,
 )
 
 if TYPE_CHECKING:
@@ -343,14 +345,21 @@ class GstackSprintPlugin(HarnessPlugin):
                     "playwright install chromium"
                 ),
             ),
-            # Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per
-            # D-07). Any GSTACK_ROLE can invoke write/list/search/prune on
-            # team or role-scoped memory. No tool_available probe — pure
-            # Python JSONL + regex, always available. install_hint empty.
+            # Phase 6 Plan 06-08: /design-shotgun (SKILL-11, designer-only).
+            # Roles = {designer}: designer-only, wave-3 Phase-6 state-machine
+            # skill. Handler is a per-turn entry point — each invocation
+            # carries an ``action`` arg (init|generate|publish|pick|refine|
+            # converge|abandon) that drives the DSState transition. State
+            # persists at <sprint_dir>/design-shotgun-state.json under
+            # file_locked; on ``pick`` the handler writes a
+            # taste-observation MemoryEntry (scope='role', role='designer')
+            # via TeamMemoryStore. No external tool dependency so
+            # tool_available=None. install_hint empty — the skill is
+            # always available in a Phase-6 team.
             SkillRegistration(
-                name="/learn",
-                roles=frozenset(GSTACK_ROLES),
-                handler=_learn_handler,
+                name="/design-shotgun",
+                roles=frozenset({"designer"}),
+                handler=_shotgun_handler,
                 tool_available=None,
                 install_hint="",
             ),

@@ -1,0 +1,7 @@
+{
+  "picked_variant_id": "variant-2",
+  "reason": "Clean typography and balanced whitespace; serif reads well for long-form content.",
+  "iteration": 1,
+  "picked_by": "user",
+  "notes": "Fixture used by test_pick_writes_memory_entry to verify TeamMemoryStore receives a role-scoped designer MemoryEntry with evidence citing design-board/variant-2/index.html."
+}
