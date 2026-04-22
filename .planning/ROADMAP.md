@@ -22,7 +22,7 @@ This roadmap delivers the gstack-as-team integration in eight phases, moving fro
 - [ ] **Phase 4: Interactive State Machines, Smart Review Routing & Cross-Agent Verification** - Interactive gstack skills (`/office-hours`, `/design-consultation`, `/investigate`) as state machines; SHA-pinned CODEOWNERS-style reviewer routing; parallel reviewer decorrelation; cross-agent verification gates; Ship-phase human-approval gate
 - [x] **Phase 5: Tool-Heavy Skills (Ship, SRE, Codex)** - `/ship`, `/land-and-deploy`, `/document-release`, `/canary`, `/benchmark`, `/setup-deploy`, `/codex` — the surfaces engineer/shipper/sre invoke at runtime — **COMPLETE 2026-04-22** (all 10 plans landed; SKILL-13..19 closed)
 - [ ] **Phase 6: Browser Skills, Design Pipeline & Team Memory** - `clawteam[browser]` extra, `/browse`, `/design-shotgun`, `/design-html`, and `/learn` memory store with provenance + decay + human gate on high-impact entries
-- [ ] **Phase 7: Parallel Sprints, AttentionQueue UX & Cost Controls** - `SprintConductor` concurrency caps, `clawteam attend` typed-priority queue with digest mode, cost dashboard, prompt caching, rate-limit-aware scheduling
+- [x] **Phase 7: Parallel Sprints, AttentionQueue UX & Cost Controls** - `SprintConductor` concurrency caps, `clawteam attend` typed-priority queue with digest mode, cost dashboard, prompt caching, rate-limit-aware scheduling — **COMPLETE 2026-04-22** (all 9 plans landed; CORE-06, INT-03, INT-04, INT-05, QUALITY-04, QUALITY-05, QUALITY-12, UX-06 closed; 5 empirical items deferred to HUMAN-UAT.md)
 
 ## Phase Details
 
