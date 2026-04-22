@@ -310,7 +310,7 @@ Plans:
 - [x] 06-07: Wave 2 /setup-browser-cookies (SKILL-10, questionary wizard) — **COMPLETE 2026-04-22**
 - [x] 06-08: Wave 3 /design-shotgun (SKILL-11, multi-turn state machine + taste-memory write) — **COMPLETE 2026-04-22**
 - [x] 06-09: Wave 3 /design-html (SKILL-12, framework detection + source emission) — **COMPLETE 2026-04-22**
-- [ ] 06-10: Wave 3 /learn CLI + backfill + conflict gate + integration (see `.planning/phases/06-*/06-10-PLAN.md`)
+- [x] 06-10: Wave 3 /learn skill + clawteam learn CLI (shared handler per D-08) — **COMPLETE 2026-04-22** (high-impact gate + conflict detection + backfill scanner deferred to Plan 06-11)
 
 **UI hint**: yes
 
