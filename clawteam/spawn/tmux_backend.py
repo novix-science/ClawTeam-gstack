@@ -437,18 +437,28 @@ def _confirm_workspace_trust_if_prompted(
     a fresh git worktree. Claude can also pause on a confirmation dialog when
     `--dangerously-skip-permissions` is enabled. Detect these screens before
     any prompt injection so the interactive TUI remains intact.
+
+    Early-exit optimization (v1.0 UAT fix): when the pane clearly shows the
+    normal TUI (input prompt markers) and no trust-style prompt is pending,
+    return False immediately instead of burning the full timeout. The opt-out
+    skips the first ``GRACE_SECONDS`` to give slow-to-boot CLIs a chance to
+    reveal a trust dialog.
     """
     if not (is_claude_command(command) or is_codex_command(command) or is_gemini_command(command)):
         return False
 
-    deadline = time.monotonic() + timeout_seconds
+    GRACE_SECONDS = 1.0  # give the CLI a moment to reveal any trust prompt
+    start = time.monotonic()
+    deadline = start + timeout_seconds
+
     while time.monotonic() < deadline:
         pane = subprocess.run(
             ["tmux", "capture-pane", "-p", "-t", target],
             capture_output=True,
             text=True,
         )
-        pane_text = pane.stdout.lower() if pane.returncode == 0 else ""
+        pane_text_raw = pane.stdout if pane.returncode == 0 else ""
+        pane_text = pane_text_raw.lower()
         action = _startup_prompt_action(command, pane_text)
         if action == "enter":
             subprocess.run(
@@ -472,6 +482,14 @@ def _confirm_workspace_trust_if_prompted(
             )
             time.sleep(0.5)
             return True
+
+        # Early-exit: after the grace window, if no trust prompt action was
+        # detected AND the pane shows clear input-prompt markers, the TUI is
+        # already past any prompt phase. No point polling further.
+        if (time.monotonic() - start) >= GRACE_SECONDS and pane_text_raw and not action:
+            # Claude/Codex/Gemini all render input prompts with these chars.
+            if "❯" in pane_text_raw or "> " in pane_text_raw or "▶" in pane_text_raw:
+                return False
 
         time.sleep(poll_interval_seconds)
 
