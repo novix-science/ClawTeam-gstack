@@ -22,6 +22,7 @@ from typing import Any
 from clawteam.fileutil import atomic_write_text
 from clawteam.plugins.skill_errors import SkillUnavailable
 from clawteam.templates.gstack.schemas.ship_notes import ShipNotes
+from clawteam.templates.gstack.skills._yaml_emit import yaml_quote_string
 from clawteam.templates.gstack.skills.ship.steps import (
     StepResult,
     audit_coverage,
@@ -77,7 +78,9 @@ def _render_ship_notes_yaml(schema: ShipNotes) -> str:
     - ``bool``                      → ``true``/``false``
     - ``list`` / ``dict``           → JSON-literal (round-trips through json.loads)
     - ``None``                      → ``null``
-    - ``str``                       → quoted via ``repr``
+    - ``str``                       → YAML single-quoted scalar (embedded ``'``
+      doubled per YAML 1.2 §7.4.2; newlines fall back to JSON-encoded form)
+      via :func:`yaml_quote_string` — see Phase-5 REVIEW WR-01.
     - all other (int / float)        → ``str()``
     """
     import json as _json
@@ -92,7 +95,7 @@ def _render_ship_notes_yaml(schema: ShipNotes) -> str:
         elif val is None:
             lines.append(f"{key}: null")
         elif isinstance(val, str):
-            lines.append(f"{key}: {val!r}")
+            lines.append(f"{key}: {yaml_quote_string(val)}")
         else:
             lines.append(f"{key}: {val}")
     lines.append("---")

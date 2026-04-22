@@ -40,6 +40,7 @@ from clawteam.fileutil import atomic_write_text
 from clawteam.plugins.skill_errors import SkillPreconditionError
 from clawteam.spawn.invoke import invoke_native_cli
 from clawteam.templates.gstack.schemas.benchmark_report import BenchmarkReport
+from clawteam.templates.gstack.skills._yaml_emit import yaml_quote_string
 
 
 # Defaults that ship here rather than via TemplateDef so direct handler
@@ -312,7 +313,9 @@ def _render_report_yaml(schema: BenchmarkReport) -> str:
     """Serialize a :class:`BenchmarkReport` to ``---`` frontmatter text.
 
     Mirrors the hand-rolled emitter in /ship + /land-and-deploy so Phase 5
-    artifacts stay consistent without a pyyaml dep.
+    artifacts stay consistent without a pyyaml dep. String values route
+    through :func:`yaml_quote_string` (YAML 1.2 single-quote escaping +
+    newline-safe JSON fallback) — see Phase-5 REVIEW WR-01.
     """
     data = schema.model_dump()
     lines: list[str] = ["---"]
@@ -324,7 +327,7 @@ def _render_report_yaml(schema: BenchmarkReport) -> str:
         elif val is None:
             lines.append(f"{key}: null")
         elif isinstance(val, str):
-            lines.append(f"{key}: {val!r}")
+            lines.append(f"{key}: {yaml_quote_string(val)}")
         else:
             lines.append(f"{key}: {val}")
     lines.append("---")

@@ -33,6 +33,7 @@ from clawteam.events.types import DeployRegressionDetected
 from clawteam.fileutil import atomic_write_text
 from clawteam.plugins.skill_errors import SkillPreconditionError
 from clawteam.templates.gstack.schemas.canary_report import CanaryReport
+from clawteam.templates.gstack.skills._yaml_emit import yaml_quote_string
 from clawteam.templates.gstack.skills.canary.poller import (
     PollResult,
     evaluate_regression,
@@ -148,7 +149,9 @@ def _render_canary_report_yaml(schema: CanaryReport) -> str:
     """Serialize a :class:`CanaryReport` instance to ``---`` frontmatter text.
 
     Mirrors the hand-rolled YAML emitter used by /ship + /land-and-deploy
-    so the Phase 5 skills stay consistent without a pyyaml dep.
+    so the Phase 5 skills stay consistent without a pyyaml dep. String values
+    route through :func:`yaml_quote_string` (YAML 1.2 single-quote escaping +
+    newline-safe JSON fallback) — see Phase-5 REVIEW WR-01.
     """
     data = schema.model_dump()
     lines: list[str] = ["---"]
@@ -160,7 +163,7 @@ def _render_canary_report_yaml(schema: CanaryReport) -> str:
         elif val is None:
             lines.append(f"{key}: null")
         elif isinstance(val, str):
-            lines.append(f"{key}: {val!r}")
+            lines.append(f"{key}: {yaml_quote_string(val)}")
         else:
             lines.append(f"{key}: {val}")
     lines.append("---")

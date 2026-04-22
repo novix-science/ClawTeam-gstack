@@ -47,6 +47,7 @@ from clawteam.fileutil import atomic_write_text
 from clawteam.plugins.skill_errors import SkillPreconditionError
 from clawteam.spawn.invoke import invoke_native_cli
 from clawteam.templates.gstack.schemas.deploy_notes import DeployNotes
+from clawteam.templates.gstack.skills._yaml_emit import yaml_quote_string
 
 _DEFAULT_CI_WAIT: int = 1800  # seconds (30 min)
 _DEFAULT_DEPLOY_VERIFY: int = 120  # seconds
@@ -269,7 +270,9 @@ def _render_deploy_notes_yaml(schema: DeployNotes) -> str:
     """Serialize a :class:`DeployNotes` instance to ``---`` frontmatter text.
 
     Mirrors the hand-rolled YAML emitter in the /ship handler so the Phase 5
-    skills stay consistent without a pyyaml dep.
+    skills stay consistent without a pyyaml dep. String values route through
+    :func:`yaml_quote_string` (YAML 1.2 single-quote escaping + newline-safe
+    JSON fallback) — see Phase-5 REVIEW WR-01.
     """
     data = schema.model_dump()
     lines: list[str] = ["---"]
@@ -281,7 +284,7 @@ def _render_deploy_notes_yaml(schema: DeployNotes) -> str:
         elif val is None:
             lines.append(f"{key}: null")
         elif isinstance(val, str):
-            lines.append(f"{key}: {val!r}")
+            lines.append(f"{key}: {yaml_quote_string(val)}")
         else:
             lines.append(f"{key}: {val}")
     lines.append("---")
