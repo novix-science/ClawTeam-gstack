@@ -40,7 +40,6 @@ from clawteam.templates.gstack.skills.design_html.framework_detect import (
     detect_framework,
 )
 
-
 # Default component name when caller omits it (designer convention — the
 # chosen /design-shotgun variant is usually the hero component).
 _DEFAULT_COMPONENT_NAME: str = "Hero"
