@@ -14,6 +14,11 @@ artifact layout.
 """
 from __future__ import annotations
 
+from clawteam.attention.auto_accept import (
+    DEFAULT_TTL_MINUTES,
+    apply_auto_accept,
+    preview_auto_accept,
+)
 from clawteam.attention.digest import build_digest, bucket_age
 from clawteam.attention.queue import (
     URGENCY_MAP,
@@ -31,10 +36,13 @@ __all__ = [
     "AttentionItem",
     "AttentionQueue",
     "AttentionWatcher",
+    "DEFAULT_TTL_MINUTES",
     "URGENCY_MAP",
+    "apply_auto_accept",
     "build_digest",
     "bucket_age",
     "compute_priority",
     "make_watcher",
+    "preview_auto_accept",
     "watchdog_available",
 ]
