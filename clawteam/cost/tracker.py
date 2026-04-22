@@ -107,6 +107,17 @@ class CostTracker:
         with self._lock:
             return dict(self._by_agent_sprint)
 
+    def fired_alarms(self) -> list[float]:
+        """Return a sorted snapshot of thresholds (%) already fired.
+
+        Public accessor for :attr:`_fired_alarms`. Taken under the
+        tracker lock so callers (e.g. the dashboard render layer) never
+        observe a ``RuntimeError: Set changed size during iteration``
+        race with the concurrent ``_on_tool_call`` mutator.
+        """
+        with self._lock:
+            return sorted(self._fired_alarms)
+
     def rollup_team(self) -> CostRollup:
         """Return a team-level :class:`CostRollup` snapshot."""
         with self._lock:

@@ -59,10 +59,12 @@ def render_team(
     )
     cache_healthy = cache_rate > HEALTHY_THRESHOLD
     actives = list(active_agents or [])
-    # ``_fired_alarms`` is an internal set on the tracker; we sort the
-    # snapshot here so downstream consumers can treat ``alarms_fired`` as
-    # an order-stable list (JSON mode + rich rendering both need this).
-    fired = sorted(tracker._fired_alarms)
+    # Use the tracker's public ``fired_alarms()`` accessor — it takes the
+    # tracker lock internally so we never race with a concurrent
+    # ``_on_tool_call`` mutating ``_fired_alarms`` (would otherwise raise
+    # ``RuntimeError: Set changed size during iteration``). The accessor
+    # also returns an order-stable sorted list (JSON + rich both need).
+    fired = tracker.fired_alarms()
     return {
         "team": team,
         "status": "ok",
