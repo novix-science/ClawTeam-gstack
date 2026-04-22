@@ -356,7 +356,7 @@ Plans:
 - [x] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission — completed 2026-04-22 (see 07-05-SUMMARY.md)
 - [x] 07-06-cost-fallback-cache: model fallback ladder + cache tracker — completed 2026-04-22 (see 07-06-SUMMARY.md)
 - [x] 07-07-dashboard-team-show: cost dashboard in clawteam team show — completed 2026-04-22 (see 07-07-SUMMARY.md)
-- [ ] 07-08-zombie-worktree-gc: doctor --gc + disk-budget alarms
+- [x] 07-08-zombie-worktree-gc: doctor --gc + disk-budget alarms — completed 2026-04-22 (see 07-08-SUMMARY.md)
 - [ ] 07-09-integration-ten-sprint-load: 10-sprint load test
 
 **UI hint**: yes
@@ -377,7 +377,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
 | 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
 | 6. Browser Skills, Design Pipeline & Team Memory | 8/10 | In Progress (Wave 3) | - |
-| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 6/9 | In Progress (Wave 4 complete — cost tracker + fallback + cache tracker live) | - |
+| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 8/9 | In Progress (Wave 5 complete — zombie-worktree GC shipped via clawteam doctor --gc; only 07-09 load test remains) | - |
 
 ## Critical Path
 
