@@ -1288,26 +1288,52 @@ def doctor(
         find_zombie_worktrees,
         gc_zombies,
     )
+    from clawteam.workspace.manager import workspaces_root as _wsroot
 
     teams_root = get_data_dir() / "teams"
+    workspaces_top = _wsroot()
     gc_summary: dict = {
         "teams": [],
         "total_zombies": 0,
         "total_freed_bytes": 0,
     }
 
+    # Union of team names discovered either under ``teams/`` (state) or
+    # under ``workspaces/`` (actual worktree dirs). A deployment may have
+    # either path present without the other (e.g. stale workspaces after a
+    # manual teams/ nuke), and GC must still run in both cases.
+    team_names: set[str] = set()
     if teams_root.is_dir():
+        for p in teams_root.iterdir():
+            if p.is_dir():
+                team_names.add(p.name)
+    if workspaces_top.is_dir():
+        for p in workspaces_top.iterdir():
+            if p.is_dir():
+                team_names.add(p.name)
+
+    if team_names:
         bus = get_event_bus()
-        for team_dir in sorted(teams_root.iterdir()):
-            if not team_dir.is_dir():
-                continue
-            worktrees_root = team_dir / "worktrees"
+        for team_name in sorted(team_names):
+            team_dir = teams_root / team_name
+            # WorkspaceManager._workspaces_root() places worktrees at
+            # ``<data_dir>/workspaces/<team>/<agent>/`` — that is the
+            # real zombie-candidate set. The previous ``team_dir /
+            # "worktrees"`` path was never written to in production, so
+            # the GC pass was a silent no-op (CR-01).
+            worktrees_root = workspaces_top / team_name
             if not worktrees_root.is_dir():
                 continue
 
             # Collect active branches from this team's sprints — active
             # workspace_branch values MUST be preserved regardless of
             # worktree age (07-RESEARCH §Pitfall 6 safety invariant).
+            # Note: under the real layout worktree dir basenames are
+            # ``<agent_name>`` rather than branch names; this safety
+            # filter therefore only protects cases where a sprint pins
+            # its workspace_branch to the agent identifier. Refining the
+            # filter to use the live WorkspaceRegistry (IN-07) is a
+            # follow-up — this commit fixes the scan path only.
             active_branches: set[str] = set()
             sprints_dir = team_dir / "sprints"
             if sprints_dir.is_dir():
@@ -1316,7 +1342,7 @@ def doctor(
                         continue
                     try:
                         state = SprintState.load(
-                            team=team_dir.name, sprint_id=sprint_dir.name
+                            team=team_name, sprint_id=sprint_dir.name
                         )
                     except Exception:
                         # Best-effort: unreadable state.json must never
@@ -1333,8 +1359,8 @@ def doctor(
                 max_age_days=30,
                 active_branches=active_branches,
             )
-            gced = gc_zombies(zombies, team_name=team_dir.name, bus=bus)
-            usage = disk_usage_report(team_dir)
+            gced = gc_zombies(zombies, team_name=team_name, bus=bus)
+            usage = disk_usage_report(team_dir if team_dir.is_dir() else worktrees_root)
             team_freed = sum(
                 # freed bytes already captured per event; reconstruct via
                 # difference between pre/post is impractical, so sum via
@@ -1346,7 +1372,7 @@ def doctor(
             )
             gc_summary["teams"].append(
                 {
-                    "team": team_dir.name,
+                    "team": team_name,
                     "zombies_removed": len(gced),
                     "active_branches_preserved": sorted(active_branches),
                     "disk_usage": usage,

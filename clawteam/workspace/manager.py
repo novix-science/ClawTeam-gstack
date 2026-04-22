@@ -23,6 +23,20 @@ def _workspaces_root() -> Path:
     return p
 
 
+def workspaces_root() -> Path:
+    """Public accessor for the shared ``<data_dir>/workspaces`` root.
+
+    Consumers outside this module (e.g. ``clawteam doctor --gc`` at
+    :mod:`clawteam.cli.commands`) need to scan this subtree because
+    ``WorkspaceManager`` always creates per-agent worktrees under
+    ``workspaces/<team>/<agent>/`` — NOT under ``teams/<team>/worktrees/``
+    which is a separate legacy-looking subtree used for state/metadata.
+    Exposing a non-underscore name lets downstream tooling reference the
+    canonical location without reaching into module-private names.
+    """
+    return _workspaces_root()
+
+
 def _registry_path(team_name: str) -> Path:
     return ensure_within_root(
         _workspaces_root(),

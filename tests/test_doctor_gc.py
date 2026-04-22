@@ -24,8 +24,16 @@ from typer.testing import CliRunner
 from clawteam.cli.commands import app
 
 
-def _make_worktree(team_dir: Path, name: str, age_days: float = 0) -> Path:
-    wt = team_dir / "worktrees" / name
+def _make_worktree(data_dir: Path, team: str, name: str, age_days: float = 0) -> Path:
+    """Build a worktree at the REAL layout used by WorkspaceManager.
+
+    ``WorkspaceManager._workspaces_root()`` creates per-agent worktrees
+    at ``<data_dir>/workspaces/<team>/<agent>/``. The earlier test
+    helper wrote to ``teams/<team>/worktrees/<name>/`` which the doctor
+    GC pass never scans (CR-01); tests pre-CR-01-fix passed by mirroring
+    the buggy scan path rather than the real production layout.
+    """
+    wt = data_dir / "workspaces" / team / name
     wt.mkdir(parents=True)
     (wt / "file.txt").write_text("content")
     if age_days > 0:
@@ -62,8 +70,8 @@ def test_doctor_gc_finds_and_cleans(isolated_data_dir):
     runner = CliRunner()
     team_dir = isolated_data_dir / "teams" / "t1"
     team_dir.mkdir(parents=True)
-    zombie = _make_worktree(team_dir, "old-branch", age_days=40)
-    young = _make_worktree(team_dir, "fresh-branch", age_days=5)
+    zombie = _make_worktree(isolated_data_dir, "t1", "old-branch", age_days=40)
+    young = _make_worktree(isolated_data_dir, "t1", "fresh-branch", age_days=5)
 
     result = runner.invoke(app, ["--json", "doctor", "--gc"])
     assert result.exit_code == 0, result.output
@@ -88,8 +96,8 @@ def test_doctor_gc_respects_active_sprints(isolated_data_dir):
     team_dir.mkdir(parents=True)
 
     # Two old worktrees — one matches an active SprintState branch.
-    active_wt = _make_worktree(team_dir, "active-branch", age_days=40)
-    zombie_wt = _make_worktree(team_dir, "zombie-branch", age_days=40)
+    active_wt = _make_worktree(isolated_data_dir, "t1", "active-branch", age_days=40)
+    zombie_wt = _make_worktree(isolated_data_dir, "t1", "zombie-branch", age_days=40)
 
     # Create SprintState pointing at active-branch. SprintState.save writes
     # to ~/.clawteam/teams/t1/sprints/<sprint_id>/state.json — CLAWTEAM_DATA_DIR
