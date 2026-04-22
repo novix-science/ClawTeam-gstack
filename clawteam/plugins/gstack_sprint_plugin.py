@@ -57,6 +57,24 @@ from clawteam.templates.gstack.skills.canary.handler import (
     canary_handler as _canary_handler,
 )
 
+# Phase 6 Plan 06-05: /browse skill (SKILL-10, engineer/qa/dx-lead).
+# Playwright probe routed through clawteam.browser so this module never
+# top-level-imports playwright itself (D-02 invariant). If Plans 06-06 /
+# 06-07 executors also alias ``playwright_available``, Python dedupes —
+# the module-level name resolves to the same function object.
+from clawteam.browser import playwright_available as _playwright_available
+from clawteam.templates.gstack.skills.browse.handler import (
+    browse_handler as _browse_handler,
+)
+
+# Phase 6 Plan 06-06: /open-gstack-browser (SKILL-10, headed mode). Same
+# lazy-Playwright invariant as /browse (D-02). Handler opens Chromium
+# headed so a human (designer / engineer / qa / dx-lead) can interact
+# with a URL pre-seeded with cookies from the team cookie jar.
+from clawteam.templates.gstack.skills.open_gstack_browser.handler import (
+    open_browser_handler as _open_browser_handler,
+)
+
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
 
@@ -252,6 +270,42 @@ class GstackSprintPlugin(HarnessPlugin):
                 install_hint=(
                     "npm install -g lighthouse  "
                     "(optional — curl fallback measures ttfb/dom_loaded without it)"
+                ),
+            ),
+            # Phase 6 Plan 06-05: /browse (SKILL-10, general-purpose headless).
+            # Roles = {engineer, qa, dx-lead}: the three personas who invoke
+            # URL + optional action-script navigation for debugging / QA /
+            # DX exploration. Designer is intentionally NOT in this set —
+            # designers use /open-gstack-browser (headed) instead (T-06-05-03).
+            # URL allow-list (http/https only) sits inside browse_handler
+            # BEFORE any browser launch (T-06-05-01); Playwright probe gates
+            # dispatch with install_hint when absent.
+            SkillRegistration(
+                name="/browse",
+                roles=frozenset({"engineer", "qa", "dx-lead"}),
+                handler=_browse_handler,
+                tool_available=_playwright_available,
+                install_hint=(
+                    "pip install 'clawteam[browser]' && "
+                    "playwright install chromium"
+                ),
+            ),
+            # Phase 6 Plan 06-06: /open-gstack-browser (SKILL-10, headed mode).
+            # Roles = {engineer, qa, dx-lead, designer}: the four personas who
+            # benefit from a pre-authenticated Chromium window — designer sees
+            # the live UI, engineer debugs a running dev server, qa verifies
+            # manually, dx-lead explores personas. Cookies loaded from the
+            # per-domain jar populated by /setup-browser-cookies (Plan 06-07).
+            # Playwright is optional; tool_available probe gates dispatch with
+            # an install hint when absent (see SkillDispatcher:71-79).
+            SkillRegistration(
+                name="/open-gstack-browser",
+                roles=frozenset({"engineer", "qa", "dx-lead", "designer"}),
+                handler=_open_browser_handler,
+                tool_available=_playwright_available,
+                install_hint=(
+                    "pip install 'clawteam[browser]' && "
+                    "playwright install chromium"
                 ),
             ),
         ]

@@ -43,11 +43,21 @@ REQUIREMENT_MAP: dict[str, str] = {
 
 
 def test_all_seven_registered() -> None:
+    """All 7 Phase-5 skills are registered (subset check; later phases may add more).
+
+    Phase 6 Wave 2 relaxed this from strict equality to a subset check so
+    plans 06-05 / 06-06 / 06-07 can each append one SkillRegistration
+    without mutually breaking each other's test suites under parallel
+    execution. The Phase-5 contract (7 baseline names + correct role
+    bindings) is preserved.
+    """
     plugin = GstackSprintPlugin()
     skills = plugin.contribute_skills()
-    names = sorted(s.name for s in skills)
-    assert names == sorted(EXPECTED_SKILLS.keys()), (
-        f"expected 7 skills {sorted(EXPECTED_SKILLS.keys())}, got {names}"
+    names = {s.name for s in skills}
+    missing = set(EXPECTED_SKILLS.keys()) - names
+    assert not missing, (
+        f"Phase-5 skills missing from GstackSprintPlugin.contribute_skills(): "
+        f"{sorted(missing)}"
     )
 
 
@@ -62,15 +72,19 @@ def test_role_bindings_match_requirements() -> None:
 
 
 def test_plugin_manager_aggregates_without_duplicate_error() -> None:
-    """PluginManager round-trip must not raise the duplicate-name ValueError."""
+    """PluginManager round-trip must not raise the duplicate-name ValueError.
+
+    Subset check: Phase-5 skills must aggregate cleanly regardless of any
+    Phase-6 additions — the invariant is that ``get_plugin_skills`` does
+    not raise and still contains all 7 baseline names.
+    """
     from clawteam.plugins.manager import PluginManager
     from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin as _Plugin
 
     manager = PluginManager()
     manager._instantiate_and_register(_Plugin)
     aggregated = manager.get_plugin_skills()
-    assert len(aggregated) == 7
-    assert set(aggregated.keys()) == set(EXPECTED_SKILLS.keys())
+    assert set(EXPECTED_SKILLS.keys()).issubset(set(aggregated.keys()))
 
 
 def test_each_skill_has_handler() -> None:
