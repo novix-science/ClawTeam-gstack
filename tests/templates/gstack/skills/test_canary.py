@@ -208,7 +208,56 @@ def test_evaluate_regression_slow():
         response_times_ms=[600.0] * 100,
     )
     flags = evaluate_regression(result, baseline_avg_ms=250.0)
-    assert "response_time>2x_baseline" in flags
+    # WR-03: flag string interpolates the multiplier (default 2.0).
+    assert "response_time>2.0x_baseline" in flags
+
+
+# ---------------------------------------------------------------------------
+# WR-03 regression: when the caller configures a non-default
+# response_time_multiplier, the emitted flag string must reflect THAT value.
+# Pre-fix the literal ``"response_time>2x_baseline"`` was stamped regardless.
+# ---------------------------------------------------------------------------
+
+
+def test_evaluate_regression_flag_reflects_custom_multiplier():
+    """The flag string interpolates the configured multiplier (not literal '2x')."""
+    from clawteam.templates.gstack.skills.canary.poller import (
+        PollResult,
+        evaluate_regression,
+    )
+
+    result = PollResult(
+        http_2xx_count=100,
+        http_5xx_count=0,
+        response_times_ms=[1000.0] * 100,
+    )
+    # baseline=250, observed=1000 → ratio 4.0; multiplier=3.0 → exceeds.
+    flags = evaluate_regression(
+        result, baseline_avg_ms=250.0, response_time_multiplier=3.0,
+    )
+    assert "response_time>3.0x_baseline" in flags
+    # The pre-fix literal "2x_baseline" narrative must NOT appear.
+    assert "response_time>2x_baseline" not in flags
+    assert "response_time>2.0x_baseline" not in flags
+
+
+def test_evaluate_regression_flag_respects_custom_multiplier_no_trigger():
+    """A larger multiplier suppresses the flag; no flag means no stamp at all."""
+    from clawteam.templates.gstack.skills.canary.poller import (
+        PollResult,
+        evaluate_regression,
+    )
+
+    result = PollResult(
+        http_2xx_count=100,
+        http_5xx_count=0,
+        response_times_ms=[600.0] * 100,
+    )
+    # baseline=250, observed=600 → ratio 2.4; multiplier=3.0 → below threshold.
+    flags = evaluate_regression(
+        result, baseline_avg_ms=250.0, response_time_multiplier=3.0,
+    )
+    assert not any("response_time>" in f for f in flags)
 
 
 def test_evaluate_regression_js_console_errors():

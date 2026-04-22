@@ -143,13 +143,20 @@ def evaluate_regression(
 ) -> list[str]:
     """Apply three threshold checks and return the list of triggered flags.
 
-    Flag strings are literal so downstream consumers can grep without
-    depending on the PollResult schema:
+    Flag strings interpolate the configured thresholds so downstream consumers
+    see the narrative that matches the runtime configuration (mirrors the
+    benchmark handler's ``f"{vital}>{threshold_ratio}x_baseline"`` pattern —
+    see Phase-5 REVIEW WR-03):
 
-    * ``"5xx_rate>1%"`` — ``http_5xx_count / total > threshold_5xx_rate``
-    * ``"response_time>2x_baseline"`` — ``avg_response_ms > multiplier * baseline_avg_ms``
-      (skipped when ``baseline_avg_ms <= 0``, i.e. baseline_missing)
-    * ``"js_console_error"`` — any entry in ``result.js_console_errors``
+    * ``"5xx_rate>1%"`` — ``http_5xx_count / total > threshold_5xx_rate``.
+      The literal ``1%`` reflects the default and is retained for parser
+      backwards-compat; a future knob would parameterize this the same way.
+    * ``f"response_time>{response_time_multiplier}x_baseline"`` — observed
+      average exceeds ``multiplier * baseline_avg_ms``. Skipped when
+      ``baseline_avg_ms <= 0`` (baseline missing). Pre-fix this string was
+      hard-coded ``"response_time>2x_baseline"`` even when the multiplier
+      was configured to a non-2.0 value.
+    * ``"js_console_error"`` — any entry in ``result.js_console_errors``.
     """
     flags: list[str] = []
     total = result.total_requests
@@ -161,7 +168,7 @@ def evaluate_regression(
         baseline_avg_ms > 0
         and result.avg_response_ms > baseline_avg_ms * response_time_multiplier
     ):
-        flags.append("response_time>2x_baseline")
+        flags.append(f"response_time>{response_time_multiplier}x_baseline")
     if result.js_console_errors:
         flags.append("js_console_error")
     return flags
