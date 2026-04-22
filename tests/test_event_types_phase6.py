@@ -143,15 +143,20 @@ def test_register_event_type_called_on_import():
 
 
 def test_memory_package_imports():
-    """Wave 0 skeleton: clawteam.memory importable as a package.
+    """clawteam.memory importable as a package.
 
-    Public API (MemoryEntry / TeamMemoryStore / rank / detect_conflict /
-    backfill_scan) arrives in Plans 06-02, 06-03, 06-10, 06-11.
+    Plan 06-02 re-exports MemoryEntry + TeamMemoryStore. Plans 06-03 / 06-10 /
+    06-11 may additively extend ``__all__``; assert the 06-02 contract is at
+    minimum present rather than a hard equality check.
     """
     import clawteam.memory
 
     assert hasattr(clawteam.memory, "__path__"), (
         "clawteam.memory must be a package, not a module"
     )
-    # __all__ is an empty list at Wave 0 (no re-exports yet).
-    assert clawteam.memory.__all__ == []
+    # Plan 06-02 contract: MemoryEntry + TeamMemoryStore exposed at the
+    # package surface. Downstream plans (06-03 search/rank/decay, 06-11
+    # conflict detection + backfill) are free to append more names.
+    assert "MemoryEntry" in clawteam.memory.__all__
+    assert "TeamMemoryStore" in clawteam.memory.__all__
+    from clawteam.memory import MemoryEntry, TeamMemoryStore  # noqa: F401
