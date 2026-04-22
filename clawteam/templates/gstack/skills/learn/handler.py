@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 from clawteam.memory import MemoryEntry, TeamMemoryStore
+from clawteam.memory.conflict import detect_conflicts
 from clawteam.memory.high_impact_gate import check_high_impact, stage_pending
 from clawteam.memory.search import search as memory_search
 from clawteam.team.models import get_data_dir
@@ -134,12 +135,54 @@ def _do_write(
         }
 
     entry_id = store.write(entry)
+
+    # Plan 06-11 QUALITY-10: conflict detection — non-blocking (D-10). The
+    # write is already committed; we only emit advisory events.
+    conflicts = detect_conflicts(entry, store)
+    if conflicts:
+        _emit_conflict_events(entry, conflicts, team_name=team_name)
+
     return {
         "status": "written",
         "id": entry_id,
         "evidence_flagged": not bool(entry.evidence),
         "high_impact": "impact:high" in entry.tags,
+        "conflicts": [c.other_id for c in conflicts],
     }
+
+
+def _emit_conflict_events(
+    new_entry: MemoryEntry, conflicts: list, *, team_name: str
+) -> None:
+    """Emit one :class:`ConflictDetected` per conflict (best-effort).
+
+    Any bus/event-type import failure is swallowed — conflict detection is
+    advisory; the /learn write already succeeded. Phase 7's cost digest is
+    the consumer.
+    """
+    try:
+        from clawteam.events.global_bus import get_event_bus
+        from clawteam.events.types import ConflictDetected
+    except Exception:
+        return
+    try:
+        bus = get_event_bus()
+    except Exception:
+        return
+    for m in conflicts:
+        try:
+            bus.emit(
+                ConflictDetected(
+                    team_name=team_name,
+                    new_entry_id=new_entry.id,
+                    conflicting_entry_id=m.other_id,
+                    similarity=float(m.similarity),
+                    shared_tags=list(m.shared_tags),
+                    scope=new_entry.scope,
+                )
+            )
+        except Exception:
+            continue
 
 
 def _do_list(
