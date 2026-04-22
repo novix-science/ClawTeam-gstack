@@ -29,11 +29,27 @@ from __future__ import annotations
 
 import shutil
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
 from clawteam.events.bus import EventBus
 from clawteam.events.types import ZombieWorktreeGced
+
+
+@dataclass(frozen=True)
+class GcResult:
+    """Per-path outcome from :func:`gc_zombies`.
+
+    Surfaces the freed-bytes signal the CLI summary needs (WR-03). The
+    per-event ``ZombieWorktreeGced.freed_bytes`` was already computed
+    but previously never bubbled back to the caller — the CLI had to
+    guess ``total_freed_bytes = sum([])`` which was hardcoded to zero.
+    """
+
+    path: Path
+    age_days: int
+    freed_bytes: int
 
 # Per-team disk-budget thresholds (07-CONTEXT §Cluster A #4).
 SOFT_BYTES = 5 * 1024 * 1024 * 1024
@@ -101,14 +117,18 @@ def gc_zombies(
     team_name: str = "",
     bus: Optional[EventBus] = None,
     now_fn=time.time,
-) -> list[Path]:
+) -> list[GcResult]:
     """Delete each path; emit ``ZombieWorktreeGced`` if a bus is set.
 
-    Idempotent on missing paths (silently skipped — no event). Uses
-    ``shutil.rmtree(ignore_errors=True)`` so a partial delete of a
-    tangled worktree still makes forward progress.
+    Returns a list of :class:`GcResult` — one entry per successfully
+    removed path (WR-03: surfaces ``freed_bytes`` so the CLI summary
+    total is meaningful).
+
+    Idempotent on missing paths (silently skipped — no event, no
+    :class:`GcResult`). Uses ``shutil.rmtree(ignore_errors=True)`` so a
+    partial delete of a tangled worktree still makes forward progress.
     """
-    gced: list[Path] = []
+    gced: list[GcResult] = []
     for path in paths:
         if not path.exists():
             continue
@@ -119,7 +139,8 @@ def gc_zombies(
             shutil.rmtree(path, ignore_errors=True)
         except OSError:
             continue
-        gced.append(path)
+        result = GcResult(path=path, age_days=age_days, freed_bytes=freed)
+        gced.append(result)
         if bus is not None:
             try:
                 bus.emit(
@@ -163,6 +184,7 @@ __all__ = [
     "find_zombie_worktrees",
     "gc_zombies",
     "disk_usage_report",
+    "GcResult",
     "SOFT_BYTES",
     "HARD_BYTES",
 ]

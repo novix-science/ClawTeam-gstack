@@ -1361,19 +1361,16 @@ def doctor(
             )
             gced = gc_zombies(zombies, team_name=team_name, bus=bus)
             usage = disk_usage_report(team_dir if team_dir.is_dir() else worktrees_root)
-            team_freed = sum(
-                # freed bytes already captured per event; reconstruct via
-                # difference between pre/post is impractical, so sum via
-                # disk_usage report delta is not available here. Leave
-                # per-path freed bytes as an implementation detail of
-                # gc_zombies (visible through event stream subscribers);
-                # the CLI summary just reports the removed count + usage.
-                []
-            )
+            # WR-03: gc_zombies now returns GcResult dataclasses carrying
+            # the already-computed per-path freed_bytes. Previously this
+            # summed an empty literal (``sum([])``) so total_freed_bytes
+            # was always 0 — a meaningless telemetry field.
+            team_freed = sum(r.freed_bytes for r in gced)
             gc_summary["teams"].append(
                 {
                     "team": team_name,
                     "zombies_removed": len(gced),
+                    "freed_bytes": team_freed,
                     "active_branches_preserved": sorted(active_branches),
                     "disk_usage": usage,
                 }

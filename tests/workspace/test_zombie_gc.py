@@ -22,6 +22,7 @@ from clawteam.events.types import ZombieWorktreeGced
 from clawteam.workspace.gc import (
     HARD_BYTES,
     SOFT_BYTES,
+    GcResult,
     disk_usage_report,
     find_zombie_worktrees,
     gc_zombies,
@@ -92,7 +93,11 @@ def test_gc_zombies_deletes_returned_paths(tmp_path):
     os.utime(d, (past, past))
     gced = gc_zombies([d])
     assert not d.exists()
-    assert gced == [d]
+    # WR-03: gc_zombies returns GcResult dataclasses, not bare Paths.
+    assert len(gced) == 1
+    assert isinstance(gced[0], GcResult)
+    assert gced[0].path == d
+    assert gced[0].freed_bytes >= 7  # "content" = 7 bytes minimum
 
 
 def test_gc_zombies_emits_event(tmp_path):
@@ -127,7 +132,8 @@ def test_gc_zombies_no_bus_ok(tmp_path):
     # Emission should be optional; passing bus=None must not crash.
     d = _mk_dir(tmp_path, "old", age_days=40)
     gced = gc_zombies([d])
-    assert gced == [d]
+    assert len(gced) == 1
+    assert gced[0].path == d
     assert not d.exists()
 
 
