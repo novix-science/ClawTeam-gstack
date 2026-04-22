@@ -99,6 +99,71 @@ def test_poll_window_network_error_counted_as_5xx():
     assert result.http_5xx_count >= 1
 
 
+# ---------------------------------------------------------------------------
+# WR-02 regression: a user-supplied http_fn that raises an arbitrary
+# exception type (RuntimeError, ValueError, mock side_effect=Exception)
+# must NOT crash the outer handler. The pre-fix catch only handled four
+# urllib-specific types, so a bare RuntimeError propagated and broke the
+# T-05-08-01 "never fails outer handler on transport issues" invariant.
+# ---------------------------------------------------------------------------
+
+
+def test_poll_window_arbitrary_exception_counted_as_5xx():
+    """T-05-08-01: any user-supplied http_fn error coerces to 5xx, never propagates."""
+    from clawteam.templates.gstack.skills.canary.poller import poll_window
+
+    def fake_http(url: str) -> tuple[int, float]:
+        # Pre-fix this would propagate — post-fix it coerces to 599/5xx.
+        raise RuntimeError("boom")
+
+    result = poll_window(
+        "https://example.com",
+        window_seconds=1.0,
+        poll_interval_seconds=0.25,
+        http_fn=fake_http,
+        sleep_fn=lambda s: None,  # noqa: ARG005
+    )
+    assert result.http_2xx_count == 0
+    assert result.http_5xx_count >= 1
+
+
+def test_poll_window_value_error_counted_as_5xx():
+    """ValueError + misc exceptions from injected http_fn also coerce to 5xx."""
+    from clawteam.templates.gstack.skills.canary.poller import poll_window
+
+    def fake_http(url: str) -> tuple[int, float]:
+        raise ValueError("bad response shape")
+
+    result = poll_window(
+        "https://example.com",
+        window_seconds=1.0,
+        poll_interval_seconds=0.25,
+        http_fn=fake_http,
+        sleep_fn=lambda s: None,  # noqa: ARG005
+    )
+    assert result.http_5xx_count >= 1
+
+
+def test_poll_window_keyboard_interrupt_still_propagates():
+    """KeyboardInterrupt must NOT be swallowed — BaseException subclasses
+    escape so tests + human operators can still interrupt a long poll.
+    """
+    import pytest
+    from clawteam.templates.gstack.skills.canary.poller import poll_window
+
+    def fake_http(url: str) -> tuple[int, float]:
+        raise KeyboardInterrupt()
+
+    with pytest.raises(KeyboardInterrupt):
+        poll_window(
+            "https://example.com",
+            window_seconds=1.0,
+            poll_interval_seconds=0.25,
+            http_fn=fake_http,
+            sleep_fn=lambda s: None,  # noqa: ARG005
+        )
+
+
 def test_evaluate_regression_clean():
     from clawteam.templates.gstack.skills.canary.poller import (
         PollResult,

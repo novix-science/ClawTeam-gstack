@@ -111,9 +111,16 @@ def poll_window(
     first = True
     while first or time.monotonic() < deadline:
         first = False
+        # T-05-08-01 invariant: /canary MUST NEVER fail its outer handler on
+        # transport or user-supplied http_fn error. Catch broadly so that
+        # mocks with side_effect=Exception("boom"), bare RuntimeError from a
+        # user-injected fake, or any new urllib subclass still degrade to a
+        # 599 "unknown transport error" sample. BaseException subclasses
+        # (KeyboardInterrupt, SystemExit) still propagate so the poll loop
+        # remains interruptible.
         try:
             status, elapsed_ms = fn_http(url)
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+        except Exception:  # noqa: BLE001 — any transport or user-fn failure = 5xx
             status, elapsed_ms = 599, 0.0
         result.response_times_ms.append(elapsed_ms)
         if 200 <= status < 400:
