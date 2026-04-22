@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 Wave 1 IN-PROGRESS (plan 06-04 browser-adapter substrate complete; 06-02/06-03 running in parallel)
-stopped_at: Completed 06-04 (Wave 1 browser substrate — adapter/session/cookies modules + __init__.py re-exports; 32 tests green, D-02 no-leak invariant locked)
-last_updated: "2026-04-22T11:20:00Z"
+status: Phase 6 Wave 1 IN-PROGRESS (plans 06-02 memory substrate + 06-04 browser substrate complete; 06-03 search/decay running in parallel)
+stopped_at: Completed 06-02 (Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation; 25 new tests all green)
+last_updated: "2026-04-22T11:18:30.032Z"
 progress:
   total_phases: 8
-  completed_phases: 4
-  total_plans: 58
-  completed_plans: 50
-  percent: 86
+  completed_phases: 6
+  total_plans: 68
+  completed_plans: 62
+  percent: 91
 ---
 
 # Project State
@@ -84,6 +84,7 @@ Plan: 06-04 complete (Wave 1 — clawteam/browser/adapter.py + session.py + cook
 | Phase 05 P10 | 30min | 4 tasks | 5 files |
 | Phase 06 P01 | 12min | 3 tasks | 10 files |
 | Phase 06 P04 | 12min | 3 tasks | 7 files |
+| Phase 06 P02 | 12min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,7 @@ Recent decisions affecting current work:
 - [Phase 06]: 06-04: Ship browser substrate as 3 single-responsibility modules: adapter.py (navigate_and_screenshot + action_script — sha256 dom_hash + http_status + png_bytes; click/fill/screenshot/wait_for_selector dispatch; TimeoutError propagates; 4xx returns without raising), session.py (build_browser_context + open_headed_with_context — @contextmanager yielding Playwright BrowserContext, closes browser on exit even on exception; reuses adapter._import_sync_playwright as single lazy-import seam for whole package), cookies.py (save/load_cookies_for_domain + cookies_dir — per-domain JSON under <team>/browser/cookies/<domain>.json via file_locked + atomic_write_text; DNS-ish regex + layered ..// path-traversal guard rejects attacker domains T-06-04-02; malformed JSON load returns [] T-06-04-03). __init__.py re-exports 8 public names. 32 tests green in tests/browser/ (7 adapter + 7 session + 14 cookies + 4 pre-existing feature-detection); zero real Chromium launches per D-16. D-02 no-leak invariant test-locked via `test_package_import_does_not_leak_playwright`.
 - [Phase 06]: 06-04: Single-seam lazy-import pattern — only adapter.py declares `_import_sync_playwright()` and inside its body does `from playwright.sync_api import sync_playwright`. session.py imports the seam directly (`from clawteam.browser.adapter import _import_sync_playwright`). Monkeypatch once to stub both modules. Reusable for any future browser sibling.
 - [Phase 06]: 06-04: Cross-executor stash interaction with Plan 06-02 (recurring 04-10 / 05-03 / 05-06 / 05-09 pattern) — a4aa2be includes 06-02's clawteam/memory/__init__.py + clawteam/memory/store.py alongside my tests/browser/test_cookies.py. Resolved by namespace separation: 06-04's commits touch only clawteam/browser/ + tests/browser/; `git log --oneline -- clawteam/browser/` confirms purity. 06-02's work in clawteam/memory/ remains intact for its own executor.
+- [Phase 06]: 06-02: Ship MemoryEntry pydantic + TeamMemoryStore append-only JSONL (D-04/D-05). TeamMemoryStore validates team_name at __init__ via validate_identifier + uses ensure_within_root on every path helper — D-15 cross-team isolation (4 tests). write() pattern: file_locked + open('a') + flush + fsync (A5 inline; no atomic_append_line helper). prune() writes op='prune' tombstone to same bucket; .list tracks tombstoned ids + suppresses. Prune bypasses the (future) high-impact gate (research Open Q3). Tag regex [a-z0-9][a-z0-9:_-]* — leading alnum required; rejected plan behavior's '_internal' claim in favor of plan action's authoritative regex. 25 new tests across 3 files, 34/34 green. Cross-executor stash attribution: store.py landed under 06-04's commit a4aa2be (same pattern as 04-10/05-03/05-06).
 
 ### Pending Todos
 
@@ -191,8 +193,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T11:20:00Z
-Stopped at: Completed 06-04 (Wave 1 browser substrate — clawteam/browser/adapter.py + session.py + cookies.py + __init__.py re-exports; 32 tests green in tests/browser/; D-02 no-leak invariant locked; parallel 06-02 + 06-03 in-flight)
+Last session: 2026-04-22T11:18:22.611Z
+Stopped at: Completed 06-02 (Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation; 25 new tests all green)
 Resume files:
 
   - Phase 6 Wave 1 (06-04 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-04-SUMMARY.md

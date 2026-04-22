@@ -302,7 +302,8 @@ Plans:
 
 Plans:
 - [x] 06-01: Wave 0 substrate — pyproject [browser] extra + playwright_available() + 3 new HarnessEvents + MemoryConfig/DesignShotgunConfig/BrowserConfig TemplateDef sub-blocks (MEM-01/02, SKILL-10/11/12, QUALITY-10 substrate) — **COMPLETE 2026-04-22**
-- [ ] 06-02 through 06-10: TeamMemoryStore, /learn, browser adapter, /browse, /open-gstack-browser, /setup-browser-cookies, /design-shotgun, /design-html, backfill + integration (see `.planning/phases/06-*/06-0{2..10}-PLAN.md`)
+- [x] 06-02: Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation (MEM-01, MEM-02, D-04, D-05, D-15) — **COMPLETE 2026-04-22**
+- [ ] 06-03 through 06-10: memory search/decay, browser adapter, /browse, /open-gstack-browser, /setup-browser-cookies, /design-shotgun, /design-html, backfill + integration (see `.planning/phases/06-*/06-0{3..10}-PLAN.md`)
 
 **UI hint**: yes
 
