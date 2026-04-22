@@ -1,11 +1,17 @@
 """Cost substrate — tracker + dashboard + fallback + cache_tracker.
 
-Plan 07-05 (this plan) ships pricing + rollup + tracker.
-Plan 07-06 ships fallback + cache_tracker.
+Plan 07-05 shipped pricing + rollup + tracker.
+Plan 07-06 (this plan) ships fallback + cache_tracker.
 Plan 07-07 wires the dashboard into ``clawteam team show``.
 """
 from __future__ import annotations
 
+from clawteam.cost.cache_tracker import HEALTHY_THRESHOLD, CacheTracker
+from clawteam.cost.fallback import (
+    FALLBACK_LADDER,
+    TIER_TO_CANONICAL,
+    apply_fallback,
+)
 from clawteam.cost.pricing import (
     MODEL_PRICING,
     ModelTier,
@@ -22,4 +28,10 @@ __all__ = [
     "resolve_tier",
     "CostRollup",
     "CostTracker",
+    # Plan 07-06 additions:
+    "apply_fallback",
+    "FALLBACK_LADDER",
+    "TIER_TO_CANONICAL",
+    "CacheTracker",
+    "HEALTHY_THRESHOLD",
 ]
