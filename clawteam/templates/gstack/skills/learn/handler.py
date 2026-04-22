@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 from clawteam.memory import MemoryEntry, TeamMemoryStore
+from clawteam.memory.backfill import backfill_scan
 from clawteam.memory.conflict import detect_conflicts
 from clawteam.memory.high_impact_gate import check_high_impact, stage_pending
 from clawteam.memory.search import search as memory_search
@@ -38,6 +39,27 @@ from clawteam.team.models import get_data_dir
 
 _VALID_ACTIONS = frozenset({"write", "list", "search", "prune"})
 _VALID_IMPACT = frozenset({"low", "medium", "high"})
+
+# Plan 06-11 D-11: per-process sentinel — first /learn invocation per team
+# triggers backfill_scan once. Reset in tests via `_backfilled_teams.clear()`.
+_backfilled_teams: set[str] = set()
+
+
+def _ensure_backfilled(team_name: str) -> None:
+    """Idempotently run backfill_scan for *team_name* in this process.
+
+    Best-effort: any exception during scan is swallowed — backfill is
+    strictly advisory and must never block a /learn invocation
+    (D-11, QUALITY-10).
+    """
+    if team_name in _backfilled_teams:
+        return
+    _backfilled_teams.add(team_name)
+    try:
+        backfill_scan(team=team_name, root=get_data_dir())
+    except Exception:
+        # Never let the backfill scanner break /learn dispatch.
+        pass
 
 
 def _resolve_team_name(ctx: Any) -> str:
@@ -261,6 +283,9 @@ def learn_handler(
         )
 
     team_name = _resolve_team_name(ctx)
+    # Plan 06-11 D-11: idempotent per-process backfill of _phase6_pending/
+    # retros. Runs once per team per process; no-op on subsequent calls.
+    _ensure_backfilled(team_name)
     store = TeamMemoryStore(team_name)
 
     if action == "write":
