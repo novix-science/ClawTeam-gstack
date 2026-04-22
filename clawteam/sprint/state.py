@@ -120,6 +120,22 @@ class SprintState(BaseModel):
         ),
     )
 
+    # ── Phase 7 Wave 0 (§07-CONTEXT D-01) additive field ────────────
+    queue_status: str = Field(
+        default="",
+        description=(
+            "Phase 7 D-01: reason the sprint is in a queued state. Empty "
+            "string '' = active / running (normal case). Non-empty values: "
+            "'queued_capacity' (acquire on max_concurrent_sprints semaphore "
+            "timed out after 60s — sprint waits for capacity), "
+            "'rate_limit_saturated' (RateLimitMonitor.is_saturated() true at "
+            "start_sprint — sprint waits for 429 window to clear). Cleared "
+            "back to '' when conductor promotes sprint to active. Persisted "
+            "so crash-recovery sees the queued sprint on resume. Open str "
+            "(not Literal) to keep field extensible (e.g. 'queued_disk_budget')."
+        ),
+    )
+
     # ── Persistence ─────────────────────────────────────────────────
 
     @staticmethod
