@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 Wave 1 COMPLETE (plans 06-02 memory substrate + 06-03 memory search/decay + 06-04 browser substrate all landed)
-stopped_at: Completed 06-03 (Wave 1 memory search/rank — decay_factor + D-06 ranking formula + grep-safe search; 28 new tests all green; 53/53 memory tests total)
-last_updated: "2026-04-22T21:00:36Z"
+status: Phase 6 Wave 2 IN PROGRESS (06-05 /browse + 06-06 /open-gstack-browser + 06-07 /setup-browser-cookies landing in parallel; 06-06 complete)
+stopped_at: Completed 06-06 (Wave 2 — /open-gstack-browser headed-mode skill + plugin registration; 7 new tests green; plugin now registers ≥9 skills)
+last_updated: "2026-04-22T21:41:00Z"
 progress:
   total_phases: 8
   completed_phases: 6
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 6 Wave 1 COMPLETE
-Plan: 06-03 complete (Wave 1 — clawteam/memory/decay.py + search.py + __init__.py re-export; 28 new tests (11 decay + 17 search); 53/53 memory tests green; MEM-03/MEM-05/MEM-07/D-06 requirements closed). Plans 06-02 (memory substrate) + 06-03 (search/rank) + 06-04 (browser substrate) all landed — Wave 1 gate reached. Next: Wave 2 (06-05..06-07 browser skills + design shotgun).
+Phase: 6 Wave 2 IN PROGRESS
+Plan: 06-06 complete (Wave 2 — /open-gstack-browser SKILL-10 headed-mode Chromium launcher with per-domain cookie injection; new skill sub-package under clawteam/templates/gstack/skills/open_gstack_browser/; 7 new tests green; plugin gains 9th SkillRegistration with roles={engineer,qa,dx-lead,designer}; tests/plugins/test_all_seven_skills_registered.py relaxed from strict ==7 equality to subset check so Wave-2 plans (06-05/06-06/06-07) commute under parallel execution). Siblings: /browse (06-05) landed commits ddfd1e2+933d14f+0ea2877; /setup-browser-cookies (06-07) in flight (RED at cf82d68). Next: finish Wave 2 (06-07 GREEN + /design-shotgun 06-08).
 
 ## Performance Metrics
 
@@ -198,11 +198,12 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T21:00:36Z
-Stopped at: Completed 06-03 (Wave 1 memory search/rank — decay_factor + D-06 ranking formula + grep-safe search; 28 new tests all green; 53/53 memory suite; Wave 1 gate reached)
+Last session: 2026-04-22T21:41:00Z
+Stopped at: Completed 06-06 (Wave 2 — /open-gstack-browser headed-mode skill; 7 new tests green; 9+ skills registered in GstackSprintPlugin)
 Resume files:
 
   - Phase 6 Wave 1 COMPLETE (06-03): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-03-SUMMARY.md
+  - Phase 6 Wave 2 06-06 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-06-SUMMARY.md
   - Phase 6 Wave 1 (06-04 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-04-SUMMARY.md
   - Phase 6 Wave 1 (06-02 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-02-SUMMARY.md
   - Phase 6 Wave 0 substrate: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-01-SUMMARY.md
