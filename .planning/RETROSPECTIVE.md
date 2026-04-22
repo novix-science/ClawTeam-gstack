@@ -52,6 +52,22 @@
 - Sessions: ~10 active working sessions across 8 days.
 - Notable: full-suite pytest at close takes ~2 minutes (1,835 tests); phase-scoped subsets run in <5 seconds, which is what the per-plan TDD gates use.
 
+### Post-Close UAT Walkthrough — 5 Fixes In-Place (2026-04-22)
+
+Immediately after `/gsd-complete-milestone` tagged v1.0, a live walkthrough surfaced 5 issues invisible to the 1,800+ automated test gates. Per user preference ("不用 bump version 去修 目前还在验收阶段"), these were committed in-place on `gstack-integration` without version bumps — folded into v1.0 UAT validation scope rather than creating v1.0.x patch tags.
+
+| Commit | Severity | What was broken |
+|--------|----------|-----------------|
+| `4e1bd29` | blocker | `clawteam launch gstack` crashed under fish/elvish/nushell — tmux used login shell for bash-style launcher |
+| `8090af7` | high | Agents spawned by `launch` had no role methodology — answered as generic Claude Code, not as "I'm ceo" |
+| `c254315` | high | Documented flow `team spawn → launch` hard-failed with "Team already exists" |
+| `bb18c8e` | high | Each agent spawn burned full 30s timeout in trust confirmer — 11-agent launch ~12 min → ~23s with early-exit |
+| `a45ed53` | feat | Added 4 top-level solo-UX commands (go/status/answer/stop) — reduced 10-command happy path to 4 |
+
+**Key process lesson:** milestone close should require a live walkthrough as its final gate, not just automated artifacts. All 5 of these issues would have been caught by running `clawteam launch gstack` on the target machine once before tagging v1.0.
+
+Full index with repro commands + test coverage: `.planning/backlog/v1.0-post-uat-fixes.md`.
+
 ---
 
 ## Cross-Milestone Trends
@@ -64,7 +80,9 @@
 | Duration | 8 days active |
 | REQs shipped | 80 (79 complete + 1 partial QUALITY-12) |
 | Post-close backlog | 4 items (999.001-004) |
+| Post-close in-place UAT fixes | 5 commits (4e1bd29, 8090af7, c254315, bb18c8e, a45ed53) |
 | Pre-existing test-isolation failures at close | 9 (registry pollution) |
 | Phases with retroactive VERIFICATION.md | 3 (Phases 4/5/6) |
+| Live-walkthrough-surfaced blockers missed by automated gates | 4 blocker/high, 1 feature gap |
 
 *Update this table as v1.x, v2.0+ ship.*
