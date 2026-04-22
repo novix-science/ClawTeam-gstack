@@ -114,6 +114,13 @@ def _compute_agreement_rate(peer_reports: list[Any]) -> float:
 
     if not rated:
         return 0.0
+    # WR-04-01 (04-REVIEW): a sycophancy cascade requires AGREEMENT between
+    # reviewers — by definition you cannot have a cascade with a single peer
+    # because there is nothing to agree against. Before this guard, a solo
+    # peer with any findings yielded rate=1.0 and spammed
+    # SycophancyCascadeDetected on every dispatch.
+    if len(rated) < 2:
+        return 0.0
     max_len = max(len(s) for s in rated)
     if max_len == 0:
         return 0.0

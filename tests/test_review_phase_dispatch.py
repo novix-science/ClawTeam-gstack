@@ -129,8 +129,28 @@ def test_agreement_rate_skips_exceptions():
         Exception("oops"),
         {"findings": [{"severity": "blocker"}]},
     ]
-    # Only the dict contributes — 1 matched position / 1 total = 1.0
-    assert _compute_agreement_rate(peers) == 1.0
+    # Only one dict survives — a cascade requires >=2 agreeing peers,
+    # so the solo-survivor case returns 0.0 (WR-04-01 guard).
+    assert _compute_agreement_rate(peers) == 0.0
+
+
+def test_agreement_rate_single_peer_returns_zero():
+    """WR-04-01 regression: a sycophancy cascade requires >=2 peers.
+
+    Before the guard, a solo peer with any findings returned 1.0 and spammed
+    SycophancyCascadeDetected on every single-peer dispatch (e.g. a sprint
+    that only touched UI and so only pulled `designer` as a peer).
+    """
+    peers = [
+        {"findings": [{"severity": "blocker"}, {"severity": "major"}]},
+    ]
+    assert _compute_agreement_rate(peers) == 0.0
+
+
+def test_agreement_rate_all_exceptions_returns_zero():
+    """Two spawn failures — no survivors — cannot form a cascade."""
+    peers = [Exception("boom1"), Exception("boom2")]
+    assert _compute_agreement_rate(peers) == 0.0
 
 
 # ── _current_head / _diff_paths ──────────────────────────────────────
