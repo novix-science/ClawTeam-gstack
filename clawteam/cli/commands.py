@@ -4662,48 +4662,88 @@ def launch_team(
     cmd = command_override or tmpl.command
 
     # 3. Create team
-    leader_id = uuid.uuid4().hex[:12]
     # Phase 3 (Plan 03-02, D-05): collect per-role identifiers from the template
     # so create_team can pre-create the memory dir tree. For existing templates
     # (software-dev, hedge-fund, etc.) `a.role` is "" for every agent, so the
     # filter yields [] and the memory-dir loop is a no-op (BC preserved).
     _gstack_roles = [a.role for a in [tmpl.leader, *tmpl.agents] if a.role]
-    try:
-        TeamManager.create_team(
-            name=t_name,
-            leader_name=tmpl.leader.name,
-            leader_id=leader_id,
-            description=tmpl.description,
-            user=_os.environ.get("CLAWTEAM_USER", ""),
-            roles=_gstack_roles,
-            leader_role=tmpl.leader_role,
-            template=tmpl.name if _gstack_roles else "",
-        )
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
 
-    # 4. Add members
-    agent_ids: dict[str, str] = {tmpl.leader.name: leader_id}
-    for agent in tmpl.agents:
-        aid = uuid.uuid4().hex[:12]
-        agent_ids[agent.name] = aid
-        TeamManager.add_member(
-            team_name=t_name,
-            member_name=agent.name,
-            agent_id=aid,
-            agent_type=agent.type,
-            user=_os.environ.get("CLAWTEAM_USER", ""),
+    # v1.0 UAT fix: the documented flow `clawteam team spawn` → `clawteam launch`
+    # requires launch to reuse an already-created team instead of hard-failing
+    # on "Team already exists". `clawteam team spawn` (Plan 03-02) explicitly
+    # tells users to "follow up with `clawteam launch` to run agents", so we
+    # must handle the existing-team case gracefully here.
+    agent_ids: dict[str, str] = {}
+    if TeamManager.team_exists(t_name):
+        existing_members = {m.name: m.agent_id for m in TeamManager.list_members(t_name)}
+        leader_id = existing_members.get(tmpl.leader.name, "")
+        if not leader_id:
+            console.print(
+                f"[red]Error: Team '{t_name}' exists but leader "
+                f"'{tmpl.leader.name}' is not registered.[/red]"
+            )
+            raise typer.Exit(1)
+        agent_ids = {tmpl.leader.name: leader_id}
+        # Only add members that are missing (lets users extend a partially
+        # populated team, though `team spawn` always populates all agents).
+        for agent in tmpl.agents:
+            aid = existing_members.get(agent.name, "")
+            if not aid:
+                aid = uuid.uuid4().hex[:12]
+                TeamManager.add_member(
+                    team_name=t_name,
+                    member_name=agent.name,
+                    agent_id=aid,
+                    agent_type=agent.type,
+                    user=_os.environ.get("CLAWTEAM_USER", ""),
+                )
+            agent_ids[agent.name] = aid
+        console.print(
+            f"[dim]Reusing existing team '{t_name}' "
+            f"({len(existing_members)} members already registered)[/dim]"
         )
+    else:
+        leader_id = uuid.uuid4().hex[:12]
+        try:
+            TeamManager.create_team(
+                name=t_name,
+                leader_name=tmpl.leader.name,
+                leader_id=leader_id,
+                description=tmpl.description,
+                user=_os.environ.get("CLAWTEAM_USER", ""),
+                roles=_gstack_roles,
+                leader_role=tmpl.leader_role,
+                template=tmpl.name if _gstack_roles else "",
+            )
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(1)
 
-    # 5. Create tasks
+        # 4. Add members
+        agent_ids = {tmpl.leader.name: leader_id}
+        for agent in tmpl.agents:
+            aid = uuid.uuid4().hex[:12]
+            agent_ids[agent.name] = aid
+            TeamManager.add_member(
+                team_name=t_name,
+                member_name=agent.name,
+                agent_id=aid,
+                agent_type=agent.type,
+                user=_os.environ.get("CLAWTEAM_USER", ""),
+            )
+
+    # 5. Create tasks (idempotent: TaskStore.create generates new IDs per call,
+    # so re-running launch on an existing team duplicates tasks — skip if the
+    # store already has the template's tasks by subject).
     ts = TaskStore(t_name)
+    existing_subjects = {t.subject for t in ts.list_tasks()}
     for task_def in tmpl.tasks:
-        ts.create(
-            subject=task_def.subject,
-            description=task_def.description,
-            owner=task_def.owner,
-        )
+        if task_def.subject not in existing_subjects:
+            ts.create(
+                subject=task_def.subject,
+                description=task_def.description,
+                owner=task_def.owner,
+            )
 
     # 6. Get backend
     try:

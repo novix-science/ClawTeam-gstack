@@ -614,3 +614,59 @@ def test_launch_upstream_template_preserves_no_system_prompt(monkeypatch, tmp_pa
             f"Upstream template '{call['agent_name']}' should have no "
             f"system_prompt (BC); got {call.get('system_prompt')!r}"
         )
+
+
+def test_launch_reuses_existing_team_created_by_team_spawn(monkeypatch, tmp_path):
+    """Regression: `clawteam team spawn` + `clawteam launch` should compose.
+
+    v1.0 UAT surfaced (2026-04-22): `team spawn gstack --name t1` creates the
+    team + registers 11 members, but the follow-up `launch gstack --team t1`
+    hard-fails with "Team 't1' already exists" because launch always called
+    TeamManager.create_team without checking existence. `team spawn`'s own
+    help text tells users to follow up with `clawteam launch`, so launch
+    must handle the existing-team case.
+    """
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+
+    # Step 1: `team spawn` creates the team + 11 members (matches user flow).
+    TeamManager.create_team(
+        name="t1",
+        leader_name="ceo",
+        leader_id="ceo-id",
+        description="pre-created by team spawn",
+        roles=["ceo", "pm", "engineer"],
+        leader_role="ceo",
+        template="gstack",
+    )
+    # (Real team spawn adds all members; simulate a partial setup: only ceo
+    # pre-registered via create_team, so launch must add the remaining 10.)
+
+    # Step 2: `launch` on existing team — should NOT raise "Team already exists".
+    backend = RecordingBackend()
+    monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: backend)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["launch", "gstack", "--team", "t1", "--goal", "test"],
+        env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+    )
+
+    assert result.exit_code == 0, (
+        f"launch on existing team failed: {result.output}"
+    )
+    assert "Reusing existing team 't1'" in result.output, (
+        f"Expected reuse message in output; got: {result.output}"
+    )
+    # All 11 agents should still have been spawned
+    assert len(backend.calls) == 11, (
+        f"Expected 11 agents spawned, got {len(backend.calls)}; "
+        f"names: {[c['agent_name'] for c in backend.calls]}"
+    )
+    # Leader should use the pre-existing agent_id (not a fresh one)
+    ceo_call = next(c for c in backend.calls if c["agent_name"] == "ceo")
+    assert ceo_call["agent_id"] == "ceo-id", (
+        f"Launch should reuse leader_id from existing team; "
+        f"got {ceo_call['agent_id']!r} instead of 'ceo-id'"
+    )
