@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 5 executing (wave 3 — /land-and-deploy + /document-release landed)
-stopped_at: Completed 05-07 (/document-release — doc_walker + patch_emitter + handler + /ship D-11 auto-invoke chain + plugin registration; 10+3 new tests)
-last_updated: "2026-04-21T14:46:54Z"
+status: Phase 5 executing (wave 4 — /benchmark landed; /canary in flight with sibling executor)
+stopped_at: Completed 05-09 (/benchmark — SKILL-18: lighthouse/curl collector + regression events + plugin registration; 12 tests green)
+last_updated: "2026-04-21T15:10:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 ## Current Position
 
 Phase: 5
-Plan: 07 complete (wave 3 — /document-release skill + /ship auto-invoke chain landed; /land-and-deploy also landed in parallel)
+Plan: 09 complete (wave 4 — /benchmark skill landed; /canary Plan 05-08 runs in parallel with this one)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Plan: 07 complete (wave 3 — /document-release skill + /ship auto-invoke chain 
 | Phase 05 P03 | 25min | 2 tasks | 7 files |
 | Phase 05 P05 | 20min | 1 task  | 4 files |
 | Phase 05 P06 | 25min | 1 task  | 4 files |
+| Phase 05 P09 | 25min | 1 task  | 3 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,8 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-06: Parallel wave-3 execution surfaced the same cross-executor stash pattern as 04-10 / 05-03 — an intermediate linter/editor pre-populated gstack_sprint_plugin.py with Plan 05-07's /document-release registration during my 05-06 execution. Resolved by scoping `git add` to 05-06 content only: built a 05-06-only plugin.py variant via regex-delete of 05-07 hunks, staged + committed, then restored the 05-07 WIP to working copy for 05-07 executor to land atomically with its own handler.py. No 05-07 files committed by this plan.
 - [Phase 05]: 05-07: Ship /document-release at clawteam/templates/gstack/skills/document_release/ as 4-module sub-package: __init__.py (PEP 562 __getattr__ lazy handler import to break ship↔document_release collection cycle) + doc_walker.py (pure walk_docs + extract_code_refs with linear-time regex only — T-05-07-01 DoS-safe) + patch_emitter.py (difflib.unified_diff emission with STALE marker prepend + max_patches cap + deferred-count trailer — T-05-07-05) + handler.py (git diff --diff-filter=D orchestration + InteractionGate question artifact emission for >5-line patches + idempotent no_changes summary on re-run — Pitfall 7). /ship handler wires D-11 auto-invoke on success inside try/except → auto_invoked_skills populated with '/document-release' on success or '/document-release:failed:<reason>' on exception (T-05-07-04 — never fails ship). GstackSprintPlugin.contribute_skills now returns 5 SkillRegistrations. 13 new tests (10 document_release + 3 ship auto-invoke) all green.
 - [Phase 05]: 05-07: Ship tests appended to existing tests/test_ship_skill.py (not the aspirational tests/templates/gstack/skills/test_ship.py path in the plan) — test_ship_skill.py predates the per-skill subdir convention and keeping all ship tests in one module keeps the 21-test pipeline surface visible to any future editor. Deviation Rule 3 — auto-fixed blocking path mismatch.
+- [Phase 05]: 05-09: Ship /benchmark skill (SKILL-18) at clawteam/templates/gstack/skills/benchmark/ as 2-file sub-package (__init__.py re-exports handler + handler.py contains lighthouse primary / curl -w fallback collection + partial-output D-15 handling + _evaluate_regressions ratio check + WebVitalRegressionDetected per-vital emit). Lazy-import `baseline_path` + `load_baseline` from canary.poller (Plan 05-08 sibling) with try/except ImportError fallback to clawteam.team.models.get_data_dir — Wave-4 cross-executor resilience pattern; tests monkeypatch both symbols at module scope so on-disk behaviour never leaks into $HOME. Regression threshold configurable via TemplateDef.benchmark.regression_threshold_ratio (default 1.5x); short vital names (lcp/fid/cls/ttfb/dom_loaded) strip _ms/_score suffixes for the WebVitalRegressionDetected.vital free-form str. Partial Lighthouse output triggers secondary-curl pass to fill ttfb/dom_loaded while keeping measured_with='lighthouse'. 12/12 tests green; plugin registers all 7 Phase 5 skills (plan verification command now prints "7 skills registered").
+- [Phase 05]: 05-09: Wave 4 cross-executor stash interaction (recurrence of the 04-10 / 05-03 / 05-06 pattern) — Plan 05-08's parallel executor pre-populated clawteam/plugins/gstack_sprint_plugin.py with its /canary import + SkillRegistration during my Task 1 write. Resolved by extracting a 05-09-only plugin variant (regex-delete of /canary hunks) before staging; feat(05-09) commit contains ONLY the /benchmark import + registration. 05-08's /canary WIP remained in the working tree for its own commit. No 05-08 files committed under any feat(05-09) hash.
 
 ### Pending Todos
 
@@ -175,14 +178,14 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-21T14:46:54Z
-Stopped at: Completed 05-07 (/document-release landed — SKILL-16: doc_walker + patch_emitter pure helpers + handler orchestration + /ship D-11 auto-invoke chain + plugin registration; 10+3 tests green; plugin now exposes 5 skills)
+Last session: 2026-04-21T15:10:00Z
+Stopped at: Completed 05-09 (/benchmark landed — SKILL-18: lighthouse-primary / curl-fallback Core Web Vitals collector + pre-deploy baseline writer + WebVitalRegressionDetected per-vital emit + plugin registration; 12 tests green; plugin now exposes 7 skills with /canary sibling in flight)
 Resume files:
 
-  - Phase 5 (executing wave 3 -> wave 4): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 (executing wave 4): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-CONTEXT.md
+  - Phase 5 Plan 09 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-09-SUMMARY.md
   - Phase 5 Plan 07 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-07-SUMMARY.md
-  - Phase 5 Plan 06 Summary: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-06-SUMMARY.md
-  - Phase 5 Plan 08 (Wave 4, /canary): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-08-PLAN.md
+  - Phase 5 Plan 08 (Wave 4, /canary — sibling executor): .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-08-PLAN.md
 
 ## Recent Activity
 
