@@ -6512,5 +6512,14 @@ def attend_pick(
     )
 
 
+# ---------------------------------------------------------------------------
+# Solo UX: 4 top-level commands (go / status / answer / stop) for the 1-person
+# founder path. Wraps the general 28-command surface into a flow most users
+# only ever need. See clawteam/solo.py for rationale + implementation.
+# ---------------------------------------------------------------------------
+from clawteam.solo import register_solo_commands
+register_solo_commands(app)
+
+
 if __name__ == "__main__":
     app()
