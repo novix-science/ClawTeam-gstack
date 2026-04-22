@@ -27,6 +27,7 @@ Surface
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
 from dataclasses import dataclass
@@ -35,6 +36,8 @@ from typing import Iterable, Optional
 
 from clawteam.events.bus import EventBus
 from clawteam.events.types import ZombieWorktreeGced
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -165,7 +168,13 @@ def gc_zombies(
                     )
                 )
             except Exception:  # pragma: no cover — defensive; emit must never crash gc
-                pass
+                # WR-06: log so schema regressions don't vanish into a
+                # silent swallow. Suppression is still the correct
+                # behavior — a bus hiccup must not crash the GC sweep.
+                _log.exception(
+                    "gc_zombies: failed to emit ZombieWorktreeGced for %s",
+                    path,
+                )
     return gced
 
 

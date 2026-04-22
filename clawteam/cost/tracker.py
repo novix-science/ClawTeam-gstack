@@ -20,6 +20,7 @@ pre-computed cost) the tracker falls back to
 """
 from __future__ import annotations
 
+import logging
 import threading
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -29,6 +30,8 @@ from clawteam.cost.pricing import calculate_cost_usd, resolve_tier
 from clawteam.cost.rollup import CostRollup
 from clawteam.events.bus import EventBus
 from clawteam.events.types import BudgetAlarmReached, ToolCallCompleted
+
+log = logging.getLogger(__name__)
 
 
 class CostTracker:
@@ -217,8 +220,16 @@ class CostTracker:
                     # Emission failures must not crash the event handler;
                     # the bus already swallows handler exceptions, but we
                     # belt-and-brace in case ``emit`` itself fails (e.g.
-                    # during shutdown).
-                    pass
+                    # during shutdown). Log so a real regression (e.g.
+                    # renamed BudgetAlarmReached field) is discoverable
+                    # in ops logs — silent swallow would let the 50/80/
+                    # 100% alarms quietly never fire (WR-06).
+                    log.exception(
+                        "CostTracker: failed to emit BudgetAlarmReached "
+                        "for team=%s threshold=%s",
+                        self._team,
+                        thresh,
+                    )
 
 
 __all__ = ["CostTracker"]

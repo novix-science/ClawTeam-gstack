@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shlex
 import subprocess
@@ -18,6 +19,8 @@ from rich.table import Table
 
 from clawteam import __version__
 from clawteam.timefmt import format_timestamp
+
+_log = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="clawteam",
@@ -1954,6 +1957,12 @@ def _team_show_cost_panel(team: str) -> dict:
             except Exception:
                 pass
     except Exception:
+        # WR-06: log before returning the defensive fallback so real
+        # failures (schema mismatch, Bus import error, missing
+        # dependency) are discoverable in ops logs. Without this the
+        # user just sees "Cost: unavailable" and has no way to debug.
+        # The fallback itself is correct and kept intact.
+        _log.exception("cost panel failed, falling back to 'unavailable'")
         return {
             "status": "unavailable",
             "cost_usd": 0.0,
