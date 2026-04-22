@@ -26,7 +26,7 @@ Cross-sprint human-in-loop, preserving gstack's taste-decision essence.
 - [ ] **INT-01**: `InteractionGate` exists as a `PhaseGate` subclass. Blocks phase transition until a companion `answers/<N>.md` is written for each `questions/<N>.md` artifact.
 - [ ] **INT-02**: Phase agents write structured questions.md markdown (per-question H3 headings + numbered choices or freeform fields). Answers.md supports both selected-option and freeform reply per question.
 - [ ] **INT-03**: `AttentionQueue` exists as a cross-sprint priority-sorted queue of pending questions. Priority formula is configurable; default combines URGENCY tag + BLOCKING flag + AGE (oldest floats up).
-- [ ] **INT-04**: `clawteam attend` CLI: prints the top-N pending questions across all teams' sprints; opens the chosen question's markdown in `$EDITOR`; on save, gate unblocks. Works for 1 sprint and scales to ≥10 parallel sprints with the same command.
+- [x] **INT-04**: `clawteam attend` CLI: prints the top-N pending questions across all teams' sprints; opens the chosen question's markdown in `$EDITOR`; on save, gate unblocks. Works for 1 sprint and scales to ≥10 parallel sprints with the same command. — Complete 2026-04-22 (07-04: attend_app typer group + invoke_without_command root callback with --top/-n, --summary, --auto-accept-reversible, --yes/-y flags; attend pick <qid> subcommand launches $EDITOR via subprocess.run(shell=False); answer-file presence re-checked on editor exit).
 - [ ] **INT-05**: Question visibility: the attention queue auto-refreshes on `watchdog` filesystem events when the optional `watchdog` package is installed; falls back to polling on 2-second intervals otherwise. No hard dep.
 - [ ] **INT-06**: Auto-advance toggle: per-sprint config `auto_advance: true|false` decides whether `InteractionGate` is inserted on every transition or only when a phase agent explicitly writes a question artifact.
 
@@ -111,7 +111,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 - [ ] **QUALITY-02**: Cycle detector in transport: if agents A → B → A within N turns, break cycle, escalate to human via `AttentionQueue` (deadlock prevention per PITFALLS #2).
 - [ ] **QUALITY-03**: Context window guard: agent prompts assembled from {role prompt + relevant memory + minimal working artifacts} ≤ configurable token budget. Excess memory spilled to retrieval, not inlined (context exhaustion prevention per PITFALLS #3).
 - [x] **QUALITY-04**: Active-agent slot pool: harness caps concurrent active agents at N (default 6). Idle agents dormant. Prevents resource blowup on laptops (PITFALLS #4). — Complete 2026-04-22 (07-02: SprintConductor._active_agent_sem=asyncio.Semaphore(max_active_agents=6 default, configurable via ConductorConfig); dispatch_turn async ctx manager acquires slot + registers agent in _active_agents_set; DormancyTransition event emitted on enter/exit; active_agents() accessor returns sorted list).
-- [ ] **QUALITY-05**: `AttentionQueue` auto-digest: questions grouped by sprint + age; Catch-Up digest view surfaces "4 sprints stalled >2h, 1 CRITICAL" — prevents attention fatigue (PITFALLS #5).
+- [x] **QUALITY-05**: `AttentionQueue` auto-digest: questions grouped by sprint + age; Catch-Up digest view surfaces "4 sprints stalled >2h, 1 CRITICAL" — prevents attention fatigue (PITFALLS #5). — Complete 2026-04-22 (07-03: build_digest + bucket_age cluster roll-up groups by sprint_id x tag_cluster x age_bucket with highest_priority + representative_title + reversibility_distribution; 07-04: `clawteam attend --summary` CLI flag dispatches build_digest with rich Table rendering + --json envelope).
 - [ ] **QUALITY-06**: Workspace hardening: file-lock retry with exponential backoff; `git index` corruption detection + auto-recovery; per-agent worktree integrity check on resume (PITFALLS #6).
 - [x] **QUALITY-07
 **: Gstack interactive skill state-machines: `/office-hours`, `/plan-design-review`, `/autoplan` ported as multi-turn state machines (not one-shot prompt bakings) that preserve the per-question interactivity (PITFALLS #7).
@@ -133,7 +133,7 @@ CLI and dashboard surfaces.
 - [ ] **UX-03**: `clawteam sprint status <id>` shows current phase, active participants, pending-questions count, recent artifacts.
 - [ ] **UX-04**: `clawteam sprint list --team <name>` lists all sprints with phase + status.
 - [ ] **UX-05**: `clawteam sprint show <id>` displays full sprint detail: participants, phase history, artifacts, memory writes.
-- [ ] **UX-06**: `clawteam attend` surfaces the top-N pending questions across sprints; user answers, queue re-refreshes.
+- [x] **UX-06**: `clawteam attend` surfaces the top-N pending questions across sprints; user answers, queue re-refreshes. — Complete 2026-04-22 (07-04: attend_root typer callback renders rich Table of top-N ranked items with Priority/Urg/Team/Sprint/Age/Rev/Title columns; --json emits structured items array; empty-queue safe with "No pending attention items." + exit 0).
 - [x] **UX-07**: `clawteam team show <name>` displays team dashboard: member list + memory highlights + active sprint progress bars + cost/token rollup.
 - [ ] **UX-08**: `clawteam doctor` detects missing optional tools (Chromium, codex CLI, ngrok, watchdog) and prints install instructions per detected OS.
 - [ ] **UX-09**: All user-facing CLI commands support `--json` for machine-readable output (consistent with existing `clawteam` pattern).
@@ -208,7 +208,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | INT-01 | Phase 1 | Pending |
 | INT-02 | Phase 1 | Pending |
 | INT-03 | Phase 7 | Pending |
-| INT-04 | Phase 7 | Pending |
+| INT-04 | Phase 7 | Complete (07-04: `clawteam attend` typer subcommand group — default top-N rich table + --summary digest dispatch + --auto-accept-reversible preview-and-apply + `attend pick <qid>` $EDITOR launch + answer-file presence re-check) |
 | INT-05 | Phase 7 | Pending |
 | INT-06 | Phase 2 | Pending |
 | MEM-01 | Phase 6 | Complete |
@@ -258,7 +258,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-02 | Phase 2 | Pending |
 | QUALITY-03 | Phase 2 | Pending |
 | QUALITY-04 | Phase 7 | Complete (07-02: _active_agent_sem + dispatch_turn ctx mgr + DormancyTransition + active_agents()) |
-| QUALITY-05 | Phase 7 | Pending |
+| QUALITY-05 | Phase 7 | Complete (07-03 + 07-04: build_digest cluster roll-up by sprint x tag x age_bucket with highest_priority + representative_title + reversibility_distribution; `clawteam attend --summary` CLI dispatch with rich Table renderer + --json envelope) |
 | QUALITY-06 | Phase 2 | Pending |
 | QUALITY-07 | Phase 4 | Complete (04-13: state-machine goldens; 04-14: inverse-assertion safety net test_markers_removed_and_runtime_present locks runtime-landed invariant) |
 | QUALITY-08 | Phase 2 | Pending |
@@ -274,7 +274,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | UX-03 | Phase 2 | Pending |
 | UX-04 | Phase 2 | Pending |
 | UX-05 | Phase 2 | Pending |
-| UX-06 | Phase 7 | Pending |
+| UX-06 | Phase 7 | Complete (07-04: `clawteam attend` default invocation renders top-N pending questions via rich Table with urgency color-coding; --json flag emits structured items array; empty-queue safe with "No pending attention items." + exit 0) |
 | UX-07 | Phase 3 | Complete |
 | UX-08 | Phase 0 | Pending |
 | UX-09 | Phase 2 | Pending |

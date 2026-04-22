@@ -351,8 +351,8 @@ Plans:
 Plans:
 - [x] 07-01-wave0-substrate: pyproject [attend] + attention/cost/rate_limit packages + 6 events + SprintState.queue_status + TemplateDef sub-blocks
 - [x] 07-02-conductor-concurrency: SprintConductor semaphores + queue_status gate + RateLimitMonitor — completed 2026-04-22 (see 07-02-SUMMARY.md)
-- [ ] 07-03-attention-queue: AttentionQueue + AttentionItem + priority scoring
-- [ ] 07-04-attend-cli: clawteam attend + watchdog auto-refresh + digest mode
+- [x] 07-03-attention-queue: AttentionQueue + AttentionItem + priority scoring — completed 2026-04-22 (see 07-03-SUMMARY.md)
+- [x] 07-04-attend-cli: clawteam attend + watchdog auto-refresh + digest mode — completed 2026-04-22 (see 07-04-SUMMARY.md)
 - [ ] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission
 - [ ] 07-06-cost-fallback-cache: model fallback ladder + prompt caching
 - [ ] 07-07-dashboard-team-show: cost dashboard in clawteam team show
@@ -377,7 +377,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
 | 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
 | 6. Browser Skills, Design Pipeline & Team Memory | 8/10 | In Progress (Wave 3) | - |
-| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 1/9 | In Progress (Wave 0 complete) | - |
+| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 4/9 | In Progress (Wave 3 complete — attend CLI live) | - |
 
 ## Critical Path
 
