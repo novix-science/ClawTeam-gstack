@@ -5661,5 +5661,235 @@ def sprint_approve(
         )
 
 
+# ============================================================================
+# Phase 6 Plan 06-10: `clawteam learn` subcommand group (MEM-03, MEM-04, D-08)
+#
+# Thin Typer wrapper that synthesizes a minimal ctx (SimpleNamespace with
+# team_name) and dispatches to :func:`learn_handler`. CLI and /learn skill
+# share the SAME handler — so every behavioural test of the handler covers
+# both surfaces (D-08).
+#
+# Validation layering:
+#   1. Typer enforces --confidence in [0.0, 1.0] at parse time.
+#   2. Handler rejects unknown --impact values → ValueError → exit 1.
+#   3. scope=role without --role surfaces as MemoryEntry pydantic error
+#      ("scope='role' requires non-empty role") → ValueError → exit 1.
+#
+# --json output is driven by the global `--json` app callback flag, so no
+# per-command json flag is needed (matches existing sprint_app pattern).
+# ============================================================================
+
+learn_app = typer.Typer(
+    help="Team memory operations (/learn skill surface — MEM-03, MEM-04).",
+    no_args_is_help=True,
+)
+app.add_typer(learn_app, name="learn")
+
+
+def _learn_ctx(team_name: str):
+    """Synthesize a minimal ctx object for the learn handler.
+
+    The handler only reads ``ctx.team_name``; no event bus or sprint dir
+    is required for pure memory ops.
+    """
+    from types import SimpleNamespace
+    return SimpleNamespace(team_name=team_name)
+
+
+def _invoke_learn(team: str, args: dict) -> dict:
+    """Dispatch to learn_handler and return the result dict.
+
+    Exceptions surface as typer.Exit(code=1) with a structured error payload
+    so --json consumers can distinguish success from failure.
+    """
+    from clawteam.templates.gstack.skills.learn.handler import learn_handler
+    try:
+        return learn_handler(_learn_ctx(team), role="cli", args=args)
+    except (ValueError, Exception) as exc:
+        _output({"error": str(exc)}, lambda d: console.print(
+            f"[red]Error:[/red] {d['error']}"
+        ))
+        raise typer.Exit(code=1)
+
+
+@learn_app.command("write")
+def learn_write(
+    team: str = typer.Option(..., "--team", help="Team name"),
+    title: str = typer.Option(..., "--title", help="Short title for the entry"),
+    scope: str = typer.Option(
+        "team", "--scope", help="team | role"
+    ),
+    role: Optional[str] = typer.Option(
+        None, "--role", help="Required when --scope=role"
+    ),
+    tags: str = typer.Option(
+        "", "--tags", help="Comma-separated tag list (e.g. pattern,async)"
+    ),
+    evidence: str = typer.Option(
+        "", "--evidence",
+        help="path:line | artifact ref | URL. Empty is flagged (MEM-05) but not blocked.",
+    ),
+    confidence: float = typer.Option(
+        0.7, "--confidence", min=0.0, max=1.0,
+        help="Confidence in [0.0, 1.0]",
+    ),
+    learned_from: str = typer.Option(
+        "artifact", "--learned-from",
+        help="user | artifact | self-inferred | sprint-reflect",
+    ),
+    impact: str = typer.Option(
+        "medium", "--impact",
+        help="low | medium | high. 'high' auto-tags with impact:high.",
+    ),
+    sprint_id: str = typer.Option(
+        "", "--sprint-id", help="Optional originating sprint id"
+    ),
+    body: str = typer.Argument(
+        "", help="Body text (positional). May be empty."
+    ),
+):
+    """Write a memory entry to the team or a per-role bucket."""
+    args = {
+        "action": "write",
+        "scope": scope,
+        "role": role,
+        "title": title,
+        "tags": tags,
+        "evidence": evidence,
+        "confidence": confidence,
+        "learned_from": learned_from,
+        "impact": impact,
+        "sprint_id": sprint_id,
+        "body": body,
+    }
+    result = _invoke_learn(team, args)
+    _output(
+        result,
+        lambda d: console.print(f"[green]Wrote[/green] {d['id']}"),
+    )
+
+
+def _print_entries_table(entries: list[dict]) -> None:
+    """Render memory entries as a rich table (human output)."""
+    tbl = Table(title="Memory entries")
+    tbl.add_column("id", style="cyan")
+    tbl.add_column("tags")
+    tbl.add_column("date")
+    tbl.add_column("conf")
+    tbl.add_column("evd")
+    for e in entries:
+        tbl.add_row(
+            e["id"],
+            ",".join(e.get("tags", [])) or "-",
+            (e.get("timestamp") or "")[:10],
+            f"{float(e.get('confidence', 0.0)):.2f}",
+            "yes" if e.get("evidence") else "no",
+        )
+    console.print(tbl)
+
+
+@learn_app.command("list")
+def learn_list(
+    team: str = typer.Option(..., "--team", help="Team name"),
+    scope: str = typer.Option("team", "--scope", help="team | role"),
+    role: Optional[str] = typer.Option(
+        None, "--role", help="Required when --scope=role"
+    ),
+    tag: Optional[str] = typer.Option(
+        None, "--tag", help="Filter by tag"
+    ),
+):
+    """List memory entries under a scope (tombstones suppressed)."""
+    args = {
+        "action": "list",
+        "scope": scope,
+        "role": role,
+        "tag": tag,
+    }
+    result = _invoke_learn(team, args)
+    _output(result, lambda d: _print_entries_table(d["entries"]))
+
+
+def _print_search_table(results: list[dict], explain: bool) -> None:
+    """Render search results as a rich table; --explain adds 3 factor cols."""
+    tbl = Table(title="Search results")
+    tbl.add_column("score", style="bold")
+    tbl.add_column("id", style="cyan")
+    tbl.add_column("title")
+    if explain:
+        tbl.add_column("recency")
+        tbl.add_column("provenance")
+        tbl.add_column("decay")
+    for r in results:
+        row = [
+            f"{float(r.get('score', 0.0)):.3f}",
+            r["id"],
+            r.get("title", ""),
+        ]
+        if explain:
+            row.extend([
+                f"{float(r.get('recency', 0.0)):.2f}",
+                f"{float(r.get('provenance', 0.0)):.2f}",
+                f"{float(r.get('decay', 0.0)):.2f}",
+            ])
+        tbl.add_row(*row)
+    console.print(tbl)
+
+
+@learn_app.command("search")
+def learn_search(
+    query: str = typer.Argument("", help="Keyword to search (case-insensitive)"),
+    team: str = typer.Option(..., "--team", help="Team name"),
+    scope: str = typer.Option("team", "--scope", help="team | role"),
+    role: Optional[str] = typer.Option(
+        None, "--role", help="Required when --scope=role"
+    ),
+    tag: Optional[str] = typer.Option(
+        None, "--tag", help="Filter by tag"
+    ),
+    explain: bool = typer.Option(
+        False, "--explain",
+        help="Surface recency/provenance/decay component factors",
+    ),
+):
+    """Search memory by keyword; ranked by recency × provenance × decay (D-06)."""
+    args = {
+        "action": "search",
+        "query": query,
+        "scope": scope,
+        "role": role,
+        "tag": tag,
+        "explain": explain,
+    }
+    result = _invoke_learn(team, args)
+    _output(
+        result,
+        lambda d: _print_search_table(d["results"], explain),
+    )
+
+
+@learn_app.command("prune")
+def learn_prune(
+    entry_id: str = typer.Argument(..., help="Memory entry id to prune"),
+    team: str = typer.Option(..., "--team", help="Team name"),
+    scope: str = typer.Option("team", "--scope", help="team | role"),
+    role: Optional[str] = typer.Option(
+        None, "--role", help="Required when --scope=role"
+    ),
+):
+    """Prune (tombstone) a memory entry. Never deletes history — only suppresses retrieval."""
+    args = {
+        "action": "prune",
+        "id": entry_id,
+        "scope": scope,
+        "role": role,
+    }
+    result = _invoke_learn(team, args)
+    _output(
+        result,
+        lambda d: console.print(f"[yellow]Pruned[/yellow] {d['id']}"),
+    )
+
+
 if __name__ == "__main__":
     app()

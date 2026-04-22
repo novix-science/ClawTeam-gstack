@@ -93,6 +93,22 @@ from clawteam.templates.gstack.skills.design_shotgun.handler import (
     shotgun_handler as _shotgun_handler,
 )
 
+# Phase 6 Plan 06-09: /design-html (SKILL-12, designer-only). Pure
+# filesystem work — framework detection from package.json + source
+# emission; no Playwright / CLI dependency so no tool_available probe.
+from clawteam.templates.gstack.skills.design_html.handler import (
+    design_html_handler as _design_html_handler,
+)
+
+# Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per D-07).
+# No tool_available probe — handler is pure Python (JSONL + regex), always
+# available. install_hint intentionally empty. Roles = frozenset(GSTACK_ROLES)
+# is the single role-enforcement point for /learn; the handler itself does
+# not gate on role.
+from clawteam.templates.gstack.skills.learn.handler import (
+    learn_handler as _learn_handler,
+)
+
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
 
@@ -360,6 +376,31 @@ class GstackSprintPlugin(HarnessPlugin):
                 name="/design-shotgun",
                 roles=frozenset({"designer"}),
                 handler=_shotgun_handler,
+                tool_available=None,
+                install_hint="",
+            ),
+            # Phase 6 Plan 06-09: /design-html (SKILL-12, designer-only).
+            # Takes the chosen /design-shotgun variant HTML + emits a
+            # production-shape source at the detected framework's root
+            # (React → src/*.jsx, Svelte → src/*.svelte, Vue → src/*.vue,
+            # plain → index.html + styles.css + app.js). Multi-framework
+            # package.json → question.md; no guessing (D-13). Pure
+            # filesystem; no external CLI so no tool_available probe.
+            SkillRegistration(
+                name="/design-html",
+                roles=frozenset({"designer"}),
+                handler=_design_html_handler,
+                tool_available=None,
+                install_hint="",
+            ),
+            # Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per
+            # D-07). Any GSTACK_ROLE can invoke write/list/search/prune on
+            # team or role-scoped memory. No tool_available probe — pure
+            # Python JSONL + regex, always available. install_hint empty.
+            SkillRegistration(
+                name="/learn",
+                roles=frozenset(GSTACK_ROLES),
+                handler=_learn_handler,
                 tool_available=None,
                 install_hint="",
             ),
