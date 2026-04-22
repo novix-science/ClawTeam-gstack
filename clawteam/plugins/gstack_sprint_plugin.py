@@ -75,7 +75,6 @@ from clawteam.templates.gstack.skills.open_gstack_browser.handler import (
     open_browser_handler as _open_browser_handler,
 )
 
-
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
 
