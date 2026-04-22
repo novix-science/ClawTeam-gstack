@@ -170,15 +170,22 @@ class TmuxBackend(SpawnBackend):
 
         target = f"{session_name}:{agent_name}"
 
+        # Force bash interpretation of the launcher script. tmux otherwise
+        # uses the user's login shell (e.g. fish), which does not support the
+        # bash-style `var=value` assignments emitted by build_keepalive_shell_command.
+        # Without this wrapper, fish/elvish/nushell users get "Unsupported use of '='"
+        # and the pane dies immediately (status 127) before any agent starts.
         if check.returncode != 0:
             launch = subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name, "-n", agent_name, full_cmd],
+                ["tmux", "new-session", "-d", "-s", session_name, "-n", agent_name,
+                 "bash", "-c", full_cmd],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
         else:
             launch = subprocess.run(
-                ["tmux", "new-window", "-t", session_name, "-n", agent_name, full_cmd],
+                ["tmux", "new-window", "-t", session_name, "-n", agent_name,
+                 "bash", "-c", full_cmd],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )

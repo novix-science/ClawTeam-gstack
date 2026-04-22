@@ -1732,3 +1732,156 @@ def test_tmux_backend_pi_injects_system_prompt(monkeypatch, tmp_path):
     full_cmd = new_session[-1]
     assert "--append-system-prompt" in full_cmd
     assert "You are a team worker." in full_cmd
+
+
+def test_tmux_new_session_forces_bash_shell(monkeypatch, tmp_path):
+    """Regression: tmux new-session/new-window must pass `bash -c` explicitly.
+
+    Without this, tmux uses the user's login shell ($SHELL) to interpret the
+    launcher script. bash-style `var=value` assignments fail under fish /
+    elvish / nushell with `Unsupported use of '='`, and the pane dies with
+    status 127 before any agent starts. v1.0.1 hotfix.
+    """
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path / "data"))
+    clawteam_bin = tmp_path / "venv" / "bin" / "clawteam"
+    clawteam_bin.parent.mkdir(parents=True)
+    clawteam_bin.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(sys, "argv", [str(clawteam_bin)])
+
+    run_calls: list[list[str]] = []
+
+    class Result:
+        def __init__(self, returncode: int = 0, stdout: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = ""
+
+    def fake_run(args, **kwargs):
+        run_calls.append(args)
+        if args[:3] == ["tmux", "has-session", "-t"]:
+            return Result(returncode=1)  # force new-session path
+        if args[:3] == ["tmux", "list-panes", "-t"]:
+            return Result(returncode=0, stdout="9876\n")
+        return Result(returncode=0)
+
+    original_which = __import__("shutil").which
+
+    def fake_which(name, path=None):
+        if name == "tmux":
+            return "/opt/homebrew/bin/tmux"
+        if name == "codex":
+            return "/usr/bin/codex"
+        return original_which(name, path=path)
+
+    monkeypatch.setattr("clawteam.spawn.tmux_backend.shutil.which", fake_which)
+    monkeypatch.setattr("clawteam.spawn.command_validation.shutil.which", fake_which)
+    monkeypatch.setattr("clawteam.spawn.tmux_backend.subprocess.run", fake_run)
+    monkeypatch.setattr("clawteam.spawn.tmux_backend.time.sleep", lambda *_: None)
+    monkeypatch.setattr(
+        "clawteam.spawn.tmux_backend._confirm_workspace_trust_if_prompted",
+        lambda *_, **__: False,
+    )
+    monkeypatch.setattr(
+        "clawteam.spawn.tmux_backend._dismiss_codex_update_prompt_if_present",
+        lambda *_, **__: False,
+    )
+    monkeypatch.setattr(
+        "clawteam.spawn.tmux_backend._wait_for_cli_ready",
+        lambda *_, **__: True,
+    )
+    monkeypatch.setattr("clawteam.spawn.tmux_backend._inject_prompt_via_buffer", lambda *_, **__: None)
+    monkeypatch.setattr("clawteam.spawn.registry.register_agent", lambda **_: None)
+
+    backend = TmuxBackend()
+    backend.spawn(
+        command=["codex"],
+        agent_name="worker1",
+        agent_id="agent-1",
+        agent_type="general-purpose",
+        team_name="demo-team",
+        prompt="do work",
+        cwd="/tmp/demo",
+        skip_permissions=True,
+    )
+
+    new_session = next(c for c in run_calls if c[:3] == ["tmux", "new-session", "-d"])
+    # The command args after `-n worker1` MUST be `bash -c <launcher_script>`.
+    # Previously tmux got the bash-style launcher directly and ran it through
+    # the user's login shell, breaking for fish/elvish/nushell users.
+    assert new_session[-3:-1] == ["bash", "-c"], (
+        f"tmux new-session must wrap launcher in `bash -c` for fish/elvish/nushell compat; "
+        f"got args: {new_session}"
+    )
+
+
+def test_tmux_new_window_forces_bash_shell(monkeypatch, tmp_path):
+    """Regression: second agent joining an existing session also needs `bash -c`."""
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path / "data"))
+    clawteam_bin = tmp_path / "venv" / "bin" / "clawteam"
+    clawteam_bin.parent.mkdir(parents=True)
+    clawteam_bin.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(sys, "argv", [str(clawteam_bin)])
+
+    run_calls: list[list[str]] = []
+
+    class Result:
+        def __init__(self, returncode: int = 0, stdout: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = ""
+
+    def fake_run(args, **kwargs):
+        run_calls.append(args)
+        if args[:3] == ["tmux", "has-session", "-t"]:
+            return Result(returncode=0)  # force new-window path (session already exists)
+        if args[:3] == ["tmux", "list-panes", "-t"]:
+            return Result(returncode=0, stdout="9876\n")
+        return Result(returncode=0)
+
+    original_which = __import__("shutil").which
+
+    def fake_which(name, path=None):
+        if name == "tmux":
+            return "/opt/homebrew/bin/tmux"
+        if name == "codex":
+            return "/usr/bin/codex"
+        return original_which(name, path=path)
+
+    monkeypatch.setattr("clawteam.spawn.tmux_backend.shutil.which", fake_which)
+    monkeypatch.setattr("clawteam.spawn.command_validation.shutil.which", fake_which)
+    monkeypatch.setattr("clawteam.spawn.tmux_backend.subprocess.run", fake_run)
+    monkeypatch.setattr("clawteam.spawn.tmux_backend.time.sleep", lambda *_: None)
+    monkeypatch.setattr(
+        "clawteam.spawn.tmux_backend._confirm_workspace_trust_if_prompted",
+        lambda *_, **__: False,
+    )
+    monkeypatch.setattr(
+        "clawteam.spawn.tmux_backend._dismiss_codex_update_prompt_if_present",
+        lambda *_, **__: False,
+    )
+    monkeypatch.setattr(
+        "clawteam.spawn.tmux_backend._wait_for_cli_ready",
+        lambda *_, **__: True,
+    )
+    monkeypatch.setattr("clawteam.spawn.tmux_backend._inject_prompt_via_buffer", lambda *_, **__: None)
+    monkeypatch.setattr("clawteam.spawn.registry.register_agent", lambda **_: None)
+
+    backend = TmuxBackend()
+    backend.spawn(
+        command=["codex"],
+        agent_name="worker2",
+        agent_id="agent-2",
+        agent_type="general-purpose",
+        team_name="demo-team",
+        prompt="do work",
+        cwd="/tmp/demo",
+        skip_permissions=True,
+    )
+
+    new_window = next(c for c in run_calls if c[:3] == ["tmux", "new-window", "-t"])
+    assert new_window[-3:-1] == ["bash", "-c"], (
+        f"tmux new-window must wrap launcher in `bash -c` for fish/elvish/nushell compat; "
+        f"got args: {new_window}"
+    )
