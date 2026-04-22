@@ -23,7 +23,7 @@ from __future__ import annotations
 import threading
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Callable, Optional
 
 from clawteam.cost.pricing import calculate_cost_usd, resolve_tier
 from clawteam.cost.rollup import CostRollup
@@ -70,8 +70,14 @@ class CostTracker:
         self._total: float = 0.0
         self._period_start = datetime.now(timezone.utc)
         self._period_end = self._period_start
+        # Store the exact bound-method reference we subscribed so
+        # ``close()`` can call ``bus.unsubscribe`` with an identity match.
+        # Bound methods are created fresh on every attribute access
+        # (``self.m is self.m`` is False), so we must pin a single ref.
+        self._handler: Optional[Callable[[ToolCallCompleted], None]] = None
         if bus is not None:
-            bus.subscribe(ToolCallCompleted, self._on_tool_call)
+            self._handler = self._on_tool_call
+            bus.subscribe(ToolCallCompleted, self._handler)
 
     # ── public API ─────────────────────────────────────────────────────
 
@@ -117,6 +123,27 @@ class CostTracker:
         """
         with self._lock:
             return sorted(self._fired_alarms)
+
+    def close(self) -> None:
+        """Unsubscribe this tracker's handler from the event bus.
+
+        Deterministic teardown — callers that construct a tracker for a
+        bounded scope (e.g. short-lived CLI invocations that build a
+        fresh tracker per call) MUST call ``close()`` (or use the
+        context-manager protocol) to avoid leaking one handler per
+        invocation on the global event bus. In-process reruns (tests,
+        long-lived daemons) would otherwise accumulate unbounded
+        subscriptions, each receiving every future event forever.
+        """
+        if self._bus is not None and self._handler is not None:
+            self._bus.unsubscribe(ToolCallCompleted, self._handler)
+            self._handler = None
+
+    def __enter__(self) -> "CostTracker":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     def rollup_team(self) -> CostRollup:
         """Return a team-level :class:`CostRollup` snapshot."""

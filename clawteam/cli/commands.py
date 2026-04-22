@@ -1924,21 +1924,38 @@ def _team_show_cost_panel(team: str) -> dict:
         )
         cache_tracker = CacheTracker(team=team, bus=bus)
 
-        # Best-effort: fetch active agents from the team's conductor.
-        actives: list[str] = []
         try:
-            from clawteam.sprint.conductor import SprintConductor
+            # Best-effort: fetch active agents from the team's conductor.
+            actives: list[str] = []
+            try:
+                from clawteam.sprint.conductor import SprintConductor
 
-            conductor = SprintConductor(team_name=team)
-            actives = conductor.active_agents()
-        except Exception:
-            # Conductor unavailable (no sprint substrate, broken state) —
-            # fall through with empty active list; panel still renders.
-            pass
+                conductor = SprintConductor(team_name=team)
+                actives = conductor.active_agents()
+            except Exception:
+                # Conductor unavailable (no sprint substrate, broken
+                # state) — fall through with empty active list; panel
+                # still renders.
+                pass
 
-        return render_team(
-            team, tracker, cache_tracker, active_agents=actives,
-        )
+            return render_team(
+                team, tracker, cache_tracker, active_agents=actives,
+            )
+        finally:
+            # WR-02: unsubscribe both trackers from the global event bus
+            # so short-lived CLI invocations don't leak one handler per
+            # call. Long-running consumers (test harness reusing the CLI
+            # in-process, future daemon mode) would otherwise accumulate
+            # unbounded subscriptions — each future event would fan out
+            # to every zombie tracker forever.
+            try:
+                tracker.close()
+            except Exception:
+                pass
+            try:
+                cache_tracker.close()
+            except Exception:
+                pass
     except Exception:
         return {
             "status": "unavailable",

@@ -18,7 +18,7 @@ because the ``team_name`` filter rejects cross-team events.
 from __future__ import annotations
 
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
 from clawteam.events.bus import EventBus
 from clawteam.events.types import ClaudeApiResponse
@@ -48,8 +48,15 @@ class CacheTracker:
         self._lock = threading.RLock()
         self._total_read: int = 0
         self._total_creation: int = 0
+        self._bus = bus
+        # Pin the bound-method ref so ``close()`` can unsubscribe with
+        # an identity match (bound methods are recreated on each
+        # ``self.m`` access; passing a fresh one to ``unsubscribe``
+        # would never match the stored subscription).
+        self._handler: Optional[Callable[[ClaudeApiResponse], None]] = None
         if bus is not None:
-            bus.subscribe(ClaudeApiResponse, self._on_response)
+            self._handler = self._on_response
+            bus.subscribe(ClaudeApiResponse, self._handler)
 
     # ── public API ────────────────────────────────────────────────────
 
@@ -85,6 +92,24 @@ class CacheTracker:
         """Return cumulative ``cache_creation_tokens`` observed for this team."""
         with self._lock:
             return self._total_creation
+
+    def close(self) -> None:
+        """Unsubscribe this tracker's handler from the event bus.
+
+        Deterministic teardown — callers that construct a tracker for a
+        bounded scope (e.g. short-lived CLI invocations) MUST call
+        ``close()`` (or use the context-manager protocol) to avoid
+        leaking one handler per invocation on the global event bus.
+        """
+        if self._bus is not None and self._handler is not None:
+            self._bus.unsubscribe(ClaudeApiResponse, self._handler)
+            self._handler = None
+
+    def __enter__(self) -> "CacheTracker":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     # ── event handler ─────────────────────────────────────────────────
 
