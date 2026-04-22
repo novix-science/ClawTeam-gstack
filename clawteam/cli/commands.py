@@ -5904,5 +5904,260 @@ def learn_prune(
     )
 
 
+# ============================================================================
+# Phase 7 Plan 07-04: Attention Queue Commands (INT-04, UX-06, QUALITY-05)
+#
+# Cross-sprint attention queue surface. Default shows top-N priority-ranked
+# questions; --summary dispatches the build_digest roll-up; --auto-accept-
+# reversible previews easy-reversibility items and applies with --yes. The
+# `pick` subcommand opens $EDITOR on the chosen question.md so the existing
+# InteractionGate unblocks on the next check.
+#
+# --json output is driven by the global `--json` app callback flag, so no
+# per-command json flag is needed (matches existing sprint_app / learn_app).
+# ============================================================================
+
+attend_app = typer.Typer(help="Cross-sprint attention queue")
+app.add_typer(attend_app, name="attend")
+
+
+def _render_attend_items_human(items: list) -> None:
+    """Render top-N pending questions as a rich table."""
+    if not items:
+        console.print("[dim]No pending attention items.[/dim]")
+        return
+    table = Table(title=f"Top {len(items)} Pending Questions")
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Priority", justify="right", style="green")
+    table.add_column("Urg", width=4)
+    table.add_column("Team", style="cyan")
+    table.add_column("Sprint", style="magenta")
+    table.add_column("Age", justify="right")
+    table.add_column("Rev", width=6)
+    table.add_column("Title")
+    urgency_labels = {3: "CRIT", 2: "HIGH", 1: "norm", 0: "low"}
+    for i, item in enumerate(items, start=1):
+        age_s = f"{item.age_hours:.1f}h"
+        u_lbl = urgency_labels.get(item.urgency, "?")
+        u_style = {"CRIT": "bold red", "HIGH": "yellow"}.get(u_lbl, "")
+        urgency_cell = f"[{u_style}]{u_lbl}[/{u_style}]" if u_style else u_lbl
+        table.add_row(
+            str(i),
+            f"{item.priority_score:.1f}",
+            urgency_cell,
+            item.team,
+            item.sprint_id[:8],
+            age_s,
+            item.reversibility,
+            item.title[:60],
+        )
+    console.print(table)
+
+
+def _render_digest_human(digest: list) -> None:
+    """Render the --summary cluster digest as a rich table."""
+    if not digest:
+        console.print("[dim]No pending attention items.[/dim]")
+        return
+    table = Table(title="Attention Digest")
+    table.add_column("Sprint", style="magenta")
+    table.add_column("Tag", style="cyan")
+    table.add_column("Age", style="dim")
+    table.add_column("Count", justify="right")
+    table.add_column("Top priority", justify="right", style="green")
+    table.add_column("Representative title")
+    for row in digest:
+        table.add_row(
+            row["sprint_id"][:8],
+            row["tag"],
+            row["age_bucket"],
+            str(row["count"]),
+            f"{row['highest_priority']:.1f}",
+            row["representative_title"][:60],
+        )
+    console.print(table)
+
+
+@attend_app.callback(invoke_without_command=True)
+def attend_root(
+    ctx: typer.Context,
+    top_n: int = typer.Option(10, "--top", "-n", help="Number of top items to display"),
+    summary: bool = typer.Option(
+        False, "--summary", help="Digest view (group by sprint/tag/age)"
+    ),
+    auto_accept_reversible: bool = typer.Option(
+        False,
+        "--auto-accept-reversible",
+        help="Preview + apply auto-accept to reversibility=easy questions",
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y",
+        help="Skip --auto-accept-reversible preview confirm; apply immediately",
+    ),
+):
+    """Show the top-N pending questions across all teams' sprints.
+
+    Default (no flags): priority-sorted table, top 10.
+    --summary: digest view (grouped by sprint + tag cluster + age bucket).
+    --auto-accept-reversible: preview easy-reversibility items; --yes applies.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+    from clawteam.attention.auto_accept import apply_auto_accept, preview_auto_accept
+    from clawteam.attention.digest import build_digest
+    from clawteam.attention.queue import AttentionQueue
+
+    queue = AttentionQueue()  # CLAWTEAM_DATA_DIR-respecting via get_data_dir()
+    # When --summary or --auto-accept-reversible are set, we want the full
+    # snapshot (digest groups everything; auto-accept previews everything
+    # eligible). Otherwise clamp to top-N.
+    snapshot_limit = None if (summary or auto_accept_reversible) else top_n
+    items = queue.snapshot(limit=snapshot_limit)
+
+    if auto_accept_reversible:
+        candidates = preview_auto_accept(items)
+        data: dict = {
+            "preview_count": len(candidates),
+            "items": [
+                {
+                    "question_id": c.question_id,
+                    "sprint_id": c.sprint_id,
+                    "team": c.team,
+                    "title": c.title,
+                    "priority_score": c.priority_score,
+                }
+                for c in candidates
+            ],
+        }
+        if yes and candidates:
+            applied_result = apply_auto_accept(candidates)
+            data["applied"] = applied_result["applied"]
+            data["skipped"] = applied_result["skipped"]
+
+        def _human(d):
+            console.print(
+                f"[yellow]Preview — {len(candidates)} easy-reversibility "
+                f"question(s) would auto-accept:[/yellow]"
+            )
+            for c in candidates:
+                console.print(
+                    f"  - {c.team}/{c.sprint_id[:8]} - {c.title} "
+                    f"(priority={c.priority_score:.1f})"
+                )
+            if not candidates:
+                console.print("[dim]No easy-reversibility items pending.[/dim]")
+            elif not yes:
+                console.print(
+                    "\nRerun with [bold]--yes[/bold] to apply. "
+                    "TTL = 15 min per answer."
+                )
+            else:
+                applied_n = len(d.get("applied", []))
+                skipped_n = len(d.get("skipped", []))
+                console.print(
+                    f"[green]OK[/green] applied={applied_n} skipped={skipped_n}"
+                )
+
+        _output(data, _human)
+        return
+
+    if summary:
+        digest = build_digest(items)
+        _output({"digest": digest}, lambda d: _render_digest_human(d["digest"]))
+        return
+
+    # Default: top-N table.
+    data = {
+        "items": [
+            {
+                "question_id": i.question_id,
+                "sprint_id": i.sprint_id,
+                "team": i.team,
+                "title": i.title,
+                "urgency": i.urgency,
+                "blocking": i.blocking,
+                "age_hours": i.age_hours,
+                "tags": list(i.tags),
+                "reversibility": i.reversibility,
+                "priority_score": i.priority_score,
+            }
+            for i in items
+        ],
+    }
+    _output(data, lambda d: _render_attend_items_human(items))
+
+
+@attend_app.command("pick")
+def attend_pick(
+    question_id: str = typer.Argument(
+        ..., help="Question id (stem of question.md) to open"
+    ),
+    team: Optional[str] = typer.Option(
+        None, "--team", help="Team filter (unambiguous if omitted)"
+    ),
+):
+    """Open the chosen question.md in ``$EDITOR``.
+
+    On editor exit, the answer file presence is checked; if present, the
+    next InteractionGate evaluation will unblock the sprint.
+    """
+    from clawteam.attention.queue import AttentionQueue
+
+    queue = AttentionQueue()
+    items = queue.snapshot()
+    matches = [
+        i for i in items
+        if i.question_id == question_id and (team is None or i.team == team)
+    ]
+    if not matches:
+        _output(
+            {"error": f"No pending question matches {question_id!r}"},
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
+    if len(matches) > 1:
+        _output(
+            {
+                "error": "Ambiguous question_id; pass --team to disambiguate",
+                "candidates": [
+                    {"team": m.team, "sprint_id": m.sprint_id} for m in matches
+                ],
+            },
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(2)
+
+    item = matches[0]
+    editor = os.environ.get("EDITOR", "vi")
+    try:
+        subprocess.run([editor, str(item.question_path)], check=False)
+    except FileNotFoundError:
+        _output(
+            {"error": f"Editor not found: {editor}"},
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(3)
+
+    # After editor exits, check if the user created the answer file.
+    answer_path = item.question_path.parent.parent / "answers" / item.question_path.name
+    _output(
+        {
+            "question_id": question_id,
+            "team": item.team,
+            "sprint_id": item.sprint_id,
+            "answered": answer_path.exists(),
+            "answer_path": str(answer_path) if answer_path.exists() else None,
+        },
+        lambda d: console.print(
+            f"[green]OK[/green] answer present at {d['answer_path']}"
+            if d["answered"]
+            else (
+                f"[yellow]No answer file yet — write it to {answer_path} "
+                f"to unblock.[/yellow]"
+            )
+        ),
+    )
+
+
 if __name__ == "__main__":
     app()
