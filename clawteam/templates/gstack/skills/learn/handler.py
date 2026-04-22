@@ -31,7 +31,9 @@ from __future__ import annotations
 from typing import Any
 
 from clawteam.memory import MemoryEntry, TeamMemoryStore
+from clawteam.memory.high_impact_gate import check_high_impact, stage_pending
 from clawteam.memory.search import search as memory_search
+from clawteam.team.models import get_data_dir
 
 _VALID_ACTIONS = frozenset({"write", "list", "search", "prune"})
 _VALID_IMPACT = frozenset({"low", "medium", "high"})
@@ -104,9 +106,33 @@ def _build_entry(
 
 
 def _do_write(
-    store: TeamMemoryStore, *, role: str, args: dict[str, Any]
+    store: TeamMemoryStore,
+    *,
+    role: str,
+    args: dict[str, Any],
+    team_name: str,
 ) -> dict[str, Any]:
     entry = _build_entry(store, role=role, args=args)
+
+    # Plan 06-11 MEM-06: high-impact gate interposes BEFORE store.write.
+    requires_confirmation, reason = check_high_impact(entry)
+    if requires_confirmation:
+        sprint_id = args.get("sprint_id") or None
+        pending_path = stage_pending(
+            entry,
+            team=team_name,
+            sprint_id=sprint_id,
+            root=get_data_dir(),
+        )
+        return {
+            "status": "pending_confirmation",
+            "id": entry.id,
+            "evidence_flagged": not bool(entry.evidence),
+            "high_impact": True,
+            "reason": reason,
+            "pending_path": str(pending_path),
+        }
+
     entry_id = store.write(entry)
     return {
         "status": "written",
@@ -195,7 +221,7 @@ def learn_handler(
     store = TeamMemoryStore(team_name)
 
     if action == "write":
-        return _do_write(store, role=role, args=args)
+        return _do_write(store, role=role, args=args, team_name=team_name)
     if action == "list":
         return _do_list(store, args=args)
     if action == "search":

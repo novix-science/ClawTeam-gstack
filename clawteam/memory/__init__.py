@@ -22,6 +22,11 @@ from __future__ import annotations
 
 from clawteam.memory.decay import decay_factor
 from clawteam.memory.entry import MemoryEntry
+from clawteam.memory.high_impact_gate import (
+    HIGH_IMPACT_TAG,
+    check_high_impact,
+    stage_pending,
+)
 from clawteam.memory.search import SearchResult, rank, search
 from clawteam.memory.store import TeamMemoryStore
 
@@ -32,4 +37,8 @@ __all__ = [
     "decay_factor",
     "rank",
     "search",
+    # Plan 06-11:
+    "HIGH_IMPACT_TAG",
+    "check_high_impact",
+    "stage_pending",
 ]
