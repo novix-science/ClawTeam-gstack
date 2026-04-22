@@ -332,13 +332,13 @@ def test_search_expired_ranks_below_unexpired(store):
 
 def test_search_role_scope(store):
     team_entry = _make_entry(
-        title="shared", scope="team", id_suffix="ggg001"
+        title="shared", scope="team", id_suffix="aa1001"
     )
     role_entry = _make_entry(
         title="designer-only",
         scope="role",
         role="designer",
-        id_suffix="ggg002",
+        id_suffix="aa1002",
     )
     store.write(team_entry)
     store.write(role_entry)
@@ -359,9 +359,9 @@ def test_search_role_scope(store):
 
 
 def test_search_empty_query_returns_all(store):
-    e1 = _make_entry(title="one", tags=["pattern"], id_suffix="hhh001")
-    e2 = _make_entry(title="two", tags=["pattern"], id_suffix="hhh002")
-    e3 = _make_entry(title="three", tags=["incident"], id_suffix="hhh003")
+    e1 = _make_entry(title="one", tags=["pattern"], id_suffix="bb1001")
+    e2 = _make_entry(title="two", tags=["pattern"], id_suffix="bb1002")
+    e3 = _make_entry(title="three", tags=["incident"], id_suffix="bb1003")
     store.write(e1)
     store.write(e2)
     store.write(e3)
