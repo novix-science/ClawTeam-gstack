@@ -265,7 +265,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event; 04-14: end-to-end integration test asserts D-19 thrash_decision frontmatter contract on reviewer report) |
 | QUALITY-10 | Phase 6 | Complete |
 | QUALITY-11 | Phase 2 | Pending |
-| QUALITY-12 | Phase 7 | Pending |
+| QUALITY-12 | Phase 7 | In Progress (07-05: cost-accounting half — MODEL_PRICING table + CostRollup 9-field frozen dataclass + CostTracker event subscriber with exactly-once 50/80/100 BudgetAlarmReached emission + pricing backstop for cost_usd<=0.0; rendering/fallback/cache half pending in 07-06 fallback.py + cache_tracker.py and 07-07 clawteam team show dashboard) |
 | QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook; 04-14: D-18 deferral markers removed from reviewer.md — SHA-pinning now framed as canonical, not deferral) |
 | QUALITY-14 | Phase 0 | Pending |
 | QUALITY-15 | Phase 0 | Pending |

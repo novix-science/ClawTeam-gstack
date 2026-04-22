@@ -353,7 +353,7 @@ Plans:
 - [x] 07-02-conductor-concurrency: SprintConductor semaphores + queue_status gate + RateLimitMonitor — completed 2026-04-22 (see 07-02-SUMMARY.md)
 - [x] 07-03-attention-queue: AttentionQueue + AttentionItem + priority scoring — completed 2026-04-22 (see 07-03-SUMMARY.md)
 - [x] 07-04-attend-cli: clawteam attend + watchdog auto-refresh + digest mode — completed 2026-04-22 (see 07-04-SUMMARY.md)
-- [ ] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission
+- [x] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission — completed 2026-04-22 (see 07-05-SUMMARY.md)
 - [ ] 07-06-cost-fallback-cache: model fallback ladder + prompt caching
 - [ ] 07-07-dashboard-team-show: cost dashboard in clawteam team show
 - [ ] 07-08-zombie-worktree-gc: doctor --gc + disk-budget alarms
@@ -377,7 +377,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
 | 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
 | 6. Browser Skills, Design Pipeline & Team Memory | 8/10 | In Progress (Wave 3) | - |
-| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 4/9 | In Progress (Wave 3 complete — attend CLI live) | - |
+| 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 5/9 | In Progress (Wave 4 part 1 — cost tracker live) | - |
 
 ## Critical Path
 
