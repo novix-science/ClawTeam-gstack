@@ -127,6 +127,14 @@ def gc_zombies(
     Idempotent on missing paths (silently skipped — no event, no
     :class:`GcResult`). Uses ``shutil.rmtree(ignore_errors=True)`` so a
     partial delete of a tangled worktree still makes forward progress.
+
+    If ``shutil.rmtree`` leaves the directory behind (permission gaps,
+    open file handles, in-use mounts), the path is NOT appended and no
+    event fires (WR-04). Callers would otherwise not be able to
+    distinguish a true delete from a silent partial failure — a GC
+    subsystem whose primary contract is freeing disk must not lie
+    about it. The zombie stays on disk and is discoverable on the next
+    sweep; freed-bytes aggregates remain honest.
     """
     gced: list[GcResult] = []
     for path in paths:
@@ -138,6 +146,11 @@ def gc_zombies(
             freed = _dir_size(path)
             shutil.rmtree(path, ignore_errors=True)
         except OSError:
+            continue
+        # WR-04: ``ignore_errors=True`` silently returns on per-entry
+        # rmtree failure. Re-check existence so we don't claim a delete
+        # that did not actually happen.
+        if path.exists():
             continue
         result = GcResult(path=path, age_days=age_days, freed_bytes=freed)
         gced.append(result)
