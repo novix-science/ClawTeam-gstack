@@ -235,6 +235,97 @@ class BrowserConfig(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 7 Wave 0 (Plan 07-01 Task 4): concurrency + attention + cost sub-blocks.
+# All default to None so existing 6 bundled templates + gstack.toml parse
+# unchanged. gstack-opt-in users add e.g. [conductor] max_concurrent_sprints = 20
+# to their gstack.toml to override defaults.
+# ---------------------------------------------------------------------------
+
+
+class ConductorConfig(BaseModel):
+    """[conductor] TOML block — SprintConductor concurrency caps (D-01/02/03)."""
+
+    max_concurrent_sprints: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "Cap on simultaneously-running sprints per team. Sprints over "
+            "cap enter queue_status='queued_capacity'."
+        ),
+    )
+    max_tasks_per_agent: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Cap on concurrent task dispatches per agent role. Prevents "
+            "accidentally-concurrent pm across sibling sprints."
+        ),
+    )
+    max_active_agents: int = Field(
+        default=6,
+        ge=1,
+        description=(
+            "Cap on concurrent active agents. Agents over cap sleep-poll "
+            "(no Claude keepalive burn)."
+        ),
+    )
+    acquire_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        description=(
+            "Grace period for acquiring max_concurrent_sprints before sprint "
+            "enters queued state."
+        ),
+    )
+
+
+class AttentionConfig(BaseModel):
+    """[attention] TOML block — AttentionQueue priority weights (D-05)."""
+
+    urgency_weight: int = Field(
+        default=10,
+        ge=0,
+        description="Multiplier applied to URGENCY bucket (critical=3 .. low=0).",
+    )
+    blocking_weight: int = Field(
+        default=5,
+        ge=0,
+        description="Added when question.md frontmatter has blocking=true.",
+    )
+    tag_weights: dict[str, int] = Field(
+        default_factory=dict,
+        description="Per-tag weight dict (e.g., design=2, security=3).",
+    )
+
+
+class CostConfig(BaseModel):
+    """[cost] TOML block — budget + fallback + alarm thresholds (D-10)."""
+
+    budget_usd: float = Field(
+        default=100.0,
+        ge=0.0,
+        description=(
+            "Per-team monthly budget. Set to 0 to disable budget tracking."
+        ),
+    )
+    fallback_at_percent: float = Field(
+        default=80.0,
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Percent-of-budget at which model_fallback_ladder kicks in "
+            "(opus→sonnet→haiku)."
+        ),
+    )
+    alarm_percent: list[float] = Field(
+        default_factory=lambda: [50.0, 80.0, 100.0],
+        description=(
+            "Budget threshold list; emits BudgetAlarmReached on each crossing."
+        ),
+    )
+
+
 class TemplateDef(BaseModel):
     name: str
     description: str = ""
@@ -276,6 +367,11 @@ class TemplateDef(BaseModel):
     memory: MemoryConfig | None = None
     design_shotgun: DesignShotgunConfig | None = None
     browser: BrowserConfig | None = None
+    # Phase 7 Wave 0 (Plan 07-01 Task 4): concurrency + attention + cost
+    # sub-blocks. Default None so existing templates parse unchanged.
+    conductor: ConductorConfig | None = None
+    attention: AttentionConfig | None = None
+    cost: CostConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +451,15 @@ def _parse_toml(path: Path) -> TemplateDef:
     design_shotgun_raw = raw.get("design_shotgun")
     browser_raw = raw.get("browser")
 
+    # Phase 7 Wave 0 (Plan 07-01 Task 4): optional TOP-LEVEL sub-blocks
+    # consumed by SprintConductor concurrency caps ([conductor]),
+    # AttentionQueue priority ([attention]), and cost tracker/fallback
+    # ([cost]). Absent blocks map to None (BC-safe for gstack + 6 bundled
+    # templates — none of which declare these blocks today).
+    conductor_raw = raw.get("conductor")
+    attention_raw = raw.get("attention")
+    cost_raw = raw.get("cost")
+
     return TemplateDef(
         name=tmpl.get("name", path.stem),
         description=tmpl.get("description", ""),
@@ -392,6 +497,14 @@ def _parse_toml(path: Path) -> TemplateDef:
             else None
         ),
         browser=BrowserConfig(**browser_raw) if browser_raw is not None else None,
+        # Phase 7 Wave 0 (Plan 07-01 Task 4): top-level optional sub-blocks.
+        conductor=(
+            ConductorConfig(**conductor_raw) if conductor_raw is not None else None
+        ),
+        attention=(
+            AttentionConfig(**attention_raw) if attention_raw is not None else None
+        ),
+        cost=CostConfig(**cost_raw) if cost_raw is not None else None,
     )
 
 
