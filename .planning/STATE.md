@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 7 Wave 4 IN PROGRESS (07-05 cost-tracker landed — CostTracker event subscriber + CostRollup frozen dataclass + per-model pricing table; QUALITY-12 partial — tracker/rollup live, fallback + cache_tracker + dashboard follow in 07-06/07-07)
-stopped_at: Completed 07-05 (Phase 7 Wave 4 cost tracker — hardcoded Anthropic 2026-04 per-model pricing (opus $15/$75, sonnet $3/$15, haiku $0.25/$1.25 per 1M) with resolve_tier substring matcher + calculate_cost_usd pure function; CostRollup 9-field frozen dataclass (team, sprint_id, agent, tokens_opus/sonnet/haiku, cost_usd, cache_hit_rate, period_start/end) with sprint_id=None + agent=None = team-level rollup; CostTracker per-team event-driven aggregator subscribes to ToolCallCompleted on construction, aggregates by (team, sprint, agent), emits BudgetAlarmReached at 50/80/100 thresholds exactly once per run (no duplicates), pricing backstop activates when event.cost_usd <= 0.0 via calculate_cost_usd(model, in, out). Cross-team events dropped silently so multiple trackers share one bus without cross-talk. Threshold crossing uses strict prev < thresh <= new so re-fires don't happen when spend stays above. BudgetAlarmReached emitted outside RLock to avoid handler re-entry deadlock. Tokens-by-tier histogram keyed by resolve_tier; unknown models contribute cost but not tier counts. rollup_team() cache_hit_rate hardcoded 0.0 — cache_tracker (Plan 07-06) merges real value externally via ClaudeApiResponse stream. Task 1 (pricing + calculate_cost_usd): 69 LOC + 9 tests. Task 2 (rollup + tracker): 30 + 170 LOC + 11 tests. 21 tests green + 55 BC tests green; zero deviations; 4 commits with strict TDD RED→GREEN gates: b3ec96e/1a284a7 Task 1; ad5f457/79ebd3e Task 2. QUALITY-12 substrate (cost-accounting half) closed.)
-last_updated: "2026-04-22T14:49:00Z"
+status: Phase 7 Wave 4 IN PROGRESS (07-06 cost-fallback-cache landed — apply_fallback pure function opus->sonnet->haiku + CacheTracker ClaudeApiResponse subscriber; QUALITY-12 policy + cache-metric halves closed, dashboard rendering pending in 07-07)
+stopped_at: Completed 07-06 (Phase 7 Wave 4 part 2 cost fallback + cache tracker — clawteam/cost/fallback.py apply_fallback(model_pref, spend_percent, fallback_at_percent=80.0) pure function returning (effective_model, fallback_applied) with FALLBACK_LADDER opus->sonnet, sonnet->haiku, haiku->haiku terminal; unknown tiers (gpt-4, '') return unchanged with fallback_applied=False; TIER_TO_CANONICAL maps downgrade tier back to canonical model string; reuses Plan 07-05 resolve_tier for alias resolution (claude-3-opus-* -> opus). clawteam/cost/cache_tracker.py CacheTracker per-team ClaudeApiResponse event subscriber; cache_hit_rate = read / (read + creation) divide-by-zero-safe; HEALTHY_THRESHOLD=0.5 with strict > (0.5 break-even is NOT healthy); total_cache_read/total_cache_creation accessors; O(1) memory via running aggregates not raw events. clawteam/cost/__init__.py re-exports apply_fallback/FALLBACK_LADDER/TIER_TO_CANONICAL/CacheTracker/HEALTHY_THRESHOLD. 21 new tests green (10 fallback + 11 cache_tracker) + full tests/cost/ suite 42 green; BC regression 73 green; zero production deviations (5 additive coverage tests beyond plan); 4 commits with strict TDD RED->GREEN gates: a699a13/9022c80 Task 1 fallback; b49e004/43b1f46 Task 2 cache_tracker. Next: 07-07 clawteam team show cost panel wires CostTracker.rollup_team + CacheTracker.cache_hit_rate + BudgetAlarmReached banners.)
+last_updated: "2026-04-22T14:50:21Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 77
-  completed_plans: 71
-  percent: 92
+  completed_plans: 72
+  percent: 94
 ---
 
 # Project State
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 7 Wave 4 IN PROGRESS (07-05 cost tracker landed; Waves 4 continuation + 5 remaining — 07-06 fallback + cache_tracker, 07-07 dashboard, 07-08 zombie-gc, 07-09 10-sprint load test)
-Plan: 07-05 complete (Wave 4 part 1 — cost pricing + CostRollup schema + CostTracker event subscriber). Prior: 07-04 complete (Wave 3 — clawteam attend typer subcommand group + auto_accept helper). Prior: 07-03 complete (Wave 2 — AttentionQueue stateless read-side over teams/*/sprints/*/questions/*.md; compute_priority pure function per D-05; AttentionWatcher with watchdog_available() feature detection and 2s polling fallback; build_digest cluster roll-up by sprint x tag x age_bucket; 26 tests green). Prior: 07-02 complete (Wave 1 — RateLimitMonitor + 3 asyncio.Semaphore caps + start_sprint_async + dispatch_turn + active_agents()). Prior: 07-01 complete (Wave 0 — pyproject [attend]/watchdog extra; 3 new top-level packages clawteam/attention + clawteam/cost + clawteam/rate_limit; 6 new HarnessEvent dataclasses; SprintState.queue_status additive open-str field; ConductorConfig/AttentionConfig/CostConfig top-level TOML sub-blocks). 07-05 ships clawteam/cost/pricing.py (MODEL_PRICING hardcoded Anthropic 2026-04 table + resolve_tier substring matcher + calculate_cost_usd pure function) + clawteam/cost/rollup.py (CostRollup 9-field frozen dataclass matching CONTEXT specifics) + clawteam/cost/tracker.py (per-team CostTracker subscribing ToolCallCompleted, aggregating by agent/sprint/(agent,sprint), exactly-once 50/80/100 alarms, pricing backstop for cost_usd<=0.0). 21 new tests (9 pricing + 12 tracker) all green + 55 Phase 7 event/state/bus BC tests green. Zero deviations; 4 commits with strict TDD RED→GREEN gates: b3ec96e/1a284a7 Task 1 (pricing); ad5f457/79ebd3e Task 2 (rollup + tracker). QUALITY-12 accounting half closed. Next: 07-06 (fallback.py opus→sonnet→haiku ladder + cache_tracker.py ClaudeApiResponse subscriber populating cache_hit_rate).
+Phase: 7 Wave 4 IN PROGRESS (07-06 cost fallback + cache tracker landed; Wave 5 remaining — 07-07 dashboard, 07-08 zombie-gc, 07-09 10-sprint load test)
+Plan: 07-06 complete (Wave 4 part 2 — clawteam/cost/fallback.py apply_fallback pure function opus->sonnet->haiku + FALLBACK_LADDER + TIER_TO_CANONICAL; clawteam/cost/cache_tracker.py CacheTracker ClaudeApiResponse event subscriber with cache_hit_rate / is_healthy / total_cache_read+creation accessors + HEALTHY_THRESHOLD=0.5; clawteam/cost/__init__.py re-exports all 5 new public names; 21 new tests 10 fallback + 11 cache_tracker all green; full tests/cost/ suite 42 green; BC regression 73 green; zero production deviations, 5 additive coverage tests beyond plan; 4 commits with strict TDD RED->GREEN gates: a699a13/9022c80 Task 1 fallback; b49e004/43b1f46 Task 2 cache_tracker). Prior: 07-05 complete (Wave 4 part 1 — cost pricing + CostRollup schema + CostTracker event subscriber). Prior: 07-04 complete (Wave 3 — clawteam attend typer subcommand group + auto_accept helper). Prior: 07-03 complete (Wave 2 — AttentionQueue stateless read-side over teams/*/sprints/*/questions/*.md; compute_priority pure function per D-05; AttentionWatcher with watchdog_available() feature detection and 2s polling fallback; build_digest cluster roll-up by sprint x tag x age_bucket; 26 tests green). Prior: 07-02 complete (Wave 1 — RateLimitMonitor + 3 asyncio.Semaphore caps + start_sprint_async + dispatch_turn + active_agents()). Prior: 07-01 complete (Wave 0 — pyproject [attend]/watchdog extra; 3 new top-level packages clawteam/attention + clawteam/cost + clawteam/rate_limit; 6 new HarnessEvent dataclasses; SprintState.queue_status additive open-str field; ConductorConfig/AttentionConfig/CostConfig top-level TOML sub-blocks). Both cost-layer halves now ship: Plan 07-05 (pricing + rollup + tracker) + Plan 07-06 (fallback + cache_tracker). QUALITY-12 policy + cache-metric halves closed; dashboard rendering half pending in 07-07. Next: 07-07 (clawteam team show cost panel consumes CostTracker.rollup_team + CacheTracker.cache_hit_rate + BudgetAlarmReached banners).
 
 ## Performance Metrics
 
@@ -95,6 +95,7 @@ Plan: 07-05 complete (Wave 4 part 1 — cost pricing + CostRollup schema + CostT
 | Phase 07 P03 | 18min | 3 tasks | 8 files  |
 | Phase 07 P04 | 4min  | 2 tasks | 5 files  |
 | Phase 07 P05 | 15min | 2 tasks | 7 files  |
+| Phase 07 P06 | 5min  | 2 tasks | 5 files  |
 
 ## Accumulated Context
 
@@ -227,10 +228,11 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T14:49:00Z
-Stopped at: Completed 07-05 (Phase 7 Wave 4 part 1 cost tracker — hardcoded Anthropic 2026-04 per-model pricing + CostRollup 9-field frozen dataclass + CostTracker per-team event subscriber with exactly-once 50/80/100 alarm firing + pricing backstop for cost_usd<=0.0. 21 new tests green + 55 BC tests green; zero deviations; QUALITY-12 accounting half closed. Next: 07-06 fallback.py opus→sonnet→haiku ladder + cache_tracker.py ClaudeApiResponse subscriber; then 07-07 team show dashboard, 07-08 zombie-gc, 07-09 10-sprint load test.)
+Last session: 2026-04-22T14:50:21Z
+Stopped at: Completed 07-06 (Phase 7 Wave 4 part 2 cost fallback + cache tracker — clawteam/cost/fallback.py apply_fallback pure function opus->sonnet->haiku + FALLBACK_LADDER + TIER_TO_CANONICAL + clawteam/cost/cache_tracker.py CacheTracker ClaudeApiResponse subscriber with HEALTHY_THRESHOLD=0.5; clawteam/cost/__init__.py re-exports all 5 new names. 21 new tests (10 fallback + 11 cache_tracker) all green + 42 full cost suite green + 73 BC green; zero production deviations; 5 additive coverage tests; QUALITY-12 policy+cache halves closed, dashboard half pending in 07-07. Next: 07-07 team show dashboard wires CostTracker.rollup_team + CacheTracker.cache_hit_rate + BudgetAlarmReached banners; 07-08 zombie-gc; 07-09 10-sprint load test.)
 Resume files:
 
+  - Phase 7 Wave 4 07-06 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-06-SUMMARY.md
   - Phase 7 Wave 4 07-05 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-05-SUMMARY.md
   - Phase 7 Wave 3 07-04 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-04-SUMMARY.md
   - Phase 7 Wave 2 07-03 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-03-SUMMARY.md
