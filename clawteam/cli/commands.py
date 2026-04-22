@@ -4777,6 +4777,28 @@ def launch_team(
             isolated_workspace=bool(cwd),
         )
 
+        # Build system_prompt (injected via --append-system-prompt) so that
+        # role-based templates like gstack have agents that know their role +
+        # methodology from the moment they spawn — not just during sprint
+        # phase transitions. Loads agent.prompt_file (e.g., gstack/prompts/ceo.md)
+        # from the template tree and combines with build_harness_system_prompt.
+        # Falls back to None (no --append-system-prompt) for upstream templates
+        # that don't set prompt_file; behavior for those templates is unchanged.
+        system_prompt: Optional[str] = None
+        if getattr(agent, "prompt_file", ""):
+            try:
+                from pathlib import Path as _Path
+                import clawteam.templates as _templates_module
+                templates_root = _Path(_templates_module.__file__).parent
+                role_prompt_path = templates_root / agent.prompt_file
+                if role_prompt_path.is_file():
+                    role_prompt = role_prompt_path.read_text(encoding="utf-8")
+                    from clawteam.harness.prompts import build_harness_system_prompt
+                    harness_sp = build_harness_system_prompt(t_name, agent.name)
+                    system_prompt = f"{harness_sp}\n\n---\n\n{role_prompt}"
+            except OSError:
+                system_prompt = None
+
         result = be.spawn(
             command=a_cmd,
             agent_name=agent.name,
@@ -4784,6 +4806,7 @@ def launch_team(
             agent_type=agent.type,
             team_name=t_name,
             prompt=prompt,
+            system_prompt=system_prompt,
             env=a_env or None,
             cwd=cwd,
             skip_permissions=skip_permissions,

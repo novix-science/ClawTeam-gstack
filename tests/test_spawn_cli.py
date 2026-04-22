@@ -544,3 +544,73 @@ def test_spawn_cli_passes_repo_as_cwd_without_worktree_and_uses_repo_prompt(monk
     assert "Working directory: " + str(repo_path.resolve()) in call["prompt"]
     assert "Work directly in this repository path" in call["prompt"]
     assert "isolated git worktree" not in call["prompt"]
+
+
+def test_launch_gstack_injects_role_prompt_as_system_prompt(monkeypatch, tmp_path):
+    """Regression: `clawteam launch gstack --team X` must pass the role-specific
+    methodology prompt (e.g., gstack/prompts/ceo.md) to each agent's
+    --append-system-prompt flag. Without this, agents spawned by launch have
+    no knowledge of their role and respond as generic Claude Code instances
+    (surfaced in v1.0 UAT walkthrough 2026-04-22)."""
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    backend = RecordingBackend()
+    monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: backend)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["launch", "gstack", "--team", "myteam", "--goal", "test goal"],
+        env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+    )
+
+    assert result.exit_code == 0, f"launch failed: {result.output}"
+    assert backend.calls, "No agents spawned"
+
+    # Every gstack agent should have a non-None system_prompt containing
+    # both the harness runtime intro and the role methodology.
+    for call in backend.calls:
+        agent_name = call["agent_name"]
+        sp = call.get("system_prompt")
+        assert sp is not None, (
+            f"Agent '{agent_name}' spawned without system_prompt — "
+            f"role methodology (gstack/prompts/<role>.md) won't reach claude CLI"
+        )
+        # Harness intro
+        assert "ClawTeam Runtime" in sp, (
+            f"Agent '{agent_name}' system_prompt missing harness intro"
+        )
+        # Role-specific content: each role's .md has the role name
+        # in its first heading. ceo.md starts with "# ceo —".
+        role_marker = f"# {agent_name}"
+        assert role_marker in sp or f"# {call['agent_type']}" in sp, (
+            f"Agent '{agent_name}' system_prompt missing role marker "
+            f"'{role_marker}' — prompt_file may not have been loaded. "
+            f"system_prompt[:200]={sp[:200]!r}"
+        )
+
+
+def test_launch_upstream_template_preserves_no_system_prompt(monkeypatch, tmp_path):
+    """BC: upstream templates (software-dev, hedge-fund, code-review,
+    harness-default, research-paper, strategy-room) have no prompt_file on
+    their agents — system_prompt should be None so existing behavior is
+    preserved exactly."""
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    backend = RecordingBackend()
+    monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: backend)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["launch", "hedge-fund", "--team", "fund1", "--goal", "Analyze AAPL"],
+        env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+    )
+
+    assert result.exit_code == 0
+    assert backend.calls
+    for call in backend.calls:
+        assert call.get("system_prompt") is None, (
+            f"Upstream template '{call['agent_name']}' should have no "
+            f"system_prompt (BC); got {call.get('system_prompt')!r}"
+        )
