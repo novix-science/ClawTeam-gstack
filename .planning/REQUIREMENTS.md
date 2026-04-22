@@ -83,7 +83,7 @@ Methodology as role prompts (baked-in) + tool-heavy skills as invokable ClawTeam
 - [x] **SKILL-10
 **: `/browse` + `/open-gstack-browser` + `/setup-browser-cookies` — real-Chromium browser via Playwright (optional `clawteam[browser]` extra). Owned by engineer, qa, dx-lead. Feature-detected; useful error on missing dep.
 - [ ] **SKILL-11**: `/design-shotgun` — mockup variant generation + comparison board + iterative refinement with taste memory under designer's per-agent memory.
-- [ ] **SKILL-12**: `/design-html` — Pretext-pattern production HTML generation with framework detection (React/Svelte/Vue).
+- [x] **SKILL-12**: `/design-html` — Pretext-pattern production HTML generation with framework detection (React/Svelte/Vue).
 - [x] **SKILL-13**: `/codex` — independent OpenAI Codex CLI second opinion via existing `NativeCliAdapter`. Three modes: review (pass/fail gate), adversarial, consultation.
 - [x] **SKILL-14**: `/ship` — sync main + run tests + audit coverage + push + open PR. Bootstraps a test framework if none exists.
 - [x] **SKILL-15**: `/land-and-deploy` — merge PR + wait for CI + deploy + verify production health. Human-gated.
@@ -241,7 +241,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | SKILL-09 | Phase 2 | Pending |
 | SKILL-10 | Phase 6 | Pending |
 | SKILL-11 | Phase 6 | Pending |
-| SKILL-12 | Phase 6 | Pending |
+| SKILL-12 | Phase 6 | Complete (06-09) |
 | SKILL-13 | Phase 5 | Complete (05-03) |
 | SKILL-14 | Phase 5 | Complete (05-04) |
 | SKILL-15 | Phase 5 | Complete (05-06) |
