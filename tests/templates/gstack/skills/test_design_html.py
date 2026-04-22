@@ -288,3 +288,171 @@ def test_registered_in_plugin() -> None:
     reg = skills["/design-html"]
     assert reg.roles == frozenset({"designer"})
     assert callable(reg.handler)
+
+
+# ---------------------------------------------------------------------------
+# WR-01 regression: component_name must be identifier-shaped.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "../../etc/passwd",        # POSIX traversal
+        "..\\..\\conf",             # Windows traversal
+        "Hero/../../evil",          # embedded traversal
+        "Hero.jsx",                 # dot (would double-extension)
+        "1Hero",                    # leading digit (not identifier-shaped)
+        "Hero component",           # space
+        "Hero;rm -rf /",            # shell metachar
+        "/absolute/path",           # absolute path
+        "a" * 65,                   # over 64-char limit
+        "Héro",                     # non-ASCII
+    ],
+)
+def test_handler_rejects_malicious_component_name(
+    tmp_path: Path, bad_name: str
+) -> None:
+    project_root = tmp_path / "proj"
+    sprint_dir = tmp_path / "sprint"
+    _write_pkg_json(project_root, {"dependencies": {"react": "^18"}})
+    mockup = _make_mockup(tmp_path / "fixtures" / "variant-1" / "index.html")
+
+    ctx = _ctx(project_root, sprint_dir)
+    with pytest.raises(ValueError, match="component_name"):
+        design_html_handler(
+            ctx,
+            role="designer",
+            args={
+                "mockup_html_path": str(mockup),
+                "component_name": bad_name,
+            },
+        )
+
+    # No emission should have happened — filesystem stays clean except for
+    # the designer's package.json we seeded.
+    assert not (project_root / "src").exists()
+
+
+def test_handler_accepts_valid_component_names(tmp_path: Path) -> None:
+    """Lowercase, PascalCase, underscores, digits-not-leading all allowed."""
+    for good_name in ("Hero", "hero", "Hero_v2", "H", "A0", "a" * 64):
+        project_root = tmp_path / good_name / "proj"
+        sprint_dir = tmp_path / good_name / "sprint"
+        _write_pkg_json(project_root, {"dependencies": {"react": "^18"}})
+        mockup = _make_mockup(
+            tmp_path / good_name / "fixtures" / "index.html"
+        )
+        ctx = _ctx(project_root, sprint_dir)
+        result = design_html_handler(
+            ctx,
+            role="designer",
+            args={
+                "mockup_html_path": str(mockup),
+                "component_name": good_name,
+            },
+        )
+        assert result["status"] == "emitted"
+        assert (project_root / "src" / f"{good_name}.jsx").is_file()
+
+
+# ---------------------------------------------------------------------------
+# WR-02 regression: workspace_root containment (opt-in).
+# ---------------------------------------------------------------------------
+
+
+def test_handler_allows_paths_inside_workspace_root(tmp_path: Path) -> None:
+    """When ctx.workspace_root is set, paths inside it must work."""
+    workspace = tmp_path / "workspace"
+    project_root = workspace / "proj"
+    sprint_dir = workspace / "sprint"
+    _write_pkg_json(project_root, {"dependencies": {"react": "^18"}})
+    mockup = _make_mockup(workspace / "fixtures" / "variant-1" / "index.html")
+
+    ctx = SimpleNamespace(
+        project_root=str(project_root),
+        sprint_dir=str(sprint_dir),
+        sprint_id="sprint-0001",
+        workspace_root=str(workspace),
+    )
+    result = design_html_handler(
+        ctx,
+        role="designer",
+        args={
+            "mockup_html_path": str(mockup),
+            "component_name": "Hero",
+        },
+    )
+    assert result["status"] == "emitted"
+
+
+def test_handler_rejects_project_root_outside_workspace(tmp_path: Path) -> None:
+    """project_root escaping ctx.workspace_root must raise ValueError."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside_project = tmp_path / "outside_proj"
+    mockup = _make_mockup(workspace / "fixtures" / "m.html")
+    _write_pkg_json(outside_project, {"dependencies": {"react": "^18"}})
+
+    ctx = SimpleNamespace(
+        project_root=str(outside_project),
+        sprint_dir=str(workspace / "sprint"),
+        sprint_id="sprint-0001",
+        workspace_root=str(workspace),
+    )
+    with pytest.raises(ValueError, match="project_root .* outside workspace_root"):
+        design_html_handler(
+            ctx,
+            role="designer",
+            args={
+                "mockup_html_path": str(mockup),
+                "component_name": "Hero",
+            },
+        )
+
+
+def test_handler_rejects_mockup_path_outside_workspace(tmp_path: Path) -> None:
+    """mockup_html_path escaping ctx.workspace_root must raise ValueError."""
+    workspace = tmp_path / "workspace"
+    project_root = workspace / "proj"
+    _write_pkg_json(project_root, {"dependencies": {"react": "^18"}})
+    # Mockup lives OUTSIDE the workspace — classic arbitrary-read attempt.
+    outside_mockup = _make_mockup(tmp_path / "outside_data" / "secret.html")
+
+    ctx = SimpleNamespace(
+        project_root=str(project_root),
+        sprint_dir=str(workspace / "sprint"),
+        sprint_id="sprint-0001",
+        workspace_root=str(workspace),
+    )
+    with pytest.raises(
+        ValueError, match="mockup_html_path .* outside workspace_root"
+    ):
+        design_html_handler(
+            ctx,
+            role="designer",
+            args={
+                "mockup_html_path": str(outside_mockup),
+                "component_name": "Hero",
+            },
+        )
+
+
+def test_handler_without_workspace_root_no_containment(tmp_path: Path) -> None:
+    """When ctx.workspace_root is absent, containment is opt-out (trust boundary)."""
+    # Uses two unrelated directories — handler must still succeed because
+    # callers without workspace_root rely on role gating (documented).
+    project_root = tmp_path / "aaa" / "proj"
+    sprint_dir = tmp_path / "bbb" / "sprint"
+    _write_pkg_json(project_root, {"dependencies": {"react": "^18"}})
+    mockup = _make_mockup(tmp_path / "ccc" / "m.html")
+    ctx = _ctx(project_root, sprint_dir)  # no workspace_root
+    result = design_html_handler(
+        ctx,
+        role="designer",
+        args={
+            "mockup_html_path": str(mockup),
+            "component_name": "Hero",
+        },
+    )
+    assert result["status"] == "emitted"

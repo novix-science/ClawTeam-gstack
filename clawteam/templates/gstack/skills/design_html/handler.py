@@ -30,6 +30,7 @@ Invariants:
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,29 @@ from clawteam.templates.gstack.skills.design_html.framework_detect import (
 # Default component name when caller omits it (designer convention — the
 # chosen /design-shotgun variant is usually the hero component).
 _DEFAULT_COMPONENT_NAME: str = "Hero"
+
+# WR-01: component_name is interpolated into emitted filenames (e.g.
+# ``<component_name>.jsx``). Reject anything that isn't a strict
+# Python-identifier-shaped token so designer input cannot escape ``src_dir``
+# via path separators, ``..`` traversal, or shell metacharacters. Same
+# defense-in-depth posture as ``_ID_RE``/``_TAG_RE`` in ``memory/entry.py``
+# and ``validate_identifier`` in ``memory/store.py``.
+_COMPONENT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
+
+
+def _validate_component_name(name: str) -> str:
+    """Reject non-identifier-shaped component names (WR-01).
+
+    Raises ``ValueError`` when ``name`` contains path separators, leading
+    dots, or any character outside ``[A-Za-z0-9_]`` — these would cause the
+    emitted source file to land outside ``src_dir``.
+    """
+    if not isinstance(name, str) or not _COMPONENT_NAME_RE.fullmatch(name):
+        raise ValueError(
+            "component_name must match [A-Za-z][A-Za-z0-9_]{0,63} "
+            f"(got {name!r})"
+        )
+    return name
 
 
 def _mockup_digest(mockup_html: str) -> str:
@@ -217,6 +241,40 @@ def _write_note(
     return note
 
 
+def _resolve_within_workspace(
+    path: Path, workspace_root: Path | None, *, label: str
+) -> Path:
+    """Constrain ``path`` to ``workspace_root`` when one is configured (WR-02).
+
+    Defense-in-depth containment: if ``ctx.workspace_root`` is set, require
+    that both ``project_root`` (write path) and ``mockup_html_path`` (read
+    path) resolve within it — mirrors the ``ensure_within_root`` posture of
+    :class:`TeamMemoryStore`.
+
+    When ``workspace_root`` is ``None`` the skill falls back to the
+    role-gating trust boundary (designers are trusted to supply their own
+    project root); the argument is intentionally opt-in so existing
+    plugin-layer callers without ``workspace_root`` continue to work.
+
+    ``path`` may be absolute (already-resolved) or relative to cwd; both
+    cases are handled by ``Path.resolve(strict=False)``.
+
+    Raises ``ValueError`` when the containment check fails.
+    """
+    if workspace_root is None:
+        return path
+    base = Path(workspace_root).resolve()
+    resolved = path.resolve(strict=False)
+    try:
+        resolved.relative_to(base)
+    except ValueError as exc:
+        raise ValueError(
+            f"{label} resolves outside workspace_root "
+            f"({resolved} not under {base})"
+        ) from exc
+    return path
+
+
 def design_html_handler(
     ctx: Any,
     *,
@@ -225,13 +283,32 @@ def design_html_handler(
 ) -> dict[str, Any]:
     """Entry point for ``/design-html``.
 
+    Trust boundary (WR-02): this skill is role-gated to ``designer`` at
+    the plugin layer (see ``GstackSprintPlugin.contribute_skills``).
+    ``project_root`` and ``mockup_html_path`` are therefore treated as
+    designer-trusted input. As defense-in-depth, callers MAY set
+    ``ctx.workspace_root``; when present, both paths are required to
+    resolve within it (``ValueError`` otherwise). ``component_name``
+    is always validated regardless (WR-01).
+
     Raises
     ------
     FileNotFoundError
         If ``args["mockup_html_path"]`` does not resolve to an existing file
         (T-06-09-01 — caller passed a nonexistent / traversed path).
+    ValueError
+        If ``component_name`` is not identifier-shaped, or if
+        ``ctx.workspace_root`` is set and a path escapes it.
     """
+    workspace_root_raw = getattr(ctx, "workspace_root", None)
+    workspace_root = (
+        Path(workspace_root_raw) if workspace_root_raw else None
+    )
+
     mockup_path = Path(args["mockup_html_path"])
+    _resolve_within_workspace(
+        mockup_path, workspace_root, label="mockup_html_path"
+    )
     if not mockup_path.is_file():
         raise FileNotFoundError(f"mockup not found: {mockup_path}")
     mockup_html = mockup_path.read_text(encoding="utf-8")
@@ -239,9 +316,15 @@ def design_html_handler(
     project_root = Path(
         args.get("project_root") or getattr(ctx, "project_root", ".")
     )
+    _resolve_within_workspace(
+        project_root, workspace_root, label="project_root"
+    )
     sprint_dir = Path(getattr(ctx, "sprint_dir", "."))
     sprint_id = getattr(ctx, "sprint_id", "")
-    component_name = args.get("component_name") or _DEFAULT_COMPONENT_NAME
+    # WR-01: validate component_name BEFORE any _emit_* call.
+    component_name = _validate_component_name(
+        args.get("component_name") or _DEFAULT_COMPONENT_NAME
+    )
 
     detection = detect_framework(project_root)
 
