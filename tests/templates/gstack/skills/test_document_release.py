@@ -268,3 +268,134 @@ def test_document_release_registered():
 
     dr_reg = next(s for s in regs if s.name == "/document-release")
     assert dr_reg.roles == frozenset({"shipper"})
+
+
+# =========================================================================
+# WR-04 regression: agent-controlled base/head args are validated BEFORE
+# being spliced into a git diff argv. git itself parses leading-dash tokens
+# (--exec=, --upload-pack=) as flags even in refspec position, so a minimal
+# allow-list closes the argv-injection vector at the handler boundary.
+# =========================================================================
+
+
+def test_base_ref_leading_dash_rejected(_dr_ctx, monkeypatch):
+    """Leading-dash base ref must ValueError BEFORE invoking git."""
+    from clawteam.templates.gstack.skills.document_release import handler
+
+    invoke_called = {"n": 0}
+
+    def fake_invoke(command, **kwargs):  # noqa: ARG001
+        invoke_called["n"] += 1
+        import subprocess
+        return subprocess.CompletedProcess(
+            args=list(command), returncode=0, stdout="", stderr="",
+        )
+
+    monkeypatch.setattr(handler, "invoke_native_cli", fake_invoke)
+
+    with pytest.raises(ValueError, match="document-release.*base"):
+        handler.document_release_handler(
+            _dr_ctx, role="shipper",
+            args={"base": "--exec=touch /tmp/pwned"},
+        )
+    # Critical: git was NEVER invoked with the malicious ref.
+    assert invoke_called["n"] == 0
+
+
+def test_head_ref_leading_dash_rejected(_dr_ctx, monkeypatch):
+    """Leading-dash head ref must ValueError BEFORE invoking git."""
+    from clawteam.templates.gstack.skills.document_release import handler
+
+    invoke_called = {"n": 0}
+
+    def fake_invoke(command, **kwargs):  # noqa: ARG001
+        invoke_called["n"] += 1
+        import subprocess
+        return subprocess.CompletedProcess(
+            args=list(command), returncode=0, stdout="", stderr="",
+        )
+
+    monkeypatch.setattr(handler, "invoke_native_cli", fake_invoke)
+
+    with pytest.raises(ValueError, match="document-release.*head"):
+        handler.document_release_handler(
+            _dr_ctx, role="shipper",
+            args={"head": "--upload-pack=/bin/sh"},
+        )
+    assert invoke_called["n"] == 0
+
+
+def test_ref_shell_metachar_rejected(_dr_ctx, monkeypatch):
+    """Shell metachars (space / ; / $ / |) in a ref must ValueError."""
+    from clawteam.templates.gstack.skills.document_release import handler
+
+    def fake_invoke(command, **kwargs):  # noqa: ARG001
+        import subprocess
+        return subprocess.CompletedProcess(
+            args=list(command), returncode=0, stdout="", stderr="",
+        )
+
+    monkeypatch.setattr(handler, "invoke_native_cli", fake_invoke)
+
+    for bad_ref in (
+        "main; rm -rf /",
+        "main && echo pwned",
+        "main | cat",
+        "main`id`",
+        "main$(id)",
+        "main with spaces",
+        "",
+    ):
+        with pytest.raises(ValueError):
+            handler.document_release_handler(
+                _dr_ctx, role="shipper", args={"base": bad_ref},
+            )
+
+
+def test_normal_refs_pass_validation(_dr_ctx, monkeypatch):
+    """Branch names, tags, SHAs, and HEAD~N must all pass validation."""
+    from clawteam.templates.gstack.skills.document_release import handler
+
+    docs_dir = _dr_ctx.workspace_dir / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "guide.md").write_text("# guide\n")
+
+    invoked_refs: list[str] = []
+
+    def fake_invoke(command, **kwargs):  # noqa: ARG001
+        # Capture the refspec we were called with.
+        import subprocess
+        for arg in command:
+            if ".." in arg and isinstance(arg, str) and arg.count("..") == 1:
+                invoked_refs.append(arg)
+        return subprocess.CompletedProcess(
+            args=list(command), returncode=0, stdout="", stderr="",
+        )
+
+    monkeypatch.setattr(handler, "invoke_native_cli", fake_invoke)
+
+    for base, head in (
+        ("main", "HEAD"),
+        ("feature/x", "HEAD~3"),
+        ("v1.2.3", "v1.2.4"),
+        ("abc1234", "def5678"),
+        ("release/2026.04", "HEAD"),
+        ("my_branch-name", "HEAD"),
+    ):
+        invoked_refs.clear()
+        out = handler.document_release_handler(
+            _dr_ctx, role="shipper", args={"base": base, "head": head},
+        )
+        # Handler completes without raising.
+        assert out["status"] == "ok"
+        # git diff was invoked with the intended refspec.
+        assert invoked_refs == [f"{base}..{head}"]
+
+
+def test_default_args_still_work(_dr_ctx, monkeypatch):
+    """Default base='main' / head='HEAD' must remain valid."""
+    from clawteam.templates.gstack.skills.document_release import handler
+
+    _install_fake_git_diff(monkeypatch, [])
+    out = handler.document_release_handler(_dr_ctx, role="shipper", args={})
+    assert out["status"] == "ok"

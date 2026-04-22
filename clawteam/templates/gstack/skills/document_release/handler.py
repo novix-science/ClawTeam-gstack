@@ -27,6 +27,7 @@ ship-notes, not a ship failure (threat register T-05-07-04 mitigation).
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,44 @@ from clawteam.templates.gstack.skills.document_release.patch_emitter import (
 
 _DEFAULT_MAX_PATCHES_PER_RUN: int = 50
 _LARGE_PATCH_LINES: int = 5  # >5-line patches gate via InteractionGate
+
+# WR-04 defense: validate agent-supplied base/head refs before splicing them
+# into a git diff argv. Even with shell=False, git itself parses leading-dash
+# tokens as flags (e.g. ``--exec=touch /tmp/pwned``, ``--upload-pack=...``)
+# when they appear in refspec position. This regex admits branch names, tags,
+# SHAs, and ``HEAD~N`` while rejecting ``..``-traversal, shell metachars,
+# whitespace, and any ref starting with ``-`` — matching git's own rules for
+# sane refs plus a defensive belt-and-braces against argv injection.
+_GIT_REF_RE: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_./~\-]+$")
+
+
+def _validate_git_ref(ref: str, *, name: str) -> str:
+    """Return ``ref`` unchanged if safe; else raise :class:`ValueError`.
+
+    Rules
+    -----
+    * Non-empty string.
+    * Does NOT start with ``-`` (rejects leading-dash flag injection).
+    * Matches :data:`_GIT_REF_RE` (alphanumerics plus ``_ . / ~ -``).
+
+    The ``name`` parameter is interpolated into the error message so the
+    caller-facing ValueError pinpoints which arg was invalid.
+    """
+    if not isinstance(ref, str) or not ref:
+        raise ValueError(
+            f"document-release: invalid git {name} ref (empty or non-string)"
+        )
+    if ref.startswith("-"):
+        raise ValueError(
+            f"document-release: invalid git {name} ref {ref!r} "
+            "(refs may not start with '-')"
+        )
+    if not _GIT_REF_RE.fullmatch(ref):
+        raise ValueError(
+            f"document-release: invalid git {name} ref {ref!r} "
+            "(only alphanumerics plus '_./~-' permitted)"
+        )
+    return ref
 
 
 def _removed_paths_from_diff(
@@ -121,8 +160,13 @@ def document_release_handler(
     """
     sprint_dir = Path(getattr(ctx, "sprint_dir", "."))
     cwd = Path(getattr(ctx, "workspace_dir", sprint_dir))
-    base = args.get("base", "main")
-    head = args.get("head", "HEAD")
+    # WR-04: validate agent-controlled base/head BEFORE passing to git. git's
+    # own argument parser treats leading-dash tokens (``--exec=...``,
+    # ``--upload-pack=...``) as flags even in refspec position, so a minimal
+    # deny-list on ``-`` plus an allow-list of ref-safe characters closes the
+    # argv-injection vector at the handler boundary.
+    base = _validate_git_ref(args.get("base", "main"), name="base")
+    head = _validate_git_ref(args.get("head", "HEAD"), name="head")
     max_patches = int(
         args.get("max_patches_per_run", _DEFAULT_MAX_PATCHES_PER_RUN)
     )
