@@ -75,6 +75,13 @@ from clawteam.templates.gstack.skills.open_gstack_browser.handler import (
     open_browser_handler as _open_browser_handler,
 )
 
+# Phase 6 Plan 06-07: /setup-browser-cookies (SKILL-10, wizard). Reuses
+# the same ``_playwright_available`` probe imported above (D-02); Python
+# dedupes the alias so co-registered Phase 6 plans share one import.
+from clawteam.templates.gstack.skills.setup_browser_cookies.handler import (
+    setup_cookies_handler as _setup_cookies_handler,
+)
+
 if TYPE_CHECKING:
     from clawteam.harness.context import HarnessContext
 
@@ -302,6 +309,25 @@ class GstackSprintPlugin(HarnessPlugin):
                 name="/open-gstack-browser",
                 roles=frozenset({"engineer", "qa", "dx-lead", "designer"}),
                 handler=_open_browser_handler,
+                tool_available=_playwright_available,
+                install_hint=(
+                    "pip install 'clawteam[browser]' && "
+                    "playwright install chromium"
+                ),
+            ),
+            # Phase 6 Plan 06-07: /setup-browser-cookies (SKILL-10, wizard).
+            # Roles = {engineer, qa, dx-lead}: the three personas who set up
+            # per-domain authenticated session cookies for subsequent /browse
+            # and /open-gstack-browser invocations. Questionary wizard runs
+            # inside the handler; Playwright is optional and gated via the
+            # shared probe — SkillUnavailable surfaces with an install hint
+            # when absent (T-06-07-03 role check; T-06-07-01 domain validator
+            # lives inside the wizard; T-06-07-02 on-disk plain-JSON cookies
+            # accepted as user-machine-scoped by design — STACK.md).
+            SkillRegistration(
+                name="/setup-browser-cookies",
+                roles=frozenset({"engineer", "qa", "dx-lead"}),
+                handler=_setup_cookies_handler,
                 tool_available=_playwright_available,
                 install_hint=(
                     "pip install 'clawteam[browser]' && "
