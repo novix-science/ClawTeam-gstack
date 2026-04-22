@@ -91,6 +91,73 @@ def _diff_paths(
     return [p for p in (result.stdout or "").splitlines() if p]
 
 
+# Candidate base refs tried in order to resolve the "before" side of the
+# Review-phase diff. ``main`` / ``master`` are the two conventional default
+# branches; ``HEAD~1`` is the last-ditch fallback so single-commit diffs
+# still route correctly when the sprint workspace has no named base branch.
+_BASE_REF_CANDIDATES: tuple[str, ...] = ("main", "master", "HEAD~1")
+
+
+def _merge_base(
+    workspace: str,
+    head_sha: str,
+    *,
+    subprocess_runner: Callable = subprocess.run,
+) -> str:
+    """Resolve the "before" SHA for the Review-phase diff.
+
+    CR-04-01 (04-REVIEW): the dispatcher previously called ``_diff_paths``
+    with the review SHA on both sides of the range, which always evaluates
+    to an empty list. That silently disabled every ReviewRouter. This helper
+    resolves a real base SHA so ``git diff <base>..<head>`` returns the set
+    of paths touched since the sprint diverged from ``main`` (or ``master``).
+
+    Strategy:
+      1. Try ``git merge-base main <head_sha>``. If that succeeds and the
+         resolved SHA differs from ``head_sha``, return it.
+      2. Try ``git merge-base master <head_sha>`` as fallback.
+      3. Fall back to ``git rev-parse <head_sha>~1`` so at least the last
+         commit's paths route correctly (matches ``git show --name-only``
+         semantics).
+
+    Returns empty string on any failure; callers must treat that as "no
+    diff paths available" and route only the reviewer floor.
+    """
+    if not workspace or not head_sha:
+        return ""
+
+    for ref in _BASE_REF_CANDIDATES:
+        if ref == "HEAD~1":
+            cmd = ["git", "rev-parse", f"{head_sha}~1"]
+        else:
+            cmd = ["git", "merge-base", ref, head_sha]
+        try:
+            result = subprocess_runner(
+                cmd,
+                cwd=workspace,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=_GIT_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except Exception as exc:  # noqa: BLE001
+            _logger.debug("_merge_base %r failed: %s", cmd, exc)
+            continue
+        if getattr(result, "returncode", 1) != 0:
+            continue
+        base = (result.stdout or "").strip()
+        # Guard: a same-SHA result would reproduce the original bug — skip it.
+        if base and base != head_sha:
+            return base
+
+    _logger.warning(
+        "_merge_base could not resolve a base SHA for %r; diff_paths will be empty",
+        head_sha,
+    )
+    return ""
+
+
 # ── Agreement-rate computation (D-09 — severity-only per RESEARCH Open Q3) ──
 
 
@@ -196,7 +263,12 @@ async def dispatch_review_phase(
     review_sha = state.review_sha or ""
 
     # 2. Participants: routers union reviewer floor.
-    diff_paths = _diff_paths(workspace, review_sha, review_sha, subprocess_runner=subprocess_runner)
+    # CR-04-01: resolve a real "before" SHA so `git diff <base>..<review_sha>`
+    # actually returns the paths changed in this sprint. The previous
+    # `<review_sha>..<review_sha>` range evaluated to an empty list and
+    # silently degraded every router to the reviewer floor.
+    base_sha = _merge_base(workspace, review_sha, subprocess_runner=subprocess_runner)
+    diff_paths = _diff_paths(workspace, base_sha, review_sha, subprocess_runner=subprocess_runner)
     participants: set[str] = {_FLOOR_REVIEWER_ROLE}
     routers = _collect_routers(plugin_manager)
     for router in routers:
@@ -300,5 +372,6 @@ __all__ = [
     "_compute_agreement_rate",
     "_current_head",
     "_diff_paths",
+    "_merge_base",
     "_default_spawn_fn",
 ]

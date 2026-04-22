@@ -647,3 +647,217 @@ def test_save_sprint_state_helper_exists_iss09():
     """ISS-09: Plan 10 call sites use save_sprint_state(state). Helper must exist."""
     from clawteam.sprint.state import save_sprint_state
     assert callable(save_sprint_state)
+
+
+# ── Plan 04-10 CR-01 regression: real GstackReviewRouter + real git repo ─
+#
+# Before the fix, `dispatch_review_phase` called `_diff_paths(ws, sha, sha)`
+# which always returned `[]`. That silently defeated every router rule
+# (ui / crypto / api) — routers saw an empty diff and matched nothing, so
+# `participants` degraded to just the `reviewer` floor for every sprint.
+#
+# The existing dispatch tests all use a `_Router` mock that ignores
+# diff_paths, so the same-SHA bug was invisible. These tests drive the
+# real `GstackReviewRouter` through a real git repo to lock the fix in.
+
+
+def _init_git_repo(workspace_path):
+    """Initialize a minimal git repo with an initial commit on main."""
+    import subprocess
+
+    for args in (
+        ["git", "init", "-q", "-b", "main"],
+        ["git", "config", "user.email", "test@example.com"],
+        ["git", "config", "user.name", "test"],
+        ["git", "config", "commit.gpgsign", "false"],
+    ):
+        subprocess.run(args, cwd=str(workspace_path), check=True, capture_output=True)
+    # Baseline commit on main so merge-base has something to resolve to.
+    (workspace_path / "README.md").write_text("baseline\n")
+    subprocess.run(
+        ["git", "add", "README.md"], cwd=str(workspace_path), check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "initial"],
+        cwd=str(workspace_path),
+        check=True,
+        capture_output=True,
+    )
+
+
+def _commit_file(workspace_path, rel_path, body="touch\n"):
+    """Write ``rel_path`` under ``workspace_path`` and commit it. Returns HEAD SHA."""
+    import subprocess
+
+    target = workspace_path / rel_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body)
+    subprocess.run(
+        ["git", "add", rel_path], cwd=str(workspace_path), check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "commit", "-q", "-m", f"add {rel_path}"],
+        cwd=str(workspace_path),
+        check=True,
+        capture_output=True,
+    )
+    r = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(workspace_path),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return r.stdout.strip()
+
+
+def _gstack_router_from_template():
+    """Build a GstackReviewRouter from the real gstack.toml rules."""
+    from clawteam.harness.gstack_review_router import GstackReviewRouter
+    from clawteam.templates import load_template
+
+    template = load_template("gstack")
+    return GstackReviewRouter(template.review.rules)
+
+
+class _RealRouterPM:
+    """Plugin-manager double that returns a real ReviewRouter instance."""
+
+    def __init__(self, router):
+        self._router = router
+
+    def get_review_routers(self):
+        return [self._router]
+
+
+def test_dispatcher_routes_security_on_auth_diff_via_real_router(tmp_path, monkeypatch):
+    """CR-04-01 regression: an `src/auth/**` file change must pull `security`.
+
+    Before the fix: `_diff_paths(ws, sha, sha) == []` → router sees no paths
+    → only `reviewer` floor ever participates. This test would have failed
+    because `"security"` never landed in `participants`.
+    """
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    _init_git_repo(tmp_path)
+    review_sha = _commit_file(tmp_path, "src/auth/middleware.py", "def auth(): ...\n")
+
+    from clawteam.sprint.state import SprintState, save_sprint_state
+
+    state = SprintState(
+        team="t1",
+        sprint_id="auth0001",
+        goal="g",
+        current_phase="review",
+        workspace_branch=str(tmp_path),
+        review_sha=review_sha,
+    )
+    save_sprint_state(state)
+
+    bus = _CapturingBus()
+    pm = _RealRouterPM(_gstack_router_from_template())
+
+    async def fake_spawn(role, state, review_sha, peer_reports=None):
+        return {"role": role, "findings": []}
+
+    # Use real subprocess.run — the dispatcher must call real git against the
+    # real repo for the base-SHA resolution and diff to work end-to-end.
+    result = asyncio.run(
+        dispatch_review_phase(state, pm, bus, spawn_fn=fake_spawn)
+    )
+    assert "security" in result["participants"], (
+        f"auth diff should route security reviewer, got {result['participants']!r}"
+    )
+    assert "reviewer" in result["participants"]  # floor still enforced
+
+
+def test_dispatcher_routes_designer_on_ui_diff_via_real_router(tmp_path, monkeypatch):
+    """A `src/components/**.tsx` file change must pull `designer`."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    _init_git_repo(tmp_path)
+    review_sha = _commit_file(
+        tmp_path, "src/components/Button.tsx", "export const Button = () => null;\n"
+    )
+
+    from clawteam.sprint.state import SprintState, save_sprint_state
+
+    state = SprintState(
+        team="t1",
+        sprint_id="ui000001",
+        goal="g",
+        current_phase="review",
+        workspace_branch=str(tmp_path),
+        review_sha=review_sha,
+    )
+    save_sprint_state(state)
+
+    bus = _CapturingBus()
+    pm = _RealRouterPM(_gstack_router_from_template())
+
+    async def fake_spawn(role, state, review_sha, peer_reports=None):
+        return {"role": role, "findings": []}
+
+    result = asyncio.run(
+        dispatch_review_phase(state, pm, bus, spawn_fn=fake_spawn)
+    )
+    assert "designer" in result["participants"], (
+        f"UI diff should route designer, got {result['participants']!r}"
+    )
+
+
+def test_dispatcher_produces_nonempty_diff_paths_end_to_end(tmp_path, monkeypatch):
+    """Anti-regression for the exact same-SHA bug — the root cause of CR-04-01.
+
+    If the dispatcher ever reverts to `_diff_paths(ws, review_sha, review_sha)`,
+    the real `GstackReviewRouter` will see an empty diff and only `reviewer`
+    will appear in `participants`. We assert the router DID observe the diff
+    by checking that a touched path routes a non-floor reviewer.
+    """
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    _init_git_repo(tmp_path)
+    review_sha = _commit_file(tmp_path, "package.json", '{"name":"x"}\n')
+
+    from clawteam.sprint.state import SprintState, save_sprint_state
+
+    state = SprintState(
+        team="t1",
+        sprint_id="pkg00001",
+        goal="g",
+        current_phase="review",
+        workspace_branch=str(tmp_path),
+        review_sha=review_sha,
+    )
+    save_sprint_state(state)
+
+    bus = _CapturingBus()
+    pm = _RealRouterPM(_gstack_router_from_template())
+
+    async def fake_spawn(role, state, review_sha, peer_reports=None):
+        return {"role": role, "findings": []}
+
+    result = asyncio.run(
+        dispatch_review_phase(state, pm, bus, spawn_fn=fake_spawn)
+    )
+    # package.json routes dx-lead — if the dispatcher sends an empty diff
+    # to the router, this assertion fails and reveals the regression.
+    assert "dx-lead" in result["participants"], (
+        f"package.json diff should route dx-lead (regression of CR-04-01 same-SHA bug); "
+        f"participants={result['participants']!r}"
+    )
+
+
+def test_merge_base_returns_empty_when_workspace_missing():
+    from clawteam.sprint.review_phase import _merge_base
+
+    assert _merge_base("", "deadbeef") == ""
+    assert _merge_base("/tmp/whatever", "") == ""
+
+
+def test_merge_base_resolves_against_main_branch(tmp_path):
+    """Real git: `_merge_base` resolves to an ancestor of review_sha on main."""
+    from clawteam.sprint.review_phase import _merge_base
+
+    _init_git_repo(tmp_path)
+    review_sha = _commit_file(tmp_path, "src/app/x.py", "x = 1\n")
+    base = _merge_base(str(tmp_path), review_sha)
+    assert base  # non-empty
+    assert base != review_sha  # avoids the same-SHA bug
