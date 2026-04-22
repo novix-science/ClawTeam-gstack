@@ -29,6 +29,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+from pydantic import ValidationError
+
 from clawteam.fileutil import file_locked
 from clawteam.memory.entry import MemoryEntry
 from clawteam.paths import ensure_within_root, validate_identifier
@@ -187,7 +189,11 @@ class TeamMemoryStore:
             for raw in self._iter_jsonl(bucket):
                 try:
                     entry = MemoryEntry(**raw)
-                except Exception:
+                except ValidationError:
+                    # WR-05: narrow to pydantic ValidationError so legacy-
+                    # shape records are skipped silently (T-06-02-04
+                    # malformed-line posture) while TypeError / KeyError
+                    # / other programmer bugs still surface loudly.
                     continue
                 if entry.op == "prune":
                     tombstoned.add(entry.id)

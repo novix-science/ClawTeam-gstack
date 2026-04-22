@@ -342,3 +342,73 @@ def test_prune_tombstone_bypasses_high_impact(isolated_data_dir):
     # Should return cleanly; no exception, no gate invocation.
     store.prune(target_id, scope="team")
     assert store.list(scope="team") == []
+
+
+# ---------------------------------------------------------------------------
+# WR-05 regression: list() skips ValidationError silently but raises loudly
+#                   on programmer errors (TypeError / KeyError).
+# ---------------------------------------------------------------------------
+
+
+def test_list_silently_skips_pydantic_validation_errors(
+    isolated_data_dir,
+):
+    """A legacy on-disk record that fails pydantic validation is skipped,
+    while a co-resident valid record is still returned."""
+    store = TeamMemoryStore("teamA")
+    store.write(
+        _mk_entry(
+            team_id="mem-teamA-20260421-cccccc",
+            timestamp="2026-04-21T10:00:00+00:00",
+        )
+    )
+
+    bucket = (
+        isolated_data_dir
+        / "teams" / "teamA" / "memory" / "team" / "2026-04.jsonl"
+    )
+    # Append a well-formed JSON object that violates MemoryEntry invariants
+    # (confidence > 1.0 → pydantic ValidationError, NOT TypeError).
+    legacy_shape = {
+        "id": "mem-teamA-20260421-dddddd",
+        "author": "legacy@sprint-0",
+        "title": "legacy record",
+        "tags": ["pattern"],
+        "learned_from": "artifact",
+        "scope": "team",
+        "timestamp": "2026-04-21T11:00:00+00:00",
+        "confidence": 999.0,  # out of range → ValidationError
+    }
+    with bucket.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(legacy_shape) + "\n")
+
+    # The valid entry survives; the bad legacy record is suppressed.
+    entries = store.list(scope="team")
+    assert len(entries) == 1
+    assert entries[0].id == "mem-teamA-20260421-cccccc"
+
+
+def test_list_raises_on_non_validation_errors(
+    isolated_data_dir, monkeypatch,
+):
+    """A TypeError/KeyError (programmer bug, not bad data) must surface —
+    WR-05 narrowed the catch to ValidationError specifically."""
+    from clawteam.memory import store as store_mod
+
+    store = TeamMemoryStore("teamA")
+    store.write(
+        _mk_entry(
+            team_id="mem-teamA-20260421-eeeeee",
+            timestamp="2026-04-21T10:00:00+00:00",
+        )
+    )
+
+    # Force MemoryEntry to raise a TypeError (simulating a future refactor
+    # that renames a field and breaks __init__ — NOT a validation issue).
+    def _boom_entry(**kw):
+        raise TypeError("simulated programmer error: bad kwarg")
+
+    monkeypatch.setattr(store_mod, "MemoryEntry", _boom_entry)
+
+    with pytest.raises(TypeError, match="simulated programmer error"):
+        store.list(scope="team")

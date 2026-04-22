@@ -85,16 +85,22 @@ def test_find_skips_non_directories(tmp_path):
 
 
 def test_gc_zombies_deletes_returned_paths(tmp_path):
-    d = _mk_dir(tmp_path, "old", age_days=40)
+    d = _mk_dir(tmp_path, "old")
     (d / "file.txt").write_text("content")
+    # Re-apply mtime AFTER populating (writing the child bumps parent mtime).
+    past = time.time() - 40 * 86400
+    os.utime(d, (past, past))
     gced = gc_zombies([d])
     assert not d.exists()
     assert gced == [d]
 
 
 def test_gc_zombies_emits_event(tmp_path):
-    d = _mk_dir(tmp_path, "old", age_days=40)
+    d = _mk_dir(tmp_path, "old")
     (d / "file.txt").write_text("hello world")  # 11 bytes
+    # Re-apply mtime AFTER populating so age_days reflects the intended age.
+    past = time.time() - 40 * 86400
+    os.utime(d, (past, past))
     bus = EventBus()
     received: list[ZombieWorktreeGced] = []
     bus.subscribe(ZombieWorktreeGced, received.append)
