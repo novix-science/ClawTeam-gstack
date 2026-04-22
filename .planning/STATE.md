@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 Wave 1 IN-PROGRESS (plans 06-02 memory substrate + 06-04 browser substrate complete; 06-03 search/decay running in parallel)
-stopped_at: Completed 06-02 (Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation; 25 new tests all green)
-last_updated: "2026-04-22T11:18:30.032Z"
+status: Phase 6 Wave 1 COMPLETE (plans 06-02 memory substrate + 06-03 memory search/decay + 06-04 browser substrate all landed)
+stopped_at: Completed 06-03 (Wave 1 memory search/rank — decay_factor + D-06 ranking formula + grep-safe search; 28 new tests all green; 53/53 memory tests total)
+last_updated: "2026-04-22T21:00:36Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 68
-  completed_plans: 62
-  percent: 91
+  completed_plans: 63
+  percent: 93
 ---
 
 # Project State
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 6 Wave 1 IN-PROGRESS
-Plan: 06-04 complete (Wave 1 — clawteam/browser/adapter.py + session.py + cookies.py + updated __init__.py re-exports; 32 tests green, D-02 no-leak invariant locked); 06-02 (TeamMemoryStore) + 06-03 (memory search/decay) running in parallel executors
+Phase: 6 Wave 1 COMPLETE
+Plan: 06-03 complete (Wave 1 — clawteam/memory/decay.py + search.py + __init__.py re-export; 28 new tests (11 decay + 17 search); 53/53 memory tests green; MEM-03/MEM-05/MEM-07/D-06 requirements closed). Plans 06-02 (memory substrate) + 06-03 (search/rank) + 06-04 (browser substrate) all landed — Wave 1 gate reached. Next: Wave 2 (06-05..06-07 browser skills + design shotgun).
 
 ## Performance Metrics
 
@@ -85,6 +85,7 @@ Plan: 06-04 complete (Wave 1 — clawteam/browser/adapter.py + session.py + cook
 | Phase 06 P01 | 12min | 3 tasks | 10 files |
 | Phase 06 P04 | 12min | 3 tasks | 7 files |
 | Phase 06 P02 | 12min | 2 tasks | 7 files |
+| Phase 06 P03 | 22min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,10 @@ Recent decisions affecting current work:
 - [Phase 06]: 06-04: Single-seam lazy-import pattern — only adapter.py declares `_import_sync_playwright()` and inside its body does `from playwright.sync_api import sync_playwright`. session.py imports the seam directly (`from clawteam.browser.adapter import _import_sync_playwright`). Monkeypatch once to stub both modules. Reusable for any future browser sibling.
 - [Phase 06]: 06-04: Cross-executor stash interaction with Plan 06-02 (recurring 04-10 / 05-03 / 05-06 / 05-09 pattern) — a4aa2be includes 06-02's clawteam/memory/__init__.py + clawteam/memory/store.py alongside my tests/browser/test_cookies.py. Resolved by namespace separation: 06-04's commits touch only clawteam/browser/ + tests/browser/; `git log --oneline -- clawteam/browser/` confirms purity. 06-02's work in clawteam/memory/ remains intact for its own executor.
 - [Phase 06]: 06-02: Ship MemoryEntry pydantic + TeamMemoryStore append-only JSONL (D-04/D-05). TeamMemoryStore validates team_name at __init__ via validate_identifier + uses ensure_within_root on every path helper — D-15 cross-team isolation (4 tests). write() pattern: file_locked + open('a') + flush + fsync (A5 inline; no atomic_append_line helper). prune() writes op='prune' tombstone to same bucket; .list tracks tombstoned ids + suppresses. Prune bypasses the (future) high-impact gate (research Open Q3). Tag regex [a-z0-9][a-z0-9:_-]* — leading alnum required; rejected plan behavior's '_internal' claim in favor of plan action's authoritative regex. 25 new tests across 3 files, 34/34 green. Cross-executor stash attribution: store.py landed under 06-04's commit a4aa2be (same pattern as 04-10/05-03/05-06).
+- [Phase 06]: 06-03: Ship decay_factor + D-06 ranking formula (recency × provenance × decay) + grep-safe keyword search at clawteam/memory/decay.py + search.py. SearchResult dataclass exposes the 3 component factors separately so /learn search --explain (Plan 06-10) can show users *why* an entry ranks where it does. Per-tag TTL (pattern=90d/incident=180d/preference=indefinite/retro=365d/decision=5y) with MAX-TTL rule for multi-tag entries + MemoryConfig override for pattern/incident. Provenance weights: user+ev=2.0, user=1.2, artifact+ev=1.0, artifact=0.6 (MEM-05 flagged-not-blocked), sprint-reflect=0.8, self-inferred=0.3. MEM-07 floor = 0.05 (never 0) so expired entries rank last but stay discoverable. T-06-03-01 ReDoS mitigation via re.escape(query) — user queries treated as literal, no catastrophic-backtracking surface. 28 new tests (11 decay + 17 search) all green; 53/53 memory suite; TDD gates RED→GREEN preserved for both tasks.
+- [Phase 06]: 06-03: user+no-evidence=1.2 (extension to D-06 table) — prevents cliff between 0 and 2.0, keeps provenance monotone in evidence-presence (user claims outrank un-cited artifacts but rank below cited users/artifacts).
+- [Phase 06]: 06-03: Rule 3 deviation — Plan 06-02's store.py substrate was staged-but-uncommitted at my Task 2 RED phase. Plan 06-02's executor landed its own commit (98425bb) before my Task 2 GREEN; clean sequence preserved. My own fix: 5 tests had non-hex id_suffix ("ggg001"/"hhh001..003") failing MemoryEntry.id pattern [a-f0-9]{6} — renamed to "aa1001..aa1002" / "bb1001..bb1003" during GREEN phase.
+- [Phase 06]: 06-03: 9 pre-existing test-ordering failures (tests/test_gstack_plugin.py + tests/test_evidence_schemas_phase5.py + tests/test_plugin_hooks.py) reproduce on baseline 98425bb WITHOUT Plan 06-03 changes — same cross-contamination noted in Plan 05-10. Logged at .planning/phases/06-browser-skills-design-pipeline-team-memory/deferred-items.md for future harness-hygiene plan; out of scope for 06-03.
 
 ### Pending Todos
 
@@ -193,14 +198,15 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T11:18:22.611Z
-Stopped at: Completed 06-02 (Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation; 25 new tests all green)
+Last session: 2026-04-22T21:00:36Z
+Stopped at: Completed 06-03 (Wave 1 memory search/rank — decay_factor + D-06 ranking formula + grep-safe search; 28 new tests all green; 53/53 memory suite; Wave 1 gate reached)
 Resume files:
 
+  - Phase 6 Wave 1 COMPLETE (06-03): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-03-SUMMARY.md
   - Phase 6 Wave 1 (06-04 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-04-SUMMARY.md
+  - Phase 6 Wave 1 (06-02 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-02-SUMMARY.md
   - Phase 6 Wave 0 substrate: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-01-SUMMARY.md
   - Phase 6 context: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-CONTEXT.md + 06-RESEARCH.md
-  - Phase 6 Wave 1 parallel (in-flight): .planning/phases/06-*/06-02-PLAN.md (TeamMemoryStore) + 06-03-PLAN.md (memory search/decay)
   - Phase 5 COMPLETE: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-10-SUMMARY.md
 
 ## Recent Activity

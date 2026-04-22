@@ -36,11 +36,11 @@ Team-scoped, layered, grep-first; provenance + decay to prevent memory poisoning
 
 - [x] **MEM-01**: `TeamMemoryStore` exists under `~/.clawteam/teams/<team>/memory/` with two-tier layout: `memory/team/` (shared) + `memory/agents/<role>/` (per-role private).
 - [x] **MEM-02**: Writes are append-only JSONL entries with frontmatter: id, author (agent id), sprint id, phase, timestamp, tags, evidence citation (path:line or artifact ref), confidence level.
-- [ ] **MEM-03**: Reads support grep-first retrieval by tag + keyword; keyword match ranked by recency-weighted score.
+- [x] **MEM-03**: Reads support grep-first retrieval by tag + keyword; keyword match ranked by recency-weighted score.
 - [ ] **MEM-04**: `/learn` skill exposes `learn write <scope> <title>`, `learn list <scope> [--tag]`, `learn search <query>`, `learn prune <id>`. Agents call via existing skill machinery; human calls via `clawteam` CLI.
-- [ ] **MEM-05**: Provenance tracking: every memory entry cites evidence; entries without evidence get a lower retrieval rank (not blocked — flagged).
+- [x] **MEM-05**: Provenance tracking: every memory entry cites evidence; entries without evidence get a lower retrieval rank (not blocked — flagged).
 - [ ] **MEM-06**: High-impact writes (tagged `impact:high` or under `memory/team/decisions/`) require human confirmation through `InteractionGate` before commit. Prevents memory poisoning (PITFALLS #10).
-- [ ] **MEM-07**: Memory decay: entries inherit a TTL from their tag (e.g., `pattern` 90 days, `preference` indefinite, `incident` 180 days). Expired entries rank below unexpired on retrieval; not auto-deleted.
+- [x] **MEM-07**: Memory decay: entries inherit a TTL from their tag (e.g., `pattern` 90 days, `preference` indefinite, `incident` 180 days). Expired entries rank below unexpired on retrieval; not auto-deleted.
 
 ### Team Roster & Template (TEAM)
 
@@ -212,11 +212,11 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | INT-06 | Phase 2 | Pending |
 | MEM-01 | Phase 6 | Complete |
 | MEM-02 | Phase 6 | Complete |
-| MEM-03 | Phase 6 | Pending |
+| MEM-03 | Phase 6 | Complete |
 | MEM-04 | Phase 6 | Pending |
-| MEM-05 | Phase 6 | Pending |
+| MEM-05 | Phase 6 | Complete |
 | MEM-06 | Phase 6 | Pending |
-| MEM-07 | Phase 6 | Pending |
+| MEM-07 | Phase 6 | Complete |
 | TEAM-01 | Phase 3 | Complete |
 | TEAM-02 | Phase 3 | Complete |
 | TEAM-03 | Phase 3 | Complete |

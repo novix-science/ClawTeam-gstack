@@ -303,7 +303,9 @@ Plans:
 Plans:
 - [x] 06-01: Wave 0 substrate — pyproject [browser] extra + playwright_available() + 3 new HarnessEvents + MemoryConfig/DesignShotgunConfig/BrowserConfig TemplateDef sub-blocks (MEM-01/02, SKILL-10/11/12, QUALITY-10 substrate) — **COMPLETE 2026-04-22**
 - [x] 06-02: Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation (MEM-01, MEM-02, D-04, D-05, D-15) — **COMPLETE 2026-04-22**
-- [ ] 06-03 through 06-10: memory search/decay, browser adapter, /browse, /open-gstack-browser, /setup-browser-cookies, /design-shotgun, /design-html, backfill + integration (see `.planning/phases/06-*/06-0{3..10}-PLAN.md`)
+- [x] 06-03: Wave 1 memory search + ranking + decay — decay_factor (per-tag TTL, MEM-07 floor) + rank (recency × provenance × decay) + search (grep-safe keyword) (MEM-03, MEM-05, MEM-07, D-06) — **COMPLETE 2026-04-22**
+- [x] 06-04: Wave 1 browser substrate — Playwright adapter + session factory + per-domain cookies store (SKILL-10 substrate, D-02 no-leak invariant) — **COMPLETE 2026-04-22**
+- [ ] 06-05 through 06-10: /browse, /open-gstack-browser, /setup-browser-cookies, /design-shotgun, /design-html, /learn CLI + backfill + conflict gate + integration (see `.planning/phases/06-*/06-0{5..10}-PLAN.md`)
 
 **UI hint**: yes
 
