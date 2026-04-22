@@ -1225,8 +1225,22 @@ def config_health():
 
 
 @app.command("doctor")
-def doctor():
-    """Detect optional external tools and print per-OS install hints."""
+def doctor(
+    gc: bool = typer.Option(
+        False,
+        "--gc",
+        help=(
+            "Phase 7 Plan 07-08: also GC zombie worktrees older than 30 days "
+            "across all teams. Active SprintState workspace_branches are "
+            "preserved regardless of age."
+        ),
+    ),
+):
+    """Detect optional external tools and print per-OS install hints.
+
+    With ``--gc``, also run the zombie-worktree cleanup pass across all
+    teams and surface the per-team disk-usage report.
+    """
     import shutil
     from importlib.util import find_spec
 
@@ -1261,7 +1275,111 @@ def doctor():
                 if info["install_hint"]:
                     console.print(f"    [dim]{escape(info['install_hint'])}[/dim]")
 
-    _output(checks, _human)
+    if not gc:
+        _output(checks, _human)
+        return
+
+    # ── Phase 7 Plan 07-08: zombie-worktree auto-GC pass ───────────
+    from clawteam.events.global_bus import get_event_bus
+    from clawteam.sprint.state import SprintState
+    from clawteam.team.models import get_data_dir
+    from clawteam.workspace.gc import (
+        disk_usage_report,
+        find_zombie_worktrees,
+        gc_zombies,
+    )
+
+    teams_root = get_data_dir() / "teams"
+    gc_summary: dict = {
+        "teams": [],
+        "total_zombies": 0,
+        "total_freed_bytes": 0,
+    }
+
+    if teams_root.is_dir():
+        bus = get_event_bus()
+        for team_dir in sorted(teams_root.iterdir()):
+            if not team_dir.is_dir():
+                continue
+            worktrees_root = team_dir / "worktrees"
+            if not worktrees_root.is_dir():
+                continue
+
+            # Collect active branches from this team's sprints — active
+            # workspace_branch values MUST be preserved regardless of
+            # worktree age (07-RESEARCH §Pitfall 6 safety invariant).
+            active_branches: set[str] = set()
+            sprints_dir = team_dir / "sprints"
+            if sprints_dir.is_dir():
+                for sprint_dir in sorted(sprints_dir.iterdir()):
+                    if not sprint_dir.is_dir():
+                        continue
+                    try:
+                        state = SprintState.load(
+                            team=team_dir.name, sprint_id=sprint_dir.name
+                        )
+                    except Exception:
+                        # Best-effort: unreadable state.json must never
+                        # block the GC pass. Safest fallback is to add
+                        # the sprint_dir name to active_branches so a
+                        # potentially-active branch is preserved.
+                        active_branches.add(sprint_dir.name)
+                        continue
+                    if state.workspace_branch:
+                        active_branches.add(state.workspace_branch)
+
+            zombies = find_zombie_worktrees(
+                worktrees_root,
+                max_age_days=30,
+                active_branches=active_branches,
+            )
+            gced = gc_zombies(zombies, team_name=team_dir.name, bus=bus)
+            usage = disk_usage_report(team_dir)
+            team_freed = sum(
+                # freed bytes already captured per event; reconstruct via
+                # difference between pre/post is impractical, so sum via
+                # disk_usage report delta is not available here. Leave
+                # per-path freed bytes as an implementation detail of
+                # gc_zombies (visible through event stream subscribers);
+                # the CLI summary just reports the removed count + usage.
+                []
+            )
+            gc_summary["teams"].append(
+                {
+                    "team": team_dir.name,
+                    "zombies_removed": len(gced),
+                    "active_branches_preserved": sorted(active_branches),
+                    "disk_usage": usage,
+                }
+            )
+            gc_summary["total_zombies"] += len(gced)
+            gc_summary["total_freed_bytes"] += team_freed
+
+    combined = {**checks, "gc": gc_summary}
+
+    def _human_with_gc(d):
+        _human(d)
+        gc_d = d["gc"]
+        total = gc_d["total_zombies"]
+        n_teams = len(gc_d["teams"])
+        console.print(
+            f"\n[green]GC complete:[/green] {total} zombie worktree(s) "
+            f"removed across {n_teams} team(s)."
+        )
+        for t in gc_d["teams"]:
+            u = t["disk_usage"]
+            if u["over_hard"]:
+                tag = "[red]over hard[/red]"
+            elif u["over_soft"]:
+                tag = "[yellow]over soft[/yellow]"
+            else:
+                tag = "[green]ok[/green]"
+            console.print(
+                f"  {t['team']}: removed={t['zombies_removed']}, "
+                f"disk={u['total_gb']} GB [{tag}]"
+            )
+
+    _output(combined, _human_with_gc)
 
 
 # ============================================================================
