@@ -75,10 +75,17 @@ class TestLoadGstackTemplate:
         assert mp.get("sre") == "haiku"
 
     def test_memory_block_declared(self):
-        """D-05: [template.memory] declares root + per_role for TeamManager pre-creation."""
-        memory = load_template("gstack").memory
-        assert memory.get("root") == "{data_dir}/teams/{team_name}/memory"
-        assert memory.get("per_role") is True
+        """D-05: [template.memory] declares root + per_role for TeamManager pre-creation.
+
+        Phase 6 (Plan 06-01 Task 3): the Phase 3 `memory` dict field was
+        renamed to `memory_layout` to free up `memory` for the new
+        Phase 6 MemoryConfig sub-block. The `[template.memory]` TOML key
+        is preserved (legacy BC); _parse_toml reads it into the
+        `memory_layout` field.
+        """
+        layout = load_template("gstack").memory_layout
+        assert layout.get("root") == "{data_dir}/teams/{team_name}/memory"
+        assert layout.get("per_role") is True
 
     def test_agents_reference_prompt_files(self):
         """D-06: every agent (leader + 10 specialists) declares prompt_file under gstack/prompts/."""

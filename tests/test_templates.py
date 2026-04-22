@@ -180,7 +180,11 @@ class TestPhase3AdditiveFields:
         assert t.leader_role == ""
         assert t.phases == []
         assert t.model_profile == {}
-        assert t.memory == {}
+        # Phase 6 (Plan 06-01 Task 3): renamed from `memory` to
+        # `memory_layout` (the `memory` name is now the MemoryConfig
+        # sub-block; Phase 3 dict field moved aside).
+        assert t.memory_layout == {}
+        assert t.memory is None
 
     @pytest.mark.parametrize(
         "template_name",
@@ -199,7 +203,10 @@ class TestPhase3AdditiveFields:
         assert tmpl.leader_role == ""
         assert tmpl.phases == []
         assert tmpl.model_profile == {}
-        assert tmpl.memory == {}
+        # Phase 6 (Plan 06-01 Task 3): dict field renamed `memory` -> `memory_layout`.
+        assert tmpl.memory_layout == {}
+        # Phase 6: new `memory` field is the MemoryConfig sub-block (None for existing BC).
+        assert tmpl.memory is None
         # AgentDef.role defaults to "" for every agent in existing templates:
         for agent in [tmpl.leader, *tmpl.agents]:
             assert agent.role == ""
@@ -253,10 +260,13 @@ model_profile = "opus"
             "default": "balanced",
             "pm": "opus",
         }
-        assert tmpl.memory == {
+        # Phase 6 (Plan 06-01 Task 3): legacy TOML key `[template.memory]`
+        # still parses into the renamed `memory_layout` dict field.
+        assert tmpl.memory_layout == {
             "root": "{data_dir}/teams/{team_name}/memory",
             "per_role": True,
         }
+        assert tmpl.memory is None  # no top-level [memory] block in probe
         assert tmpl.leader.role == "ceo"
         assert tmpl.leader.prompt_file == "gstack/prompts/ceo.md"
         assert tmpl.agents[0].role == "pm"

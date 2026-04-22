@@ -162,6 +162,79 @@ class BenchmarkConfig(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 6 Wave 0 (Plan 06-01 Task 3, A7): optional top-level sub-blocks
+# consumed by Phase 6 /learn (MemoryConfig), /design-shotgun
+# (DesignShotgunConfig), and the 3 browser skills (BrowserConfig). All
+# default to None so existing templates (gstack + 6 bundled) continue to
+# parse unchanged.
+# ---------------------------------------------------------------------------
+
+
+class MemoryConfig(BaseModel):
+    """[memory] TOML block — TeamMemoryStore tuning (D-06, D-10, MEM-07)."""
+
+    conflict_threshold: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "BoW cosine threshold above which /learn write flags a conflict "
+            "(with sentiment-opposition secondary check). Advisory-only — "
+            "the write is never blocked (D-10)."
+        ),
+    )
+    retention_pattern_days: int = Field(
+        default=90,
+        ge=1,
+        description=(
+            "TTL for 'pattern' tagged entries before decay_factor drops to "
+            "0.2 (MEM-07)."
+        ),
+    )
+    retention_incident_days: int = Field(
+        default=180,
+        ge=1,
+        description="TTL for 'incident' tagged entries (MEM-07).",
+    )
+
+
+class DesignShotgunConfig(BaseModel):
+    """[design_shotgun] TOML block — /design-shotgun variant count + board format (D-12)."""
+
+    variant_count: int = Field(
+        default=4,
+        ge=1,
+        le=32,
+        description="Number of variants to generate per shotgun iteration.",
+    )
+    board_format: Literal["html", "markdown"] = Field(
+        default="html",
+        description="Comparison-board rendering format.",
+    )
+
+
+class BrowserConfig(BaseModel):
+    """[browser] TOML block — browser skill defaults (D-01, SKILL-10)."""
+
+    headless: bool = Field(
+        default=True,
+        description="Whether /browse launches Chromium headless by default.",
+    )
+    timeout_seconds: int = Field(
+        default=30,
+        ge=1,
+        description="Default per-action timeout (navigate, click, fill).",
+    )
+    cookies_dir: str = Field(
+        default="",
+        description=(
+            "Override cookies directory. Empty string = "
+            "<data_dir>/teams/<team>/browser/cookies/."
+        ),
+    )
+
+
 class TemplateDef(BaseModel):
     name: str
     description: str = ""
@@ -179,10 +252,13 @@ class TemplateDef(BaseModel):
     # Phase 3 (Plan 03-02, TEAM-05): per-role model assignments keyed by role,
     # with a reserved "default" key (Pitfall 12 prevention — never default to "quality").
     model_profile: dict[str, str] = {}
-    # Phase 3 (Plan 03-02, D-05): memory layout declaration, e.g.
-    # {"root": "{data_dir}/teams/{team_name}/memory", "per_role": True}.
-    # TeamManager.create_team consults this to pre-create per-role dirs.
-    memory: dict[str, str | bool] = {}
+    # Phase 3 (Plan 03-02, D-05): per-role memory-directory layout
+    # declaration, e.g. {"root": "{data_dir}/teams/{team_name}/memory",
+    # "per_role": True}. TeamManager.create_team consults this to pre-create
+    # per-role dirs. Renamed from `memory` to `memory_layout` in Plan 06-01
+    # Task 3 to free up the `memory` name for the new MemoryConfig
+    # sub-block (Rule 3 deviation — field-name collision).
+    memory_layout: dict[str, str | bool] = {}
     # Phase 4 (Plan 04-06, §04-CONTEXT D-04): review-phase routing +
     # decorrelation config. Default empty ReviewConfig keeps the 6 existing
     # non-gstack templates BC-safe (they omit [template.review] entirely).
@@ -194,6 +270,12 @@ class TemplateDef(BaseModel):
     deploy: DeployConfig | None = None
     canary: CanaryConfig | None = None
     benchmark: BenchmarkConfig | None = None
+    # Phase 6 Wave 0 (Plan 06-01 Task 3, A7): optional top-level sub-blocks
+    # consumed by Phase 6 /learn (memory), /design-shotgun, and the 3
+    # browser skills. Default None so existing templates parse unchanged.
+    memory: MemoryConfig | None = None
+    design_shotgun: DesignShotgunConfig | None = None
+    browser: BrowserConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +346,15 @@ def _parse_toml(path: Path) -> TemplateDef:
     canary_raw = raw.get("canary")
     benchmark_raw = raw.get("benchmark")
 
+    # Phase 6 Wave 0 (Plan 06-01 Task 3, A7): optional TOP-LEVEL sub-blocks
+    # consumed by Phase 6 /learn ([memory] — TeamMemoryStore tuning),
+    # /design-shotgun ([design_shotgun]), and the 3 browser skills
+    # ([browser]). Absent blocks map to None (BC-safe for gstack + 6
+    # bundled templates — none of which declare these blocks today).
+    memory_raw = raw.get("memory")
+    design_shotgun_raw = raw.get("design_shotgun")
+    browser_raw = raw.get("browser")
+
     return TemplateDef(
         name=tmpl.get("name", path.stem),
         description=tmpl.get("description", ""),
@@ -277,7 +368,12 @@ def _parse_toml(path: Path) -> TemplateDef:
         leader_role=tmpl.get("leader_role", ""),
         phases=tmpl.get("phases", []),
         model_profile=tmpl.get("model_profile", {}),
-        memory=tmpl.get("memory", {}),
+        # Plan 06-01 Task 3: field renamed `memory` -> `memory_layout`
+        # to free up `memory` for MemoryConfig. gstack.toml still ships
+        # `[template.memory]` (legacy TOML key), so read that key first
+        # and fall back to `memory_layout` for future templates that
+        # want to use the new spelling.
+        memory_layout=tmpl.get("memory", tmpl.get("memory_layout", {})),
         # Phase 4 (Plan 04-06): review-phase config. Default empty when the
         # template declares no [template.review] block.
         review=review_config,
@@ -288,6 +384,14 @@ def _parse_toml(path: Path) -> TemplateDef:
         benchmark=(
             BenchmarkConfig(**benchmark_raw) if benchmark_raw is not None else None
         ),
+        # Phase 6 Wave 0 (Plan 06-01 Task 3): top-level optional sub-blocks.
+        memory=MemoryConfig(**memory_raw) if memory_raw is not None else None,
+        design_shotgun=(
+            DesignShotgunConfig(**design_shotgun_raw)
+            if design_shotgun_raw is not None
+            else None
+        ),
+        browser=BrowserConfig(**browser_raw) if browser_raw is not None else None,
     )
 
 
