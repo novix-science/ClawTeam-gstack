@@ -16,7 +16,7 @@ Generic, upstream-PR-friendly additions to ClawTeam's harness. No gstack-specifi
 - [ ] **CORE-03**: Existing templates (`software-dev`, `hedge-fund`, `code-review`, `harness-default`, `research-paper`, `strategy-room`) continue to spawn, advance phases, and pass all existing tests with no code changes.
 - [ ] **CORE-04**: `SprintState` exists as a pydantic model capturing: sprint id, goal, phase_state, owning team, workspace branch, artifacts, participants, pending-questions ids. Persisted via existing file-locked JSON machinery under `~/.clawteam/teams/<team>/sprints/<id>/state.json`.
 - [ ] **CORE-05**: `SprintConductor` manages one team's N concurrent sprints — enumerates active sprints, dispatches phase-advance events, coordinates per-sprint artifact stores.
-- [ ] **CORE-06**: One team can hold ≥10 concurrent sprints without race conditions on the team-level task store or memory store (verified by integration test).
+- [~] **CORE-06**: One team can hold ≥10 concurrent sprints without race conditions on the team-level task store or memory store (verified by integration test). — Substrate complete 2026-04-22 (07-02: 3 asyncio.Semaphore caps + start_sprint_async + RateLimitMonitor + thread-safe active-agents set under threading.RLock; dual-lock pattern prevents coroutine/thread races on shared state). Integration test pending Plan 07-09.
 - [ ] **CORE-07**: Sprint pause / resume: `clawteam sprint pause <id>` checkpoints state; `clawteam sprint resume <id>` rehydrates and re-emits the last pending gate event. Sprints survive a full `HarnessOrchestrator` restart.
 
 ### Human Interaction (INT)
@@ -110,7 +110,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 - [ ] **QUALITY-01**: Structured response envelope enforced on every agent turn (drift prevention per PITFALLS #1).
 - [ ] **QUALITY-02**: Cycle detector in transport: if agents A → B → A within N turns, break cycle, escalate to human via `AttentionQueue` (deadlock prevention per PITFALLS #2).
 - [ ] **QUALITY-03**: Context window guard: agent prompts assembled from {role prompt + relevant memory + minimal working artifacts} ≤ configurable token budget. Excess memory spilled to retrieval, not inlined (context exhaustion prevention per PITFALLS #3).
-- [ ] **QUALITY-04**: Active-agent slot pool: harness caps concurrent active agents at N (default 6). Idle agents dormant. Prevents resource blowup on laptops (PITFALLS #4).
+- [x] **QUALITY-04**: Active-agent slot pool: harness caps concurrent active agents at N (default 6). Idle agents dormant. Prevents resource blowup on laptops (PITFALLS #4). — Complete 2026-04-22 (07-02: SprintConductor._active_agent_sem=asyncio.Semaphore(max_active_agents=6 default, configurable via ConductorConfig); dispatch_turn async ctx manager acquires slot + registers agent in _active_agents_set; DormancyTransition event emitted on enter/exit; active_agents() accessor returns sorted list).
 - [ ] **QUALITY-05**: `AttentionQueue` auto-digest: questions grouped by sprint + age; Catch-Up digest view surfaces "4 sprints stalled >2h, 1 CRITICAL" — prevents attention fatigue (PITFALLS #5).
 - [ ] **QUALITY-06**: Workspace hardening: file-lock retry with exponential backoff; `git index` corruption detection + auto-recovery; per-agent worktree integrity check on resume (PITFALLS #6).
 - [x] **QUALITY-07
@@ -203,7 +203,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | CORE-03 | Phase 0 | Pending |
 | CORE-04 | Phase 1 | Pending |
 | CORE-05 | Phase 2 | Pending |
-| CORE-06 | Phase 7 | Pending |
+| CORE-06 | Phase 7 | Substrate complete (07-02: semaphores + thread-safe set); integration test pending 07-09 |
 | CORE-07 | Phase 2 | Pending |
 | INT-01 | Phase 1 | Pending |
 | INT-02 | Phase 1 | Pending |
@@ -257,7 +257,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-01 | Phase 2 | Pending |
 | QUALITY-02 | Phase 2 | Pending |
 | QUALITY-03 | Phase 2 | Pending |
-| QUALITY-04 | Phase 7 | Pending |
+| QUALITY-04 | Phase 7 | Complete (07-02: _active_agent_sem + dispatch_turn ctx mgr + DormancyTransition + active_agents()) |
 | QUALITY-05 | Phase 7 | Pending |
 | QUALITY-06 | Phase 2 | Pending |
 | QUALITY-07 | Phase 4 | Complete (04-13: state-machine goldens; 04-14: inverse-assertion safety net test_markers_removed_and_runtime_present locks runtime-landed invariant) |

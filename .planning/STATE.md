@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 7 Wave 0 COMPLETE (07-01 substrate landed — [attend] extra + 3 packages + 6 events + queue_status + 3 TemplateDef sub-blocks; Waves 1-5 unblocked)
-stopped_at: Completed 07-01 (Phase 7 Wave 0 substrate — pyproject [attend]/watchdog extra, 3 new top-level packages (attention/cost/rate_limit), 6 new HarnessEvent dataclasses (ToolCallCompleted/ClaudeApiResponse/BudgetAlarmReached/RateLimitSaturated/ZombieWorktreeGced/DormancyTransition), SprintState.queue_status additive field, 3 new TemplateDef sub-blocks (ConductorConfig/AttentionConfig/CostConfig); 41 new tests + 180 BC regression green; 8 commits with strict TDD RED→GREEN gates per task)
-last_updated: "2026-04-22T20:35:00Z"
+status: Phase 7 Wave 1 COMPLETE (07-02 conductor-concurrency landed — 3 asyncio.Semaphore caps + start_sprint_async + RateLimitMonitor + dispatch_turn + active_agents(); Waves 2-5 unblocked)
+stopped_at: Completed 07-02 (Phase 7 Wave 1 SprintConductor concurrency — RateLimitMonitor 60s sliding 429 window with threshold-strict emit-on-cross + self-healing rearm; SprintConductor gains 3 asyncio.Semaphore caps (sprint=10/per-agent=1/active-agent=6) loaded from ConductorConfig, start_sprint_async with rate-limit consultation + acquire_timeout + queue_status writeback, dispatch_turn async context manager emitting DormancyTransition on enter/exit, active_agents() accessor for QUALITY-04; 16 new tests (8 RateLimitMonitor + 8 conductor-concurrency) all green + 35 BC sprint tests green; 4 commits with strict TDD RED→GREEN gates; plan executed exactly as written with zero deviations)
+last_updated: "2026-04-22T13:02:18Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 77
-  completed_plans: 67
-  percent: 87
+  completed_plans: 68
+  percent: 88
 ---
 
 # Project State
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 7 Wave 0 COMPLETE (substrate — attention/cost/rate_limit substrate laid; Waves 1-5 unblocked)
-Plan: 07-01 complete (Wave 0 — pyproject [attend]/watchdog extra; 3 new top-level packages clawteam/attention + clawteam/cost + clawteam/rate_limit with empty __all__; 6 new HarnessEvent dataclasses registered via register_event_type at module bottom (ToolCallCompleted D-09, ClaudeApiResponse D-12, BudgetAlarmReached D-10, RateLimitSaturated D-13, ZombieWorktreeGced SC#10, DormancyTransition QUALITY-04); SprintState.queue_status additive open-str field ("", "queued_capacity", "rate_limit_saturated") round-tripping through existing file_locked+atomic_write_text path, legacy state.json files load with default; ConductorConfig (max_concurrent_sprints=10/max_tasks_per_agent=1/max_active_agents=6/acquire_timeout=60s), AttentionConfig (urgency_weight=10/blocking_weight=5/tag_weights={}), CostConfig (budget_usd=100/fallback_at_percent=80/alarm_percent=[50,80,100]) as top-level TOML sub-blocks; gstack.toml + 6 packaged templates parse unchanged (parametrized BC lock). 41 new tests (5 pyproject + 14 events + 5 sprint-state + 17 template) all green; 180 BC regression tests unchanged. TDD RED→GREEN gates preserved per task — 8 commits: 88c4bca/b8e06f3 Task 1; f610a3c/9b34c22 Task 2; 7ed0900/b7732db Task 3; 6249f02/3defade Task 4. Next: 07-02 (SprintConductor concurrency — consumes queue_status + ConductorConfig + RateLimitSaturated).
+Phase: 7 Wave 1 COMPLETE (07-02 SprintConductor concurrency landed; Waves 2-5 unblocked)
+Plan: 07-02 complete (Wave 1 — RateLimitMonitor + 3 asyncio.Semaphore caps + start_sprint_async + dispatch_turn + active_agents()). Prior: 07-01 complete (Wave 0 — pyproject [attend]/watchdog extra; 3 new top-level packages clawteam/attention + clawteam/cost + clawteam/rate_limit with empty __all__; 6 new HarnessEvent dataclasses registered via register_event_type at module bottom (ToolCallCompleted D-09, ClaudeApiResponse D-12, BudgetAlarmReached D-10, RateLimitSaturated D-13, ZombieWorktreeGced SC#10, DormancyTransition QUALITY-04); SprintState.queue_status additive open-str field ("", "queued_capacity", "rate_limit_saturated") round-tripping through existing file_locked+atomic_write_text path, legacy state.json files load with default; ConductorConfig (max_concurrent_sprints=10/max_tasks_per_agent=1/max_active_agents=6/acquire_timeout=60s), AttentionConfig (urgency_weight=10/blocking_weight=5/tag_weights={}), CostConfig (budget_usd=100/fallback_at_percent=80/alarm_percent=[50,80,100]) as top-level TOML sub-blocks; gstack.toml + 6 packaged templates parse unchanged (parametrized BC lock). 41 new tests (5 pyproject + 14 events + 5 sprint-state + 17 template) all green; 180 BC regression tests unchanged. TDD RED→GREEN gates preserved per task — 8 commits: 88c4bca/b8e06f3 Task 1; f610a3c/9b34c22 Task 2; 7ed0900/b7732db Task 3; 6249f02/3defade Task 4. Next: 07-02 (SprintConductor concurrency — consumes queue_status + ConductorConfig + RateLimitSaturated).
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Plan: 07-01 complete (Wave 0 — pyproject [attend]/watchdog extra; 3 new top-le
 | Phase 06 P10 | 45min | 2 tasks | 5 files |
 | Phase 06 P09 | 11min | 1 task  | 5 files |
 | Phase 07 P01 | 25min | 4 tasks | 11 files |
+| Phase 07 P02 | 7min  | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -188,6 +189,7 @@ Recent decisions affecting current work:
 - [Phase 06]: 06-10: Test-file location deviation — plan specifies tests/cli/test_learn_cli.py but that subdir does not exist; repo convention is tests/test_cli_commands.py at repo root. Placed the 9 CLI tests at tests/test_learn_cli.py (Rule 3 — auto-fixed blocking path mismatch; same precedent as Plan 05-07's test_ship_skill.py placement).
 - [Phase 06]: 06-10: test_registered_in_plugin uses subset-on-count (len(regs) >= 11) rather than strict == 13 so Wave-3 parallel plans (06-08 / 06-09 / 06-10) commute under any commit ordering. Explicit /learn presence + role-agnostic role-set assertion is strict; post-wave strict == 13 invariant enforced by the Phase-6 close-out integration test (Plan 06-11 surface).
 - [Phase 07]: 07-01: Wave 0 substrate — 4 tasks strict-additive. pyproject [attend]=[watchdog>=3,<4] + 3 new top-level packages (clawteam/{attention,cost,rate_limit}/__init__.py with empty __all__, package markers only — Waves 1-5 append public API). 6 new HarnessEvent dataclasses registered via register_event_type at module bottom AFTER the Phase 6 block. Phase 6 events still resolvable (BC lock). SprintState.queue_status: str = "" open-str type (NOT Literal) — future queue reasons ('queued_disk_budget' etc.) don't require schema migration. TemplateDef sub-blocks at TOP LEVEL of TOML (matches Phase 5/6 precedent — NOT under [template]): ConductorConfig (4 caps), AttentionConfig (3 priority knobs), CostConfig (3 budget knobs). All 3 TemplateDef fields default to None so gstack.toml + 6 packaged templates parse unchanged (parametrized BC test locks for all 6 names). [attention.tag_weights] uses TOML subtable syntax (not inline dict) because inline {...} dicts only support literal values; subtable tested in test_attention_block_parsed.
+- [Phase 07]: 07-02: Wave 1 SprintConductor concurrency — RateLimitMonitor at clawteam/rate_limit/monitor.py (107 LOC) uses threshold-strict comparison (count > threshold, not >=) with 60s sliding-window deque (append now, popleft until cutoff, O(1) amortized); exactly-once RateLimitSaturated emission on un-saturated→saturated transition with self-healing rearm when window drains (caller never calls rearm()); dual-lock pattern (threading.RLock on deque for thread-safety). SprintConductor gains 3 asyncio.Semaphore caps constructed in __init__ from ConductorConfig loaded via _resolve_conductor_config helper (defensive TeamManager.get_team try/except → template.conductor lookup → ConductorConfig() defaults). start_sprint_async consults is_saturated() first (writes queue_status='rate_limit_saturated' + returns), then acquires _sprint_sem via asyncio.wait_for(timeout=acquire_timeout_seconds) (writes queue_status='queued_capacity' + returns on TimeoutError); both queue paths call existing sync start_sprint() so BC state-creation pipeline is reused verbatim. dispatch_turn async ctx manager acquires per-agent sem FIRST then active-agent sem (per-agent cheaper/less contention; minimize rollback surface); per-agent sems built lazily per-role (no upfront 11-role iteration); active_agents_set mutations under threading.RLock. DormancyTransition emitted symmetrically on enter (dormant→active) and exit (active→dormant). active_agents() returns sorted list for QUALITY-04 sensor. release_sprint_slot(sprint_id) swallows ValueError for idempotent double-release. Zero deviations (plan executed exactly as written); TDD gates RED→GREEN preserved for both tasks (fa7a8fe/e8660e7 Task 1; 7beccbc/b72ce71 Task 2). 16 new tests + 35 BC sprint tests green.
 
 ### Pending Todos
 
@@ -219,10 +221,11 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T20:35:00Z
-Stopped at: Completed 07-01 (Phase 7 Wave 0 substrate — [attend] extra + 3 packages + 6 events + queue_status + 3 TemplateDef sub-blocks; 41 new tests + 180 BC green; Waves 1-5 unblocked)
+Last session: 2026-04-22T13:02:18Z
+Stopped at: Completed 07-02 (Phase 7 Wave 1 SprintConductor concurrency — RateLimitMonitor 60s sliding 429 window + 3 asyncio.Semaphore caps (sprint/per-agent/active-agent) + start_sprint_async + dispatch_turn ctx manager + active_agents() + DormancyTransition emission; 16 new tests + 35 BC sprint tests green; Waves 2-5 unblocked)
 Resume files:
 
+  - Phase 7 Wave 1 07-02 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-02-SUMMARY.md
   - Phase 7 Wave 0 07-01 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-01-SUMMARY.md
   - Phase 6 Wave 3 06-10 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-10-SUMMARY.md
   - Phase 6 Wave 3 06-09 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-09-SUMMARY.md

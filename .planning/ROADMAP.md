@@ -350,7 +350,7 @@ Plans:
 
 Plans:
 - [x] 07-01-wave0-substrate: pyproject [attend] + attention/cost/rate_limit packages + 6 events + SprintState.queue_status + TemplateDef sub-blocks
-- [ ] 07-02-conductor-concurrency: SprintConductor semaphores + queue_status gate + RateLimitMonitor
+- [x] 07-02-conductor-concurrency: SprintConductor semaphores + queue_status gate + RateLimitMonitor — completed 2026-04-22 (see 07-02-SUMMARY.md)
 - [ ] 07-03-attention-queue: AttentionQueue + AttentionItem + priority scoring
 - [ ] 07-04-attend-cli: clawteam attend + watchdog auto-refresh + digest mode
 - [ ] 07-05-cost-tracker: CostTracker + invoke wrapper hooks + BudgetAlarm emission
