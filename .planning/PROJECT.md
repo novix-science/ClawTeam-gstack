@@ -30,49 +30,68 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 - ✓ Transport-level cycle detector + `TurnEnvelope` structured-response protocol + `forced_progress_gate` (theater/no-progress detector) + artifact size caps (50 KB/file, 500 KB/phase) — Phase 2
 - ✓ Phase 0 BC regression matrix (12/12 green) — Phase 2 primitives are opt-in; existing templates (software-dev, hedge-fund, code-review, harness-default, research-paper, strategy-room) unchanged
 
-### Active
+### Validated (v1.0 shipped 2026-04-22)
 
-<!-- v1 scope: the gstack-as-team milestone. Hypotheses until shipped. -->
+<!-- All v1 requirements delivered in milestone v1.0. See .planning/milestones/v1.0-REQUIREMENTS.md for full traceability. -->
 
 **Team & agent roster:**
-- [ ] 11-agent persistent team template `gstack.toml` with roles: pm (YC office-hours advisor), ceo (scope owner + team leader), eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre
-- [ ] Agents are long-lived: one `team spawn` = hire; agents persist across multiple sprints; each has own worktree "desk" + per-role memory
-- [ ] Team-shared `/learn` memory under `~/.clawteam/teams/<team>/memory/` accumulated across sprints
+- ✓ 11-agent persistent team template `gstack.toml` — v1.0 Phase 3 (TEAM-01..05, SKILL-01..08)
+- ✓ Long-lived agents across sprints with per-agent worktree desks + per-role memory — v1.0 Phase 3
+- ✓ Team-shared `/learn` memory under `~/.clawteam/teams/<team>/memory/` with provenance + decay + human-gate — v1.0 Phase 6 (MEM-01..07)
 
 **Sprint model:**
-- [ ] First-class 7-phase sprint state machine: Think → Plan → Build → Review → Test → Ship → Reflect *(engine + gate infrastructure shipped Phase 2; 7 gstack-specific phase instances ship Phase 3)*
-- [x] `PhaseRegistry` extension API — new phases registered as plugins, not hardcoded into core `PhaseState` enum (upstream-compatible) *(validated Phase 1)*
-- [x] `SprintConductor` — sprint-level loop owner composing router/eventbus/phase_registry/artifact_store + gates; pause/resume survives process restart *(validated Phase 2, CORE-05/CORE-07)*
-- [x] `EvidenceGate` 4-check protocol (presence → frontmatter+schema → stub detection → post-check cap); replaces `ArtifactRequiredGate` via subclass — opt-in per template *(validated Phase 2, SPRINT-01/SPRINT-02)*
-- [x] `EvidenceSchemaRegistry` — plugin-populated pydantic schema registry dispatched by `artifact_type` *(validated Phase 2, QUALITY-08)*
-- [ ] `GstackSprintPlugin` registers 7 phases + per-phase `ArtifactRequiredGate`s (design-doc, plan-doc, diff, review-report, test-report, ship-notes, retro)
-- [ ] Auto-advance between phases by default; toggleable via config to require human approval per transition
-- [ ] One team can run multiple sprints concurrently; team members juggle sprint assignments like a real team handles multiple PRs
+- ✓ 7-phase sprint state machine (Think → Plan → Build → Review → Test → Ship → Reflect) — v1.0 Phase 2+3
+- ✓ `PhaseRegistry` + `SprintConductor` + `EvidenceGate` + `EvidenceSchemaRegistry` — v1.0 Phase 1+2
+- ✓ `GstackSprintPlugin` wires 7 phases + per-phase evidence gates — v1.0 Phase 3 (SPRINT-06)
+- ✓ Auto-advance with `--no-auto-advance` toggle for human approval per transition — v1.0 Phase 2
+- ✓ Concurrent sprint support via `SprintConductor` 3-semaphore caps (10 sprints × 1 per-agent × 6 active) — v1.0 Phase 7 (CORE-06)
 
-**Smart review routing:**
-- [ ] Review-phase participant selection driven by diff content: UI touched → designer joins; public API → dx-lead joins; auth/crypto → security joins
-- [ ] Parallel reviewer execution during Review phase; `reviewer` (staff eng) synthesizes to a single aggregated review report
+**Smart review routing + cross-agent verification:**
+- ✓ `SmartReviewRouter` with SHA-pinned CODEOWNERS-style routing — v1.0 Phase 4 (SPRINT-03)
+- ✓ Parallel reviewer decorrelation + sycophancy cascade detector + `CrossAgentVerificationGate` — v1.0 Phase 4 (SPRINT-04, QUALITY-07/09/13)
+- ✓ Ship-phase human-approval gate ignoring `auto_advance` — v1.0 Phase 4 (SPRINT-05, SAFETY-05)
 
-**Gstack skill port (full port, no runtime dependency on gstack installation):**
-- [ ] Methodology/rubrics baked into role prompts: /office-hours (pm), /plan-ceo-review (ceo), /plan-eng-review + /retro (eng-mgr), /plan-design-review + /design-review + /design-consultation (designer), /plan-devex-review + /devex-review (dx-lead), /review + /investigate (reviewer), /qa + /qa-only (qa), /cso (security)
-- [ ] Tool-heavy skills ported as ClawTeam skills owned by specific agents: /browse + /pair-agent + /open-gstack-browser + /setup-browser-cookies (engineer/qa/dx-lead), /design-shotgun + /design-html (designer), /codex (engineer/reviewer), /ship + /land-and-deploy + /document-release (shipper), /canary + /benchmark + /setup-deploy (sre), /learn (team-shared)
-- [x] Team-level safety rails as harness primitives: /careful (destructive-command warnings), /freeze (edit-lock to a path), /guard (both), /unfreeze *(validated Phase 2, SAFETY-01..04; /autoplan = sprint phase transitions shipped via `SprintConductor`)*
+**Gstack skill port:**
+- ✓ Methodology/rubrics baked into role prompts for 11 roles — v1.0 Phase 3
+- ✓ Tool-heavy skills: `/ship`, `/land-and-deploy`, `/document-release`, `/canary`, `/benchmark`, `/setup-deploy`, `/codex` — v1.0 Phase 5 (SKILL-13..19)
+- ✓ Browser + design skills: `/browse`, `/open-gstack-browser`, `/setup-browser-cookies`, `/design-shotgun`, `/design-html` — v1.0 Phase 6 (SKILL-10..12)
+- ✓ Safety-rail primitives: `/careful`, `/freeze`, `/guard`, `/unfreeze` — v1.0 Phase 2 (SAFETY-01..04)
+- ✓ Interactive state-machine skills: `/office-hours`, `/design-consultation`, `/investigate` — v1.0 Phase 4
 
 **Human interaction:**
-- [x] `InteractionGate` — new `PhaseGate` subclass that blocks until a human answers questions written by phase agents *(validated Phase 1)*
-- [ ] `AttentionQueue` — cross-sprint pending-questions view; `clawteam attend` surfaces questions from any sprint, priority-sorted
-- [ ] Per-sprint question artifacts: `sprint/<id>/questions/<N>.md` + `answers/<N>.md` round-tripping through existing file-locked store
+- ✓ `InteractionGate` — v1.0 Phase 1 (INT-02)
+- ✓ `AttentionQueue` + `clawteam attend` priority queue with `--summary` digest + `--auto-accept-reversible` + `pick` → `$EDITOR` — v1.0 Phase 7 (INT-03, INT-04)
+- ✓ Per-sprint question/answer artifacts round-tripping through file-locked store — v1.0 Phase 7 (INT-05)
 
 **Launch UX:**
-- [ ] `clawteam team spawn gstack --name <team-name>` — one-time hire
-- [x] `clawteam sprint start --team <name> --goal "..."` — dispatch work *(validated Phase 2, UX-02)*
-- [x] `clawteam sprint status / show / list / pause / resume` — per-team sprint visibility, all with `--json` envelope *(validated Phase 2, UX-03/UX-04/UX-05/UX-09)*
-- [ ] `clawteam attend` — human attention loop (answer pending questions)
-- [ ] `clawteam team show <name>` — team dashboard (agents, active sprints, memory highlights)
+- ✓ `clawteam team spawn gstack --name <team>` — v1.0 Phase 3 (UX-01)
+- ✓ `clawteam sprint start / status / show / list / pause / resume` — v1.0 Phase 2 (UX-02..05, UX-09)
+- ✓ `clawteam attend` / `clawteam attend pick` / `clawteam attend --summary` — v1.0 Phase 7 (UX-06)
+- ✓ `clawteam team show <name>` with cost + memory + sprint panels — v1.0 Phase 3+7
 
-**Workspace strategy:**
-- [ ] Each of 11 agents: persistent worktree (agent's "desk") reused across sprints
-- [ ] Each sprint: dedicated branch/worktree; engineer forks ephemeral helper agents with their own sub-worktrees, merged back via existing `WorkspaceManager.merge`
+**Observability + cost controls:**
+- ✓ Rate-limit-aware scheduling with `RateLimitMonitor` 60s 429-window — v1.0 Phase 7 (QUALITY-04)
+- ✓ Zombie worktree GC via `doctor --gc` with 5/10 GB disk budget — v1.0 Phase 7 (CORE-06)
+- ⚠ Cost + cache observability — infrastructure + UI shipped, emit-path gap deferred to v1.x backlog 999.001 (QUALITY-12 partial)
+
+### Active (v1.x candidates)
+
+<!-- v1.x scope: fix observability emit-path gaps + UX polish from v1.0 UAT walkthrough. See .planning/backlog/ for detail. -->
+
+**Observability emit-path wiring (critical, unblocks QUALITY-12):**
+- [ ] 999.001 — Wire `ClaudeApiResponse` + `ToolCallCompleted` emit path from `claude` CLI stream-json output through `TmuxBackend` / `invoke_native_cli` to the event bus. Unblocks real cost + cache metrics in `clawteam team show`.
+
+**attend CLI UX polish (surfaced in v1.0 UAT walkthrough):**
+- [ ] 999.002 — `attend` "Urg" column currently shows `norm` for all questions regardless of frontmatter `urgency:` — map numeric values or display raw.
+- [ ] 999.003 — `attend --summary` "Representative title" shows qid instead of first-H1-from-body — digest UX value depends on this.
+- [ ] 999.004 — Sprint `state.json::pending_question_ids` not synced until `AttentionWatcher` runs — either auto-start watcher on `sprint start` or do one-shot reconciliation on `sprint status`.
+
+**Real-environment dogfood (requires live API + tmux sessions):**
+- [ ] Real 10-sprint 5-minute / 4 GB RAM load (ROADMAP SC #1)
+- [ ] Live Anthropic 429 rate-limit handling + pause/resume (SC #9)
+- [ ] >50% prompt-cache hit rate steady-state (SC #8 — depends on 999.001)
+- [ ] Digest-mode UX quality at 20+ question scale (subjective)
+- [ ] `attend → $EDITOR → answer → gate unblock` E2E round-trip with real `claude` agent in tmux
 
 ### Out of Scope
 
@@ -148,4 +167,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-04-20 after Phase 2 completion (SprintConductor + EvidenceGate + FreezeRegistry + safety-rail CLI + TurnEnvelope + cycle detector + forced_progress_gate + artifact caps + `clawteam sprint` sub-app; 21 REQ-IDs validated; Phase 0 BC matrix 12/12 green; 813/813 tests pass)*
+*Last updated: 2026-04-22 after v1.0 milestone (8 phases, 78 plans, 80 REQs delivered, ~70.7k LOC; emit-path gap QUALITY-12 deferred to v1.x backlog 999.001).*
