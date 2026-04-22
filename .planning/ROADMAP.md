@@ -305,7 +305,11 @@ Plans:
 - [x] 06-02: Wave 1 memory substrate — MemoryEntry pydantic + TeamMemoryStore write/list/prune + cross-team isolation (MEM-01, MEM-02, D-04, D-05, D-15) — **COMPLETE 2026-04-22**
 - [x] 06-03: Wave 1 memory search + ranking + decay — decay_factor (per-tag TTL, MEM-07 floor) + rank (recency × provenance × decay) + search (grep-safe keyword) (MEM-03, MEM-05, MEM-07, D-06) — **COMPLETE 2026-04-22**
 - [x] 06-04: Wave 1 browser substrate — Playwright adapter + session factory + per-domain cookies store (SKILL-10 substrate, D-02 no-leak invariant) — **COMPLETE 2026-04-22**
-- [ ] 06-05 through 06-10: /browse, /open-gstack-browser, /setup-browser-cookies, /design-shotgun, /design-html, /learn CLI + backfill + conflict gate + integration (see `.planning/phases/06-*/06-0{5..10}-PLAN.md`)
+- [x] 06-05: Wave 2 /browse skill (SKILL-10, headless URL+actions) — **COMPLETE 2026-04-22**
+- [x] 06-06: Wave 2 /open-gstack-browser (SKILL-10, headed Chromium with cookies) — **COMPLETE 2026-04-22**
+- [x] 06-07: Wave 2 /setup-browser-cookies (SKILL-10, questionary wizard) — **COMPLETE 2026-04-22**
+- [x] 06-08: Wave 3 /design-shotgun (SKILL-11, multi-turn state machine + taste-memory write) — **COMPLETE 2026-04-22**
+- [ ] 06-09 through 06-10: /design-html, /learn CLI + backfill + conflict gate + integration (see `.planning/phases/06-*/06-{09,10}-PLAN.md`)
 
 **UI hint**: yes
 
@@ -363,7 +367,7 @@ Phases execute in numeric order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Any urgen
 | 3. Gstack Team Template & Methodology Port | 0/TBD | Not started | - |
 | 4. Interactive State Machines, Review Routing & Verification | 0/TBD | Not started | - |
 | 5. Tool-Heavy Skills (Ship, SRE, Codex) | 0/TBD | Not started | - |
-| 6. Browser Skills, Design Pipeline & Team Memory | 0/TBD | Not started | - |
+| 6. Browser Skills, Design Pipeline & Team Memory | 8/10 | In Progress (Wave 3) | - |
 | 7. Parallel Sprints, AttentionQueue UX & Cost Controls | 0/TBD | Not started | - |
 
 ## Critical Path
