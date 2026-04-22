@@ -80,7 +80,8 @@ Methodology as role prompts (baked-in) + tool-heavy skills as invokable ClawTeam
 - [ ] **SKILL-09**: All role prompts use a structured response envelope (per PITFALLS #1 persona-drift prevention): persona-identity header, step label, output schema, no-freelance rule.
 
 **Invokable ClawTeam skills (tool-heavy):**
-- [ ] **SKILL-10**: `/browse` + `/open-gstack-browser` + `/setup-browser-cookies` — real-Chromium browser via Playwright (optional `clawteam[browser]` extra). Owned by engineer, qa, dx-lead. Feature-detected; useful error on missing dep.
+- [x] **SKILL-10
+**: `/browse` + `/open-gstack-browser` + `/setup-browser-cookies` — real-Chromium browser via Playwright (optional `clawteam[browser]` extra). Owned by engineer, qa, dx-lead. Feature-detected; useful error on missing dep.
 - [ ] **SKILL-11**: `/design-shotgun` — mockup variant generation + comparison board + iterative refinement with taste memory under designer's per-agent memory.
 - [ ] **SKILL-12**: `/design-html` — Pretext-pattern production HTML generation with framework detection (React/Svelte/Vue).
 - [x] **SKILL-13**: `/codex` — independent OpenAI Codex CLI second opinion via existing `NativeCliAdapter`. Three modes: review (pass/fail gate), adversarial, consultation.

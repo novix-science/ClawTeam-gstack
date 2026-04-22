@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 6 Wave 2 IN PROGRESS (06-05 /browse + 06-06 /open-gstack-browser + 06-07 /setup-browser-cookies landing in parallel; 06-06 complete)
-stopped_at: Completed 06-06 (Wave 2 — /open-gstack-browser headed-mode skill + plugin registration; 7 new tests green; plugin now registers ≥9 skills)
-last_updated: "2026-04-22T21:41:00Z"
+status: unknown
+stopped_at: Completed 06-05 (/browse skill — 10 tests green, 8 skills registered)
+last_updated: "2026-04-22T11:46:41.333Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 68
-  completed_plans: 63
-  percent: 93
+  completed_plans: 65
+  percent: 96
 ---
 
 # Project State
@@ -167,6 +167,8 @@ Recent decisions affecting current work:
 - [Phase 06]: 06-03: user+no-evidence=1.2 (extension to D-06 table) — prevents cliff between 0 and 2.0, keeps provenance monotone in evidence-presence (user claims outrank un-cited artifacts but rank below cited users/artifacts).
 - [Phase 06]: 06-03: Rule 3 deviation — Plan 06-02's store.py substrate was staged-but-uncommitted at my Task 2 RED phase. Plan 06-02's executor landed its own commit (98425bb) before my Task 2 GREEN; clean sequence preserved. My own fix: 5 tests had non-hex id_suffix ("ggg001"/"hhh001..003") failing MemoryEntry.id pattern [a-f0-9]{6} — renamed to "aa1001..aa1002" / "bb1001..bb1003" during GREEN phase.
 - [Phase 06]: 06-03: 9 pre-existing test-ordering failures (tests/test_gstack_plugin.py + tests/test_evidence_schemas_phase5.py + tests/test_plugin_hooks.py) reproduce on baseline 98425bb WITHOUT Plan 06-03 changes — same cross-contamination noted in Plan 05-10. Logged at .planning/phases/06-browser-skills-design-pipeline-team-memory/deferred-items.md for future harness-hygiene plan; out of scope for 06-03.
+- Plan 06-05: URL scheme allow-list at skill boundary (not adapter boundary) — push security check up to the skill handler so future callers through other paths can't bypass it
+- Plan 06-05: Designer role intentionally excluded from /browse — designers get /open-gstack-browser (headed, 06-06) since /browse only returns hash+status+screenshot (T-06-05-03 role tampering mitigation)
 
 ### Pending Todos
 
@@ -198,8 +200,8 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T21:41:00Z
-Stopped at: Completed 06-06 (Wave 2 — /open-gstack-browser headed-mode skill; 7 new tests green; 9+ skills registered in GstackSprintPlugin)
+Last session: 2026-04-22T11:46:24.312Z
+Stopped at: Completed 06-05 (/browse skill — 10 tests green, 8 skills registered)
 Resume files:
 
   - Phase 6 Wave 1 COMPLETE (06-03): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-03-SUMMARY.md
