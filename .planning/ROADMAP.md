@@ -298,10 +298,11 @@ Plans:
 
 **Research flag**: MEDIUM. Memory provenance + decay schema benefits from a planning pass per `research/SUMMARY.md` — MINJA/MemoryGraft/SSGM papers describe the problem but concrete schema choice needs a product decision. Browser skills use well-documented Playwright patterns. **Consider `/gsd-research-phase 6` if the memory write-path preventions feel under-specified at plan time.**
 
-**Plans**: TBD
+**Plans**: 10 (outlined via `/gsd-plan-phase 6`; Wave 0 substrate landed 2026-04-22)
 
 Plans:
-- [ ] 06-01: TBD (outlined during `/gsd-plan-phase 6`)
+- [x] 06-01: Wave 0 substrate — pyproject [browser] extra + playwright_available() + 3 new HarnessEvents + MemoryConfig/DesignShotgunConfig/BrowserConfig TemplateDef sub-blocks (MEM-01/02, SKILL-10/11/12, QUALITY-10 substrate) — **COMPLETE 2026-04-22**
+- [ ] 06-02 through 06-10: TeamMemoryStore, /learn, browser adapter, /browse, /open-gstack-browser, /setup-browser-cookies, /design-shotgun, /design-html, backfill + integration (see `.planning/phases/06-*/06-0{2..10}-PLAN.md`)
 
 **UI hint**: yes
 

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 5 COMPLETE (wave 5 — integration + adversarial matrix + plan 05-10 SUMMARY)
-stopped_at: Completed 05-10 (integration + adversarial matrix — SKILL-13..19 all closed; 21-ID D-15 matrix + D-16 e2e chain green; Phase 5 delivery gate reached)
-last_updated: "2026-04-22T00:00:00Z"
+status: Phase 6 Wave 0 COMPLETE (plan 06-01 plan-prep substrate)
+stopped_at: Completed 06-01 (Wave 0 substrate — pyproject [browser] extra, playwright_available(), 3 new memory/conflict/backfill HarnessEvents, 3 new TemplateDef sub-block pydantic models; Phase 3 memory dict renamed to memory_layout)
+last_updated: "2026-04-22T11:02:00Z"
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 48
-  completed_plans: 48
-  percent: 100
+  total_plans: 58
+  completed_plans: 49
+  percent: 84
 ---
 
 # Project State
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 
 ## Current Position
 
-Phase: 5 COMPLETE
-Plan: 10 complete (wave 5 — integration + adversarial matrix; all 7 SKILL-13..19 requirements closed)
+Phase: 6 Wave 0 COMPLETE
+Plan: 06-01 complete (Wave 0 substrate — plan-prep verification of A1/A3/A7 items); next up 06-02 (TeamMemoryStore substrate) + 06-04 (browser adapter) as parallel Wave 1 candidates
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Plan: 10 complete (wave 5 — integration + adversarial matrix; all 7 SKILL-13..
 | Phase 05 P06 | 25min | 1 task  | 4 files |
 | Phase 05 P09 | 25min | 1 task  | 3 files |
 | Phase 05 P10 | 30min | 4 tasks | 5 files |
+| Phase 06 P01 | 12min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-10: /setup-deploy happy-path test monkeypatches run_wizard on the HANDLER module (not the wizard module) because handler.py does `from wizard import run_wizard` at top level — rebinding must happen on handler's namespace for the dispatch to use the stub. Auto-fixed as Rule 3 during Task 2 initial run.
 - [Phase 05]: 05-10: /land-and-deploy missing-tool case asserts pytest.raises(FileNotFoundError) — the handler's CI-wait try/except only covers subprocess.TimeoutExpired, so FileNotFoundError propagates as structured raise ("handled gracefully" per D-15 intent: no silent crash, no partial artifact write). Test documents this as contract.
 - [Phase 05]: 05-10: Pre-existing 9-failure cross-contamination in test_evidence_schemas_phase5 / test_gstack_plugin / test_plugin_hooks (process-global _registry state from test_gstack_template.py — noted for Plan 05-01 deferral) remains OUT OF SCOPE. Verified unchanged: same 9 failures reproduce under full-suite ordering WITHOUT Plan 05-10 test additions. All 9 pass in isolation. Not a Wave 5 regression.
+- [Phase 06]: 06-01: Wave 0 substrate — close A1/A3/A7 plan-prep items. Ship [browser] optional-dependencies extra (playwright>=1.58,<2), clawteam/browser/__init__.py with playwright_available() via importlib.util.find_spec (D-02 no-top-level-import invariant test-locked), clawteam/memory/__init__.py package marker, 3 new HarnessEvents (MemoryWritePersisted / ConflictDetected / MemoryBackfillComplete) auto-registered via module-bottom register_event_type calls, 3 new pydantic sub-block models (MemoryConfig with conflict_threshold ge/le validation + retention TTLs, DesignShotgunConfig with variant_count [1,32] + Literal board_format, BrowserConfig with headless/timeout/cookies_dir). 32 new tests across 4 files, all green; Phase 5 + earlier BC tests unchanged (1388 passed + 3 skipped in full suite run, excluding 9 known pre-existing cross-contamination failures).
+- [Phase 06]: 06-01: Rule 3 deviation — Phase 3 TemplateDef.memory dict field (D-05, per-role memory-dir layout for TeamManager) collided with new Phase 6 MemoryConfig sub-block. Renamed Phase 3 field to memory_layout; _parse_toml keeps reading legacy [template.memory] TOML key via fallback tmpl.get("memory", tmpl.get("memory_layout", {})) so gstack.toml is unchanged. 4 pre-existing test assertions updated (test_gstack_template.py + test_templates.py); no production code consumed the dict field (grep -rn verified before rename). Zero downstream impact: Phase 6 Waves 1-5 will read tmpl.memory.* (MemoryConfig) exactly as the plan specified.
+- [Phase 06]: 06-01: Field-rename BC pattern established — rename the Python field but keep the original TOML key; _parse_toml reads legacy key first, new key as fallback. Reusable when future plans need to repurpose a field name on TemplateDef without breaking shipped TOML templates.
 
 ### Pending Todos
 
@@ -183,13 +187,14 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T00:00:00Z
-Stopped at: Completed 05-10 (Wave 5 — integration + adversarial matrix; D-15 21-ID matrix + D-16 e2e chain + 7-skill registration coverage; all 7 SKILL-13..19 requirements closed; Phase 5 delivery gate reached)
+Last session: 2026-04-22T11:02:00Z
+Stopped at: Completed 06-01 (Wave 0 substrate — pyproject [browser] extra + clawteam.browser + clawteam.memory skeletons + 3 new memory HarnessEvents + 3 new TemplateDef sub-block models; Phase 3 memory dict renamed to memory_layout with legacy TOML-key BC)
 Resume files:
 
+  - Phase 6 Wave 0: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-01-SUMMARY.md
+  - Phase 6 context: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-CONTEXT.md + 06-RESEARCH.md
+  - Phase 6 Wave 1 candidates: .planning/phases/06-*/06-02-PLAN.md (TeamMemoryStore) + 06-04-PLAN.md (browser adapter)
   - Phase 5 COMPLETE: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-10-SUMMARY.md
-  - Phase 5 per-plan summaries: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-0{1..9}-SUMMARY.md
-  - Phase 6 (next): .planning/phases/06-*/06-CONTEXT.md (when created)
 
 ## Recent Activity
 
