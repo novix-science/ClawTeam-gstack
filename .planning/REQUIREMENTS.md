@@ -39,7 +39,7 @@ Team-scoped, layered, grep-first; provenance + decay to prevent memory poisoning
 - [x] **MEM-03**: Reads support grep-first retrieval by tag + keyword; keyword match ranked by recency-weighted score.
 - [x] **MEM-04**: `/learn` skill exposes `learn write <scope> <title>`, `learn list <scope> [--tag]`, `learn search <query>`, `learn prune <id>`. Agents call via existing skill machinery; human calls via `clawteam` CLI.
 - [x] **MEM-05**: Provenance tracking: every memory entry cites evidence; entries without evidence get a lower retrieval rank (not blocked — flagged).
-- [ ] **MEM-06**: High-impact writes (tagged `impact:high` or under `memory/team/decisions/`) require human confirmation through `InteractionGate` before commit. Prevents memory poisoning (PITFALLS #10).
+- [x] **MEM-06**: High-impact writes (tagged `impact:high` or under `memory/team/decisions/`) require human confirmation through `InteractionGate` before commit. Prevents memory poisoning (PITFALLS #10).
 - [x] **MEM-07**: Memory decay: entries inherit a TTL from their tag (e.g., `pattern` 90 days, `preference` indefinite, `incident` 180 days). Expired entries rank below unexpired on retrieval; not auto-deleted.
 
 ### Team Roster & Template (TEAM)
@@ -117,7 +117,7 @@ Ship-blocker preventions from `PITFALLS.md`. Every one is a v1 requirement becau
 **: Gstack interactive skill state-machines: `/office-hours`, `/plan-design-review`, `/autoplan` ported as multi-turn state machines (not one-shot prompt bakings) that preserve the per-question interactivity (PITFALLS #7).
 - [ ] **QUALITY-08**: `EvidenceGate` validates artifact structure (not just presence) — e.g., design-doc.md must contain all 6 forcing-question answers; test-report.md must cite actual test run output (PITFALLS #8).
 - [x] **QUALITY-09**: `SmartReviewRouter` pins to a commit SHA — routing decision is made on the SHA that will be reviewed, not the HEAD that might have moved (PITFALLS #9 thrashing prevention).
-- [ ] **QUALITY-10**: Memory provenance + decay + human gate on high-impact (covered by MEM-05, MEM-06, MEM-07) (PITFALLS #10).
+- [x] **QUALITY-10**: Memory provenance + decay + human gate on high-impact (covered by MEM-05, MEM-06, MEM-07) (PITFALLS #10).
 - [ ] **QUALITY-11**: Progress-on-artifact rule: an agent's turn is "progress" only if it produced new artifact content or an AttentionQueue entry. Consecutive no-progress turns trigger human escalation (theater prevention per PITFALLS #11).
 - [ ] **QUALITY-12**: Cost observability: `clawteam team show` displays per-agent token usage and estimated cost; sprint-level cost rollups. Advisor pattern reserves expensive model calls for critical gates. Cache hit rate surfaced (PITFALLS #12).
 - [x] **QUALITY-13**: Reviewer decorrelation: parallel reviewers receive different system prompts optimized for their persona (reviewer=staff-eng-cross-cutting, security=threat-model-first, designer=rubric-first, dx-lead=friction-first) so their findings diverge rather than mirror each other (PITFALLS #13).
@@ -216,7 +216,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | MEM-03 | Phase 6 | Complete |
 | MEM-04 | Phase 6 | Complete |
 | MEM-05 | Phase 6 | Complete |
-| MEM-06 | Phase 6 | Pending |
+| MEM-06 | Phase 6 | Complete |
 | MEM-07 | Phase 6 | Complete |
 | TEAM-01 | Phase 3 | Complete |
 | TEAM-02 | Phase 3 | Complete |
@@ -263,7 +263,7 @@ Roadmap is 8 phases (granularity: fine): 0 Foundation, 1 Core Extensions, 2 Spri
 | QUALITY-07 | Phase 4 | Complete (04-13: state-machine goldens; 04-14: inverse-assertion safety net test_markers_removed_and_runtime_present locks runtime-landed invariant) |
 | QUALITY-08 | Phase 2 | Pending |
 | QUALITY-09 | Phase 4 | Complete (04-06: schema substrate; 04-10: SHA pinning + mid-review thrash event; 04-14: end-to-end integration test asserts D-19 thrash_decision frontmatter contract on reviewer report) |
-| QUALITY-10 | Phase 6 | Pending |
+| QUALITY-10 | Phase 6 | Complete |
 | QUALITY-11 | Phase 2 | Pending |
 | QUALITY-12 | Phase 7 | Pending |
 | QUALITY-13 | Phase 4 | Complete (04-06: 4 decorrelation prompts; 04-11: plugin appends via review-phase supplement hook; 04-14: D-18 deferral markers removed from reviewer.md — SHA-pinning now framed as canonical, not deferral) |
