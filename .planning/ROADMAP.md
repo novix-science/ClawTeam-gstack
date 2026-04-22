@@ -20,7 +20,7 @@ This roadmap delivers the gstack-as-team integration in eight phases, moving fro
 - [ ] **Phase 2: Sprint Engine, Evidence Gates & Theater/Drift/Deadlock Prevention** - Single-sprint end-to-end with EvidenceGates, cycle detector, structured-response envelope, safety-rail primitives, and sprint CLI (start/status/show/list/pause/resume)
 - [ ] **Phase 3: Gstack Team Template & Methodology Port** - Ships `gstack.toml` (11 agents) + `GstackSprintPlugin` with per-role methodology prompts baked in; first runnable Think->Ship sprint on the real team roster
 - [ ] **Phase 4: Interactive State Machines, Smart Review Routing & Cross-Agent Verification** - Interactive gstack skills (`/office-hours`, `/design-consultation`, `/investigate`) as state machines; SHA-pinned CODEOWNERS-style reviewer routing; parallel reviewer decorrelation; cross-agent verification gates; Ship-phase human-approval gate
-- [ ] **Phase 5: Tool-Heavy Skills (Ship, SRE, Codex)** - `/ship`, `/land-and-deploy`, `/document-release`, `/canary`, `/benchmark`, `/setup-deploy`, `/codex` — the surfaces engineer/shipper/sre invoke at runtime
+- [x] **Phase 5: Tool-Heavy Skills (Ship, SRE, Codex)** - `/ship`, `/land-and-deploy`, `/document-release`, `/canary`, `/benchmark`, `/setup-deploy`, `/codex` — the surfaces engineer/shipper/sre invoke at runtime — **COMPLETE 2026-04-22** (all 10 plans landed; SKILL-13..19 closed)
 - [ ] **Phase 6: Browser Skills, Design Pipeline & Team Memory** - `clawteam[browser]` extra, `/browse`, `/design-shotgun`, `/design-html`, and `/learn` memory store with provenance + decay + human gate on high-impact entries
 - [ ] **Phase 7: Parallel Sprints, AttentionQueue UX & Cost Controls** - `SprintConductor` concurrency caps, `clawteam attend` typed-priority queue with digest mode, cost dashboard, prompt caching, rate-limit-aware scheduling
 
@@ -257,14 +257,14 @@ Plans:
 Plans:
 - [x] 05-01-PLAN.md — Wave 0 substrate: SkillRegistration + SkillDispatcher + contribute_skills hook + invoke_native_cli wrapper + 5 doctor entries + TemplateDef [ship]/[deploy]/[canary]/[benchmark] blocks — completed 2026-04-21 (see 05-01-SUMMARY.md)
 - [x] 05-02-PLAN.md — Wave 1 schemas + events: DeployNotes + CanaryReport + BenchmarkReport + CodexReview pydantic schemas + ShipNotes Phase 5 extension + 2 HarnessEvent dataclasses (DeployRegressionDetected, WebVitalRegressionDetected) — completed 2026-04-21 (see 05-02-SUMMARY.md; 18 new tests; 80min; 3 tasks TDD-disciplined)
-- [ ] 05-03-PLAN.md — Wave 2 /codex skill (SKILL-13): engineer/reviewer, 3 modes, adversarial-input safety via shell=False + list argv
-- [ ] 05-04-PLAN.md — Wave 2 /ship skill (SKILL-14): shipper, 5-step pipeline (sync_main → run_tests → audit_coverage → push → open_pr) + test bootstrap on missing tests
+- [x] 05-03-PLAN.md — Wave 2 /codex skill (SKILL-13): engineer/reviewer, 3 modes, adversarial-input safety via shell=False + list argv — completed 2026-04-21 (see 05-03-SUMMARY.md; 9 tests; 25min)
+- [x] 05-04-PLAN.md — Wave 2 /ship skill (SKILL-14): shipper, 5-step pipeline (sync_main → run_tests → audit_coverage → push → open_pr) + test bootstrap on missing tests — completed 2026-04-21 (see 05-04-SUMMARY.md)
 - [x] 05-05-PLAN.md — Wave 2 /setup-deploy wizard (SKILL-19): sre, questionary-backed interactive wizard with shell-metachar input validation + idempotent gstack.toml [deploy] block write — completed 2026-04-21 (see 05-05-SUMMARY.md; 11 tests; 20min; 1 task TDD-disciplined)
 - [x] 05-06-PLAN.md — Wave 3 /land-and-deploy (SKILL-15): shipper, CI wait + provider deploy (vercel/netlify/fly/custom) + health probe with exponential backoff — completed 2026-04-21 (see 05-06-SUMMARY.md; 13 new tests; 25min; 1 task TDD-disciplined)
-- [ ] 05-07-PLAN.md — Wave 3 /document-release (SKILL-16) + /ship auto-invoke wiring: shipper, diff-vs-docs stale-ref detector with InteractionGate human-gate for non-trivial writes
-- [ ] 05-08-PLAN.md — Wave 4 /canary skill (SKILL-17): sre, HTTP polling + regression evaluation + DeployRegressionDetected event emit + Playwright lazy-import
-- [ ] 05-09-PLAN.md — Wave 4 /benchmark skill (SKILL-18): sre, Lighthouse primary + curl fallback + baseline JSON write + WebVitalRegressionDetected event emit
-- [ ] 05-10-PLAN.md — Wave 5 integration: end-to-end /ship→/land-and-deploy→/canary artifact chain + 21-ID D-15 adversarial matrix + 7-skill registration coverage assertion
+- [x] 05-07-PLAN.md — Wave 3 /document-release (SKILL-16) + /ship auto-invoke wiring: shipper, diff-vs-docs stale-ref detector with InteractionGate human-gate for non-trivial writes — completed 2026-04-21 (see 05-07-SUMMARY.md)
+- [x] 05-08-PLAN.md — Wave 4 /canary skill (SKILL-17): sre, HTTP polling + regression evaluation + DeployRegressionDetected event emit + Playwright lazy-import — completed 2026-04-21 (see 05-08-SUMMARY.md)
+- [x] 05-09-PLAN.md — Wave 4 /benchmark skill (SKILL-18): sre, Lighthouse primary + curl fallback + baseline JSON write + WebVitalRegressionDetected event emit — completed 2026-04-21 (see 05-09-SUMMARY.md; 12 tests; 25min)
+- [x] 05-10-PLAN.md — Wave 5 integration: end-to-end /ship→/land-and-deploy→/canary artifact chain + 21-ID D-15 adversarial matrix + 7-skill registration coverage assertion — completed 2026-04-22 (see 05-10-SUMMARY.md; 29 tests; 30min; 4 tasks)
 
 ---
 
