@@ -59,6 +59,22 @@ const docs = [
   { title: "Workflows", body: "Practical patterns for real teams.", href: "skills/clawteam/references/workflows.md" }
 ];
 
+const sprintPhases = ["Think", "Plan", "Build", "Review", "Test", "Ship", "Reflect"];
+
+const teamRoster = [
+  { role: "ceo",      group: "Strategy", job: "Scope calls + phase advancement" },
+  { role: "pm",       group: "Strategy", job: "Think-phase design + challenges" },
+  { role: "eng-mgr",  group: "Strategy", job: "Plan review + coordination" },
+  { role: "designer", group: "Design",   job: "Design consults + reviews" },
+  { role: "dx-lead",  group: "Design",   job: "Developer-experience review" },
+  { role: "engineer", group: "Build",    job: "Build-phase execution" },
+  { role: "reviewer", group: "Review",   job: "Staff-eng synthesis + routing" },
+  { role: "qa",       group: "Review",   job: "Cross-agent test verification" },
+  { role: "security", group: "Review",   job: "Security review + CSO gate" },
+  { role: "shipper",  group: "Ship",     job: "Ship + land-and-deploy" },
+  { role: "sre",      group: "Ship",     job: "Canary + benchmark + deploy" }
+];
+
 function HalfGlobe() {
   const ref = useRef(null);
   useEffect(() => {
@@ -197,16 +213,16 @@ function App() {
       <header className="header">
         <div className="shell header-inner">
           <a className="logo" href="#top"><img src={logo} alt="ClawTeam"/><strong>ClawTeam</strong></a>
-          <nav className="nav"><a href="#features">Features</a><a href="#workflow">How it works</a><a href="#docs">Docs</a></nav>
+          <nav className="nav"><a href="#features">Features</a><a href="#gstack">gstack</a><a href="#workflow">How it works</a><a href="#docs">Docs</a></nav>
           <a className="btn-primary" href="https://github.com/HKUDS/ClawTeam" target="_blank" rel="noreferrer">GitHub</a>
         </div>
       </header>
       <main>
         <section className="hero shell" id="top">
           <div className="hero-content">
-            <p className="badge">Agent swarm orchestration</p>
+            <p className="badge">Agent swarm orchestration · gstack team template</p>
             <h1>Coordinate any coding agent from one CLI</h1>
-            <p className="hero-sub">ClawTeam is the coordination layer for Claude Code, Codex, OpenClaw, nanobot, and any terminal-native client that needs to plan, delegate, and ship together.</p>
+            <p className="hero-sub">ClawTeam is the coordination layer for Claude Code, Codex, OpenClaw, nanobot, and any terminal-native client. One command hires the <strong>gstack team</strong> — 11 persistent specialists running parallel Think→Ship sprints with evidence gates and attention routing.</p>
             <div className="hero-cta">
               <a className="btn-primary" href="https://github.com/HKUDS/ClawTeam#-quick-start" target="_blank" rel="noreferrer">Get started</a>
               <a className="btn-ghost" href="skills/clawteam/references/cli-reference.md">CLI Reference</a>
@@ -228,6 +244,36 @@ function App() {
         <section className="workflow shell" id="workflow">
           <div className="section-header"><p className="section-label">How it works</p><h2>Three steps to a running swarm</h2></div>
           <div className="steps">{steps.map(s=><div className="step" key={s.num}><div className="step-info"><span className="step-num">{s.num}</span><h3>{s.title}</h3><p>{s.body}</p></div><pre className="step-code"><code>{s.code}</code></pre></div>)}</div>
+        </section>
+        <section className="gstack shell" id="gstack">
+          <div className="section-header">
+            <p className="section-label">The flagship team</p>
+            <h2>One command. Eleven agents. Seven phases.</h2>
+            <p className="section-sub">
+              <code>clawteam team spawn gstack</code> hires a persistent 11-specialist team that runs parallel Think → Ship sprints.
+              Each role holds identity across sprints via protocol-level envelopes; evidence gates replace gameable artifact-required gates;
+              the attention queue ranks what needs a human across every running sprint.
+            </p>
+          </div>
+          <div className="phases" aria-label="Sprint phases">
+            {sprintPhases.map((p, i) => (
+              <span key={p} className="phase-pill">
+                <span className="phase-num">{String(i+1).padStart(2,"0")}</span>
+                <span className="phase-name">{p}</span>
+              </span>
+            ))}
+          </div>
+          <div className="roster">
+            {teamRoster.map(r => (
+              <div className="role-card" key={r.role}>
+                <div className="role-head">
+                  <span className="role-name">{r.role}</span>
+                  <span className="role-group">{r.group}</span>
+                </div>
+                <span className="role-job">{r.job}</span>
+              </div>
+            ))}
+          </div>
         </section>
         <section className="docs shell" id="docs">
           <div className="section-header"><p className="section-label">Documentation</p><h2>Learn more</h2></div>
