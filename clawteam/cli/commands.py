@@ -4603,12 +4603,15 @@ def launch_team(
                 f"     `clawteam task create {t_name} \"<task subject>\" --owner <role>`\n"
                 f"     Candidate owners: designer, eng-mgr, engineer, "
                 f"reviewer, qa, security, shipper, sre, dx-lead, pm.\n"
-                f"  3. Only after tasks are assigned: `clawteam lifecycle "
-                f"idle {t_name}` while specialists work.\n\n"
+                f"  3. After delegation is done, advance the sprint:\n"
+                f"     `clawteam sprint advance $(clawteam sprint list "
+                f"--team {t_name} --json | jq -r '.[0].id') --team {t_name}`\n"
+                f"     (or pass an explicit sprint id). You advance once "
+                f"per completed phase as the 7-phase lifecycle progresses.\n\n"
                 f"**You do not implement.** If you find yourself about to "
                 f"open Edit/Write/Bash on project files, STOP and delegate "
-                f"the work instead. Your tools are decisions and task "
-                f"assignments only."
+                f"the work instead. Your tools are decisions, task "
+                f"assignments, and phase advances only."
             )
 
         # Workspace
@@ -5665,6 +5668,52 @@ def sprint_resume(
         _sprint_emit_err("RESUME_FAILED", str(exc))
         return
     _sprint_emit_ok(c.status_dict(new_state))
+
+
+@sprint_app.command("advance")
+def sprint_advance(
+    sprint_id: str = typer.Argument(
+        ..., help="Sprint id or unambiguous prefix.",
+    ),
+    team: str = typer.Option("", "--team", envvar="CLAWTEAM_TEAM"),
+    actor: str = typer.Option(
+        "", "--actor",
+        envvar="CLAWTEAM_AGENT_NAME",
+        help="Role performing the advance (must match team.leader_role). "
+             "Defaults to $CLAWTEAM_AGENT_NAME so leader agents auto-authenticate.",
+    ),
+) -> None:
+    """Advance the sprint to its next phase (think → plan → build → ... → reflect).
+
+    Runs the gate chain for the current phase (evidence + forced-progress +
+    plugin gates + interaction). If all gates pass, phase advances and a
+    PhaseTransition event fires. If any gate blocks, prints the reason and
+    exits 1.
+
+    Only the team's leader_role can advance (gstack: ceo). The `--actor` flag
+    defaults to $CLAWTEAM_AGENT_NAME (set by the spawn environment), so CEO
+    agents calling this from their pane auto-authenticate.
+    """
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return
+    try:
+        ok, reason = c.advance_phase(state.sprint_id, actor=actor)
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("ADVANCE_FAILED", str(exc))
+        return
+    if not ok:
+        _sprint_emit_err("GATE_BLOCKED", reason)
+        raise typer.Exit(1)
+    # Reload state after the transition for fresh status output.
+    try:
+        reloaded = c._load_by_id(state.sprint_id)  # noqa: SLF001 — read-only access
+    except Exception:
+        reloaded = state
+    _sprint_emit_ok(c.status_dict(reloaded))
 
 
 @sprint_app.command("approve")

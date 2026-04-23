@@ -65,9 +65,25 @@ _ROLE_CMD_APPENDICES: dict[str, str] = {
 ### ceo-specific
 - `clawteam task create {team} "<subject>" --owner <role>` — **your main
   tool**. Decompose the goal into tasks and assign each to a specialist.
-- `clawteam sprint status <sprint_id> --team {team}` — see current phase.
-- `clawteam sprint resume <sprint_id> --team {team}` — advance phase after
-  gate artifacts exist (you are the only role authorized to advance).
+- `clawteam sprint list --team {team}` — see all sprints + their phases.
+- `clawteam sprint advance <sprint_id> --team {team}` — **advance the
+  sprint to the next phase** (think → plan → build → review → test →
+  ship → reflect). You are the only role authorized to advance. Call
+  this when the current phase's work is complete (e.g. after delegation
+  in think, after plan artifacts in plan, after code lands in build).
+- `clawteam sprint status <sprint_id> --team {team}` — check current phase.
+
+Phase lifecycle you drive:
+  1. **think** — you decompose goal → assign tasks → `sprint advance`
+  2. **plan** — eng-mgr produces architecture-lock → you `sprint advance`
+  3. **build** — engineer implements → you `sprint advance` when diff lands
+  4. **review** — reviewer approves → you `sprint advance`
+  5. **test** — qa passes → you `sprint advance`
+  6. **ship** — shipper deploys → you `sprint advance`
+  7. **reflect** — eng-mgr retro → sprint auto-completes
+
+If `sprint advance` reports `GATE_BLOCKED`, the reason tells you what's
+missing (artifact / pending question / evidence). Fix and retry.
 
 You DELEGATE, never implement. If you catch yourself about to open
 Edit/Write/Bash on project files, STOP and `task create` instead.
