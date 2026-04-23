@@ -407,9 +407,14 @@ class TmuxBackend(SpawnBackend):
         )
         num_panes = len(pane_count.stdout.strip().splitlines()) if pane_count.returncode == 0 else 0
 
-        # If already tiled (1 window, multiple panes), just refresh border status.
+        # If already tiled (1 window, multiple panes), refresh the UX
+        # affordances (border + mouse) and return.
         if len(windows) <= 1 and num_panes > 1:
             _configure_pane_border_status(session)
+            subprocess.run(
+                ["tmux", "set-option", "-t", session, "mouse", "on"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
             return f"Already tiled ({num_panes} panes) in {session}"
 
         # pane_map is built from post-tile readback. We deliberately do NOT
@@ -455,6 +460,24 @@ class TmuxBackend(SpawnBackend):
             if failures:
                 _log_tile_failures(session, failures)
 
+            # UX fixes (2026-04-23):
+            #
+            # 1. Enable mouse support so the user can CLICK panes to switch
+            #    focus (otherwise they're stuck with Ctrl+b + arrow keys,
+            #    and the last-joined pane — sre in a gstack team — stays
+            #    active because each join-pane re-sets active-pane).
+            # 2. Explicitly select pane 0 (CEO) so the user starts in the
+            #    team leader's window rather than whatever pane was last
+            #    active post-merge.
+            subprocess.run(
+                ["tmux", "set-option", "-t", session, "mouse", "on"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            subprocess.run(
+                ["tmux", "select-pane", "-t", f"{session}:{first_idx}.0"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+
             # Readback: list-panes with the final pane_index + pane_title
             # (the latter is what `claude -n <role>` wrote). This is the
             # authoritative post-layout mapping the user sees on the pane
@@ -488,6 +511,27 @@ class TmuxBackend(SpawnBackend):
         )
         final_panes = len(pane_count.stdout.strip().splitlines()) if pane_count.returncode == 0 else 0
         return f"Tiled {final_panes} panes in {session}"
+
+    @staticmethod
+    def enable_mouse(team_name: str) -> None:
+        """Enable tmux mouse support + pane border status on the team's session.
+
+        Idempotent. Safe to call whether panes are tiled or kept as separate
+        windows. Mouse support lets the user click panes/windows to switch
+        focus instead of relying on ``Ctrl+b`` + arrow keys.
+        """
+        session = TmuxBackend.session_name(team_name)
+        check = subprocess.run(
+            ["tmux", "has-session", "-t", session],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        if check.returncode != 0:
+            return
+        subprocess.run(
+            ["tmux", "set-option", "-t", session, "mouse", "on"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        _configure_pane_border_status(session)
 
     @staticmethod
     def attach_all(team_name: str, tile_first: bool = True) -> str:

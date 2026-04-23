@@ -271,14 +271,18 @@ def cmd_go(
     # Tile panes by default so the user sees all 11 agents on one screen
     # with per-pane index labels. Opt out with --windows.
     pane_map: list[tuple[int, str]] = []
+    from clawteam.spawn.tmux_backend import TmuxBackend, read_pane_map
     if tile:
-        from clawteam.spawn.tmux_backend import TmuxBackend, read_pane_map
         TmuxBackend.tile_panes(team_name)
         # Read the pane → agent mapping captured during tiling. Claude's
         # TUI overwrites pane_title dynamically post-launch, so the stable
         # identifier is the pane index; we pair it with launch-order names
         # so the user can always tell which pane is which agent.
         pane_map = read_pane_map(team_name)
+    else:
+        # Non-tiled (separate windows) mode still benefits from mouse
+        # support + pane-border labels, so enable those explicitly.
+        TmuxBackend.enable_mouse(team_name)
 
     console.print()
     layout_line = (
