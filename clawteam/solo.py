@@ -89,7 +89,12 @@ def cmd_go(
     ),
     attach: bool = typer.Option(
         False, "--attach", "-a",
-        help="After launch, attach to tmux session immediately",
+        help="After launch, attach to the tmux session immediately",
+    ),
+    tile: bool = typer.Option(
+        True, "--tile/--windows",
+        help="Show all 11 agents as tiled panes in ONE window (default). "
+             "Use --windows to keep them in separate windows instead.",
     ),
 ) -> None:
     """Start working on a goal: create team + start sprint + launch agents."""
@@ -154,19 +159,49 @@ def cmd_go(
     # Mark this team as active
     set_active_team(team_name)
 
+    # Tile panes by default so the user sees all 11 agents on one screen
+    # with per-pane index labels. Opt out with --windows.
+    pane_map: list[tuple[int, str]] = []
+    if tile:
+        from clawteam.spawn.tmux_backend import TmuxBackend, read_pane_map
+        TmuxBackend.tile_panes(team_name)
+        # Read the pane → agent mapping captured during tiling. Claude's
+        # TUI overwrites pane_title dynamically post-launch, so the stable
+        # identifier is the pane index; we pair it with launch-order names
+        # so the user can always tell which pane is which agent.
+        pane_map = read_pane_map(team_name)
+
     console.print()
+    layout_line = (
+        "11 panes in one tmux window (see pane-to-agent map below)"
+        if tile
+        else "11 separate tmux windows (Ctrl+b n to cycle)"
+    )
+    # Format the pane map as a compact inline roster.
+    roster_line = ""
+    if pane_map:
+        roster_line = (
+            "\n[bold]Panes:[/bold]   "
+            + "  ".join(
+                f"[yellow]{idx}[/yellow]=[cyan]{name}[/cyan]"
+                for idx, name in pane_map
+            )
+        )
     console.print(Panel(
         f"[bold green]✓ Team '{team_name}' is live[/bold green]\n\n"
         f"[bold]Goal:[/bold]    {goal}\n"
         f"[bold]Sprint:[/bold]  {sprint_id or '(see clawteam status)'}\n"
         f"[bold]Agents:[/bold]  11 (ceo, pm, eng-mgr, designer, dx-lead, "
-        f"engineer, reviewer, qa, security, shipper, sre)\n\n"
+        f"engineer, reviewer, qa, security, shipper, sre)\n"
+        f"[bold]Layout:[/bold]  {layout_line}"
+        f"{roster_line}\n\n"
         f"[bold]Next:[/bold]\n"
-        f"  [cyan]clawteam status[/cyan]          — see what's happening (no tmux needed)\n"
+        f"  [cyan]clawteam status[/cyan]          — dashboard (no tmux needed)\n"
         f"  [cyan]clawteam answer[/cyan]          — when agents ask you questions\n"
         f"  [cyan]clawteam stop[/cyan]            — shut everything down cleanly\n"
         f"  [cyan]tmux attach -t clawteam-{team_name}[/cyan]\n"
-        f"     [dim](power-user: watch agents live in tmux panes)[/dim]",
+        f"     [dim]watch all 11 agents live "
+        f"(Ctrl+b → arrow keys to move between panes, Ctrl+b d to detach)[/dim]",
         title="🚀 Team running",
         border_style="green",
     ))
@@ -345,21 +380,45 @@ def _render_cost_panel(team: str) -> None:
 
 
 def _render_tmux_indicator(team: str) -> None:
-    """Show whether the team's tmux session is alive."""
+    """Show whether the team's tmux session is alive + pane roster if tiled."""
     session = f"clawteam-{team}"
     check = subprocess.run(
         ["tmux", "has-session", "-t", session],
         capture_output=True,
     )
     if check.returncode == 0:
-        # Count windows
+        # Count windows + panes in window 0 to distinguish tiled vs windows mode
         wins = subprocess.run(
             ["tmux", "list-windows", "-t", session, "-F", "#{window_name}"],
             capture_output=True, text=True,
         )
         win_count = len(wins.stdout.splitlines()) if wins.returncode == 0 else 0
+        panes_w0 = subprocess.run(
+            ["tmux", "list-panes", "-t", f"{session}:0"],
+            capture_output=True, text=True,
+        )
+        pane_count = (
+            len(panes_w0.stdout.strip().splitlines()) if panes_w0.returncode == 0 else 0
+        )
+        if pane_count > 1:
+            layout_desc = f"{pane_count} panes tiled in window 0"
+        else:
+            layout_desc = f"{win_count} separate windows"
         console.print(f"\n[bold]Tmux:[/bold]    [green]●[/green] session live  "
-                      f"[dim]({win_count} agent windows)[/dim]")
+                      f"[dim]({layout_desc})[/dim]")
+
+        # Render pane-to-agent roster if we have one on disk.
+        try:
+            from clawteam.spawn.tmux_backend import read_pane_map
+            pane_map = read_pane_map(team)
+            if pane_map:
+                roster = "  ".join(
+                    f"[yellow]{idx}[/yellow]=[cyan]{name}[/cyan]"
+                    for idx, name in pane_map
+                )
+                console.print(f"[bold]Panes:[/bold]   {roster}")
+        except Exception:
+            pass
     else:
         console.print(f"\n[bold]Tmux:[/bold]    [red]○[/red] no session  "
                       f"[dim](agents not running — `clawteam go` to start)[/dim]")

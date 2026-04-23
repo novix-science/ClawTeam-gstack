@@ -359,9 +359,20 @@ class TmuxBackend(SpawnBackend):
 
     @staticmethod
     def tile_panes(team_name: str) -> str:
-        """Merge all windows into one tiled view. Does NOT attach.
+        """Merge all windows into one tiled view with per-pane agent titles.
 
-        Returns status message or error.
+        Sets each pane's title to its originating window name (e.g. "ceo",
+        "pm", "engineer") and enables ``pane-border-status top`` on the
+        session so the user can see which pane is which agent at a glance.
+
+        Does NOT attach. Returns status message or error.
+
+        Side effect: writes ``~/.clawteam/teams/<team>/tmux_pane_map.json``
+        recording the pane_index → agent_name mapping captured during the
+        merge. Useful because claude's TUI overwrites pane_title dynamically
+        (with its own status string), so pane_title alone is unreliable
+        post-launch. Callers (e.g. ``clawteam go``, ``clawteam status``)
+        can read this file to present a stable roster.
         """
         session = TmuxBackend.session_name(team_name)
 
@@ -373,38 +384,89 @@ class TmuxBackend(SpawnBackend):
         if check.returncode != 0:
             return f"Error: tmux session '{session}' not found. No agents spawned for team '{team_name}'?"
 
-        # Count current panes in window 0
+        # Gather window metadata (index + name) up front so we can carry the
+        # agent name into the merged pane's title.
+        windows_raw = subprocess.run(
+            ["tmux", "list-windows", "-t", session, "-F", "#{window_index}:#{window_name}"],
+            capture_output=True, text=True,
+        )
+        if windows_raw.returncode != 0:
+            return f"Error: failed to list windows: {windows_raw.stderr.strip()}"
+
+        windows: list[tuple[str, str]] = []
+        for line in windows_raw.stdout.strip().splitlines():
+            if ":" not in line:
+                continue
+            idx, name = line.split(":", 1)
+            windows.append((idx, name))
+
+        # Count current panes in window 0 for the "already tiled" shortcut.
         pane_count = subprocess.run(
             ["tmux", "list-panes", "-t", f"{session}:0"],
             capture_output=True, text=True,
         )
         num_panes = len(pane_count.stdout.strip().splitlines()) if pane_count.returncode == 0 else 0
 
-        # Get windows
-        result = subprocess.run(
-            ["tmux", "list-windows", "-t", session, "-F", "#{window_index}"],
-            capture_output=True, text=True,
-        )
-        if result.returncode != 0:
-            return f"Error: failed to list windows: {result.stderr.strip()}"
-
-        windows = result.stdout.strip().splitlines()
-
-        # If already tiled (1 window, multiple panes), skip merge
+        # If already tiled (1 window, multiple panes), just refresh border status.
         if len(windows) <= 1 and num_panes > 1:
+            _configure_pane_border_status(session)
             return f"Already tiled ({num_panes} panes) in {session}"
 
+        # pane_map[i] = (pane_index, agent_name) — tracks the final
+        # pane_index for each successfully merged agent so the mapping
+        # survives claude's dynamic pane_title updates later.
+        pane_map: list[tuple[int, str]] = []
+
         if len(windows) > 1:
-            first = windows[0]
-            for w in windows[1:]:
-                subprocess.run(
-                    ["tmux", "join-pane", "-s", f"{session}:{w}", "-t", f"{session}:{first}", "-h"],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                )
+            first_idx, first_name = windows[0]
+            # Seed pane 0's title from window 0's name.
             subprocess.run(
-                ["tmux", "select-layout", "-t", f"{session}:{first}", "tiled"],
+                ["tmux", "select-pane", "-t", f"{session}:{first_idx}.0", "-T", first_name],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
+            pane_map.append((0, first_name))
+            # Join each subsequent window's pane into window 0 one at a time,
+            # re-tiling after each join so the next join has space to split
+            # (tmux refuses join-pane when the target has no room to split).
+            failures: list[str] = []
+            next_pane_idx = 1
+            for idx, name in windows[1:]:
+                join = subprocess.run(
+                    ["tmux", "join-pane", "-s", f"{session}:{idx}", "-t", f"{session}:{first_idx}"],
+                    capture_output=True, text=True,
+                )
+                if join.returncode != 0:
+                    failures.append(f"{name}: {(join.stderr or '').strip()}")
+                    continue
+                # The just-joined pane is the currently active pane.
+                subprocess.run(
+                    ["tmux", "select-pane", "-t", f"{session}:{first_idx}.{{last}}", "-T", name],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                )
+                pane_map.append((next_pane_idx, name))
+                next_pane_idx += 1
+                # Re-tile to make room for the next pane.
+                subprocess.run(
+                    ["tmux", "select-layout", "-t", f"{session}:{first_idx}", "tiled"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                )
+            # Final layout pass.
+            subprocess.run(
+                ["tmux", "select-layout", "-t", f"{session}:{first_idx}", "tiled"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            if failures:
+                # Surfaced via logger so callers (e.g. `clawteam go`) can
+                # include it in user output; non-fatal — partial tile is
+                # better than no tile.
+                _log_tile_failures(session, failures)
+
+        # Persist pane map for downstream consumers (`clawteam status`,
+        # `clawteam go` output, future `clawteam panes` command).
+        if pane_map:
+            _write_pane_map(team_name, pane_map)
+
+        _configure_pane_border_status(session)
 
         # Recount
         pane_count = subprocess.run(
@@ -415,15 +477,103 @@ class TmuxBackend(SpawnBackend):
         return f"Tiled {final_panes} panes in {session}"
 
     @staticmethod
-    def attach_all(team_name: str) -> str:
-        """Tile all windows into panes and attach to the session."""
-        result = TmuxBackend.tile_panes(team_name)
-        if result.startswith("Error"):
-            return result
+    def attach_all(team_name: str, tile_first: bool = True) -> str:
+        """Tile all windows into panes and attach to the session.
+
+        ``tile_first=False`` skips the merge step — useful when the caller
+        already tiled the panes (e.g. right after ``clawteam go``) or wants
+        to attach to a session whose layout should be preserved.
+        """
+        if tile_first:
+            result = TmuxBackend.tile_panes(team_name)
+            if result.startswith("Error"):
+                return result
+        else:
+            result = ""
 
         session = TmuxBackend.session_name(team_name)
         subprocess.run(["tmux", "attach-session", "-t", session])
         return result
+
+
+def _configure_pane_border_status(session: str) -> None:
+    """Enable per-pane agent-name labels on the tiled layout.
+
+    tmux's ``pane-border-status top`` draws the pane title on the top
+    border of each pane. Combined with ``pane_title`` set from the
+    originating window name, each tiled agent pane is labeled so the
+    user can see at a glance which pane is ceo / pm / engineer / etc.
+
+    The format includes ``pane_index`` as a stable prefix since claude's
+    TUI can dynamically rewrite ``pane_title`` with its own status string
+    (e.g. "⠂ Working on X"); the index never changes, so the user can
+    always cross-reference to a separate `clawteam team status` roster.
+    """
+    # Set at the session scope so new windows / panes inherit it.
+    subprocess.run(
+        ["tmux", "set-option", "-t", session, "pane-border-status", "top"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    subprocess.run(
+        ["tmux", "set-option", "-t", session,
+         "pane-border-format",
+         " #[fg=yellow]#{pane_index}#[default] "
+         "#[fg=cyan,bold]#{pane_title}#[default] "],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+
+
+def _pane_map_path(team_name: str):
+    """Return the on-disk path for the tmux pane→agent mapping JSON."""
+    from pathlib import Path as _Path
+    from clawteam.team.models import get_data_dir as _get_data_dir
+    return _get_data_dir() / "teams" / team_name / "tmux_pane_map.json"
+
+
+def _write_pane_map(team_name: str, pane_map: list[tuple[int, str]]) -> None:
+    """Persist pane_index → agent_name mapping after tile_panes finishes."""
+    import json as _json
+    path = _pane_map_path(team_name)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            _json.dumps({str(idx): name for idx, name in pane_map}, indent=2),
+            encoding="utf-8",
+        )
+    except OSError:
+        # Non-fatal — the roster is a UX nicety, not correctness-critical.
+        pass
+
+
+def read_pane_map(team_name: str) -> list[tuple[int, str]]:
+    """Public helper: load the persisted pane map, or return [] if absent."""
+    import json as _json
+    path = _pane_map_path(team_name)
+    if not path.is_file():
+        return []
+    try:
+        raw = _json.loads(path.read_text(encoding="utf-8"))
+        return sorted(
+            ((int(k), v) for k, v in raw.items()),
+            key=lambda kv: kv[0],
+        )
+    except (OSError, _json.JSONDecodeError, ValueError):
+        return []
+
+
+def _log_tile_failures(session: str, failures: list[str]) -> None:
+    """Record partial-tile failures (non-fatal) via the stdlib logger.
+
+    Keeps tile_panes() quiet on the happy path but gives ops visibility
+    when a user reports "only 6/11 agents visible".
+    """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    _log.warning(
+        "tmux tile_panes on session=%s had %d join failures: %s",
+        session, len(failures), "; ".join(failures),
+    )
+
 
 def _confirm_workspace_trust_if_prompted(
     target: str,
