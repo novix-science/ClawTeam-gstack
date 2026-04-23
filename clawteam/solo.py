@@ -18,6 +18,7 @@ unchanged and still available.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -29,6 +30,83 @@ from rich.panel import Panel
 from rich.table import Table
 
 console = Console()
+
+
+# ---------------------------------------------------------------------------
+# Terminal emulator detection (for `clawteam go --window`)
+# ---------------------------------------------------------------------------
+
+def _find_terminal_emulator() -> Optional[list[str]]:
+    """Return an argv prefix for a detected terminal emulator + its exec flag.
+
+    The returned list is everything needed before the command to run in the
+    new window (e.g. ``["kitty", "-e"]``). Respects the user's ``$TERMINAL``
+    env var first (an override/contract for unusual setups), else probes a
+    short list of common Linux emulators via ``shutil.which``. Returns
+    ``None`` if no known terminal is available — callers should fall back
+    to a copy-paste command.
+    """
+    # Honor explicit override. Format: either just the binary name (we add
+    # `-e` as the default exec flag) or "binary --exec-flag".
+    override = os.environ.get("TERMINAL", "").strip()
+    if override:
+        parts = override.split()
+        if shutil.which(parts[0]):
+            # Most terminals use `-e` or `--` for "run this command".
+            if len(parts) == 1:
+                return [parts[0], "-e"]
+            return parts
+
+    # Probe order: modern GPU terminals first, then traditional X11 ones.
+    # Each tuple is (binary, exec-arg).
+    candidates = [
+        ("kitty", "--"),          # kitty: `kitty -- cmd args`
+        ("alacritty", "-e"),      # alacritty: `alacritty -e cmd args`
+        ("wezterm", "start"),     # wezterm: `wezterm start -- cmd args`
+        ("foot", "-e"),           # foot (wayland)
+        ("ghostty", "-e"),        # ghostty
+        ("gnome-terminal", "--"), # GNOME: `gnome-terminal -- cmd args`
+        ("konsole", "-e"),        # KDE Plasma
+        ("xfce4-terminal", "-e"), # XFCE
+        ("terminator", "-e"),     # terminator
+        ("xterm", "-e"),          # xterm (fallback — nearly always present)
+    ]
+    for binary, exec_flag in candidates:
+        if shutil.which(binary):
+            if binary == "wezterm":
+                # wezterm wants `wezterm start -- cmd`
+                return ["wezterm", "start", "--"]
+            return [binary, exec_flag]
+    return None
+
+
+def _spawn_tmux_attach_window(team_name: str) -> str:
+    """Launch a detached new-terminal-window that attaches to the team's tmux.
+
+    Returns a status string for the caller to show (e.g. "opened in kitty"
+    or a copy-paste fallback command).
+    """
+    session = f"clawteam-{team_name}"
+    term = _find_terminal_emulator()
+    if term is None:
+        return (
+            f"[dim]No known terminal emulator detected. Open a new window "
+            f"and run:[/dim] [cyan]tmux attach -t {session}[/cyan]"
+        )
+    try:
+        subprocess.Popen(
+            term + ["tmux", "attach", "-t", session],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        return (
+            f"[yellow]Failed to spawn {term[0]}: {exc}. Manually run:[/yellow] "
+            f"[cyan]tmux attach -t {session}[/cyan]"
+        )
+    return f"[green]✓[/green] Opened new [bold]{term[0]}[/bold] window attached to tmux"
 
 
 # ---------------------------------------------------------------------------
@@ -89,12 +167,18 @@ def cmd_go(
     ),
     attach: bool = typer.Option(
         False, "--attach", "-a",
-        help="After launch, attach to the tmux session immediately",
+        help="After launch, attach to the tmux session in the CURRENT terminal",
+    ),
+    window: bool = typer.Option(
+        False, "--window", "-w",
+        help="Spawn a NEW terminal window attached to the tmux session "
+             "(kitty/alacritty/wezterm/gnome-terminal/konsole/xterm auto-detected). "
+             "Your current shell stays free. Overrides --attach.",
     ),
     tile: bool = typer.Option(
         True, "--tile/--windows",
         help="Show all 11 agents as tiled panes in ONE window (default). "
-             "Use --windows to keep them in separate windows instead.",
+             "Use --windows to keep them in separate tmux windows instead.",
     ),
 ) -> None:
     """Start working on a goal: create team + start sprint + launch agents."""
@@ -147,13 +231,38 @@ def cmd_go(
     console.print(f"[bold cyan]▶ Launching 11 agents[/bold cyan] "
                   f"[dim](tmux session: clawteam-{team_name})[/dim]")
 
-    # 3. Launch agents
-    launch_rc = subprocess.run(
+    # 3. Launch agents. Run in the background so we can open a new-terminal
+    # attach window as soon as the tmux session comes up (user sees agents
+    # materialize live rather than staring at a blank terminal for 25s).
+    launch_proc = subprocess.Popen(
         [sys.executable, "-m", "clawteam", "launch", template, "--team", team_name],
-        capture_output=True, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
-    if launch_rc.returncode != 0:
-        console.print(f"[red]Launch failed:[/red] {launch_rc.stderr or launch_rc.stdout}")
+
+    session = f"clawteam-{team_name}"
+    if window:
+        # Poll until tmux session exists, then spawn terminal + attach.
+        import time as _time
+        deadline = _time.monotonic() + 10.0  # generous — first agent usually ~2s
+        spawned = False
+        while _time.monotonic() < deadline:
+            if subprocess.run(
+                ["tmux", "has-session", "-t", session],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            ).returncode == 0:
+                msg = _spawn_tmux_attach_window(team_name)
+                console.print(f"  {msg}")
+                spawned = True
+                break
+            _time.sleep(0.2)
+        if not spawned:
+            console.print(f"  [yellow]tmux session didn't appear within 10s; "
+                          f"skipping new-window attach[/yellow]")
+
+    # Wait for the background launch to finish.
+    launch_stdout, launch_stderr = launch_proc.communicate()
+    if launch_proc.returncode != 0:
+        console.print(f"[red]Launch failed:[/red] {launch_stderr or launch_stdout}")
         raise typer.Exit(1)
 
     # Mark this team as active
@@ -206,7 +315,9 @@ def cmd_go(
         border_style="green",
     ))
 
-    if attach:
+    # --window already opened a new terminal earlier; only honor --attach
+    # when --window wasn't set (they're mutually exclusive UX-wise).
+    if attach and not window:
         console.print()
         console.print(f"[dim]Attaching to tmux session clawteam-{team_name}... "
                       f"(Ctrl+b d to detach)[/dim]")

@@ -412,24 +412,28 @@ class TmuxBackend(SpawnBackend):
             _configure_pane_border_status(session)
             return f"Already tiled ({num_panes} panes) in {session}"
 
-        # pane_map[i] = (pane_index, agent_name) — tracks the final
-        # pane_index for each successfully merged agent so the mapping
-        # survives claude's dynamic pane_title updates later.
+        # pane_map is built from post-tile readback. We deliberately do NOT
+        # seed pane titles with tmux `select-pane -T` because:
+        #   (a) `claude -n <role>` already sets a stable terminal title that
+        #       overrides tmux's auto-renaming and claude's own dynamic
+        #       status-string updates via ANSI OSC sequences;
+        #   (b) the `{last}` target in tmux refers to the *previously active*
+        #       pane, not the just-joined pane — so attempting to -T the
+        #       "new" pane actually overwrote the wrong pane (observed bug
+        #       2026-04-23: ceo→pane 0 lost its title to pm, duplicates in
+        #       later panes);
+        #   (c) `select-layout tiled` renumbers panes based on visual
+        #       position, so pre-layout indices are unreliable anyway.
+        # Launch callers must pass `claude -n <agent_name>` for this to
+        # work (see clawteam/cli/commands.py::launch_team).
         pane_map: list[tuple[int, str]] = []
 
         if len(windows) > 1:
-            first_idx, first_name = windows[0]
-            # Seed pane 0's title from window 0's name.
-            subprocess.run(
-                ["tmux", "select-pane", "-t", f"{session}:{first_idx}.0", "-T", first_name],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            )
-            pane_map.append((0, first_name))
-            # Join each subsequent window's pane into window 0 one at a time,
-            # re-tiling after each join so the next join has space to split
-            # (tmux refuses join-pane when the target has no room to split).
+            first_idx, _ = windows[0]
+            # Join each subsequent window's pane into window 0 one at a
+            # time, re-tiling after each join so the next join has room to
+            # split (tmux refuses join-pane when the target has no space).
             failures: list[str] = []
-            next_pane_idx = 1
             for idx, name in windows[1:]:
                 join = subprocess.run(
                     ["tmux", "join-pane", "-s", f"{session}:{idx}", "-t", f"{session}:{first_idx}"],
@@ -438,28 +442,37 @@ class TmuxBackend(SpawnBackend):
                 if join.returncode != 0:
                     failures.append(f"{name}: {(join.stderr or '').strip()}")
                     continue
-                # The just-joined pane is the currently active pane.
-                subprocess.run(
-                    ["tmux", "select-pane", "-t", f"{session}:{first_idx}.{{last}}", "-T", name],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                )
-                pane_map.append((next_pane_idx, name))
-                next_pane_idx += 1
-                # Re-tile to make room for the next pane.
+                # Re-tile to redistribute space before the next join.
                 subprocess.run(
                     ["tmux", "select-layout", "-t", f"{session}:{first_idx}", "tiled"],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 )
-            # Final layout pass.
+            # Final layout pass for an even grid.
             subprocess.run(
                 ["tmux", "select-layout", "-t", f"{session}:{first_idx}", "tiled"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
             if failures:
-                # Surfaced via logger so callers (e.g. `clawteam go`) can
-                # include it in user output; non-fatal — partial tile is
-                # better than no tile.
                 _log_tile_failures(session, failures)
+
+            # Readback: list-panes with the final pane_index + pane_title
+            # (the latter is what `claude -n <role>` wrote). This is the
+            # authoritative post-layout mapping the user sees on the pane
+            # borders.
+            readback = subprocess.run(
+                ["tmux", "list-panes", "-t", f"{session}:{first_idx}",
+                 "-F", "#{pane_index}:#{pane_title}"],
+                capture_output=True, text=True,
+            )
+            if readback.returncode == 0:
+                for line in readback.stdout.strip().splitlines():
+                    if ":" not in line:
+                        continue
+                    idx_str, title = line.split(":", 1)
+                    try:
+                        pane_map.append((int(idx_str), title.strip()))
+                    except ValueError:
+                        continue
 
         # Persist pane map for downstream consumers (`clawteam status`,
         # `clawteam go` output, future `clawteam panes` command).

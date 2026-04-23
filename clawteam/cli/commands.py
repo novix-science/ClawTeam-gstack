@@ -4530,6 +4530,18 @@ def launch_team(
             command_seed = list(a_cmd) if (agent.command or command_override) else []
             a_cmd, a_env, _ = apply_profile(resolved_profile, command=command_seed)
 
+        # v1.0 UAT fix 2026-04-23: inject `claude -n <AGENT_NAME>` so the
+        # agent's role shows up in the claude prompt box, in /resume picker,
+        # and most importantly in the terminal/tmux pane title — stable
+        # regardless of claude's dynamic status updates. Uppercase for
+        # visual emphasis in the tmux border (CEO / PM / ENGINEER beats
+        # lowercase; user request 2026-04-23). Only applies when the
+        # spawned command is claude; other CLIs (codex, gemini, ...) keep
+        # their existing invocation unchanged (BC).
+        from clawteam.spawn.adapters import is_claude_command as _is_claude
+        if a_cmd and _is_claude(a_cmd) and "-n" not in a_cmd and "--name" not in a_cmd:
+            a_cmd = list(a_cmd) + ["-n", agent.name.upper()]
+
         # Variable substitution
         rendered = render_task(
             agent.task,
