@@ -4646,6 +4646,21 @@ def launch_team(
             except OSError:
                 system_prompt = None
 
+            # Install the on-disk role card so the nudge hook can tell
+            # agents to re-read it when they drift. The card combines
+            # the base methodology prompt with a role-specific command
+            # appendix. Silent-fail on any I/O error.
+            try:
+                from clawteam.role_cards import install_agent_card
+                install_agent_card(
+                    team=t_name,
+                    agent=agent.name,
+                    prompt_file=agent.prompt_file,
+                    leader_name=tmpl.leader.name,
+                )
+            except Exception:
+                pass
+
         result = be.spawn(
             command=a_cmd,
             agent_name=agent.name,

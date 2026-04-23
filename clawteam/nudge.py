@@ -149,97 +149,38 @@ def _latest_sprint_state(team: str) -> dict:
 # Role-specific nudge text
 # ---------------------------------------------------------------------------
 
-# Short reminders indexed by (role_name). Phase-specific nudges can be added
-# by branching on the phase below. Keep each message < 3 lines so injection
-# doesn't drown out the agent's own work.
-_ROLE_NUDGES: dict[str, str] = {
-    "ceo": (
-        "[nudge] Reminder: you DELEGATE, never implement. "
-        "Decompose the goal into tasks via `clawteam task create {team} "
-        "\"<subject>\" --owner <role>` (designer/engineer/reviewer/qa/"
-        "shipper/sre/security/pm). Advance phase with `clawteam sprint "
-        "resume` after delegation."
-    ),
-    "pm": (
-        "[nudge] As pm (YC advisor): emit ONE of the 6 forcing questions "
-        "(demand / status-quo / specificity / wedge / observation / "
-        "future-fit) in TurnEnvelope form. Challenge, don't advise. "
-        "Hand back to ceo when all 6 answered."
-    ),
-    "eng-mgr": (
-        "[nudge] As eng-mgr: produce one of your 5 deliverables "
-        "(architecture-lock, data-flow, edge-case-matrix, test-plan, "
-        "retro-breakdown). Check `clawteam task list {team} --owner "
-        "eng-mgr` for assignments."
-    ),
-    "designer": (
-        "[nudge] As designer: deliver visual spec / mocks. If task "
-        "requires variant exploration, the `/design-shotgun` handler "
-        "exists but no CLI wrapper yet — produce inline mocks in your "
-        "answer. Check `clawteam task list {team} --owner designer`."
-    ),
-    "engineer": (
-        "[nudge] As engineer: your output IS the implementation. "
-        "Read files before edits. Commit via git. Check `clawteam task "
-        "list {team} --owner engineer` before writing code, and "
-        "`clawteam workspace checkpoint {team}` to commit WIP."
-    ),
-    "reviewer": (
-        "[nudge] As reviewer: review against architecture-lock "
-        "(eng-mgr's artifact). Don't approve without reading it. "
-        "Check `clawteam task list {team} --owner reviewer`."
-    ),
-    "qa": (
-        "[nudge] As qa: execute the test-plan (eng-mgr's artifact) "
-        "+ adversarial edge cases. Report bugs via `clawteam inbox "
-        "send {team} engineer \"Bug: ...\"`. Check your tasks: "
-        "`clawteam task list {team} --owner qa`."
-    ),
-    "security": (
-        "[nudge] As security: run STRIDE on anything touching auth, "
-        "user data, or external input. Spoof / Tamper / Repudiate / "
-        "InfoDisclose / DoS / Elevate. Check your tasks: `clawteam "
-        "task list {team} --owner security`."
-    ),
-    "shipper": (
-        "[nudge] As shipper: gate ship on ceo approval. `/ship` and "
-        "`/land-and-deploy` live in clawteam framework — currently "
-        "no CLI wrapper, so describe ship plan inline + wait for "
-        "ceo. Check `clawteam task list {team} --owner shipper`."
-    ),
-    "sre": (
-        "[nudge] As sre: canary / benchmark / deploy infra. `/canary` "
-        "and `/setup-deploy` handlers exist but no CLI wrapper yet — "
-        "describe inline. Check `clawteam task list {team} --owner sre`."
-    ),
-    "dx-lead": (
-        "[nudge] As dx-lead: CLI ergonomics + docs + onboarding "
-        "polish. Check `clawteam task list {team} --owner dx-lead`."
-    ),
-}
-
-
 def _build_nudge_text(team: str, agent: str, state: dict) -> str:
-    """Compose a short role + phase aware nudge."""
-    base = _ROLE_NUDGES.get(agent, "")
-    if not base:
-        # Unknown role — minimal generic nudge.
-        return (
-            f"[nudge] You are {agent} on team {team}. Check your tasks: "
-            f"`clawteam task list {team} --owner {agent}`. "
-            f"Send messages via `clawteam inbox send {team} <to> \"...\"`."
-        )
+    """Compose a short nudge that points at the role card on disk.
+
+    Rather than repeating the full role methodology on every nudge
+    (~3-5 lines, ~100 tokens), we inject a ONE-LINE pointer at the
+    agent's ``agent.md`` file. Agents fetch on demand via the Read
+    tool if they've drifted — otherwise they ignore the nudge.
+
+    The card lives at
+    ``~/.clawteam/teams/<team>/agents/<agent>/agent.md`` (installed at
+    team launch time by clawteam.role_cards.install_agent_card). Its
+    content is the role's methodology prompt + a role-specific
+    `clawteam` command appendix; single source of truth for "who am
+    I, what can I do".
+    """
+    from clawteam.role_cards import agent_card_path
+    path = agent_card_path(team, agent)
     phase = state.get("current_phase", "")
     goal = state.get("goal", "")
-    text = base.format(team=team)
+
     context_bits: list[str] = []
     if goal:
-        context_bits.append(f"Goal: {goal}")
+        context_bits.append(f"goal={goal}")
     if phase:
-        context_bits.append(f"Phase: {phase}")
-    if context_bits:
-        text = text + " (" + " · ".join(context_bits) + ")"
-    return text
+        context_bits.append(f"phase={phase}")
+    context = f" ({' · '.join(context_bits)})" if context_bits else ""
+
+    return (
+        f"[nudge] Drifted from your role? Re-read `{path}` — it's your "
+        f"role methodology + available `clawteam` commands in one file."
+        f"{context}"
+    )
 
 
 # ---------------------------------------------------------------------------
