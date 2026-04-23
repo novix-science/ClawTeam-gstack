@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import logo from "../../assets/icon.png";
+import logo from "../../assets/icon.webp";
 
 const IconClaude = () => (
   <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor">
@@ -49,14 +49,14 @@ const features = [
 ];
 const steps = [
   { num: "01", title: "Install", body: "Get the CLI. Add P2P transport when the team needs it.", code: 'pip install clawteam\npip install "clawteam[p2p]"' },
-  { num: "02", title: "Model the work", body: "Create a team and define tasks so the board tracks the project.", code: 'clawteam team spawn-team my-team -d "Docs + engineering"\nclawteam task create my-team "Build landing page" --priority urgent' },
+  { num: "02", title: "Spawn the team", body: "Hire the flagship gstack team and define tasks so the board tracks the project.", code: 'clawteam team spawn gstack\nclawteam task create my-team "Build landing page" --priority urgent' },
   { num: "03", title: "Spawn agents", body: "Run any terminal-native client from the same surface.", code: "clawteam spawn tmux claude-code --team my-team --agent-name builder\nclawteam spawn tmux codex --team my-team --agent-name reviewer" }
 ];
 const docs = [
   { title: "Quick Start", body: "Install to first running swarm.", href: "https://github.com/HKUDS/ClawTeam#-quick-start" },
-  { title: "Skill Guide", body: "Agent-facing operating guide.", href: "skills/clawteam/SKILL.md" },
-  { title: "CLI Reference", body: "Commands, flags, and runtime details.", href: "skills/clawteam/references/cli-reference.md" },
-  { title: "Workflows", body: "Practical patterns for real teams.", href: "skills/clawteam/references/workflows.md" }
+  { title: "Skill Guide", body: "Agent-facing operating guide.", href: "https://github.com/HKUDS/ClawTeam/blob/main/skills/clawteam/SKILL.md" },
+  { title: "CLI Reference", body: "Commands, flags, and runtime details.", href: "https://github.com/HKUDS/ClawTeam/blob/main/skills/clawteam/references/cli-reference.md" },
+  { title: "Workflows", body: "Practical patterns for real teams.", href: "https://github.com/HKUDS/ClawTeam/blob/main/skills/clawteam/references/workflows.md" }
 ];
 
 const sprintPhases = ["Think", "Plan", "Build", "Review", "Test", "Ship", "Reflect"];
@@ -167,8 +167,23 @@ function HalfGlobe() {
       });
     };
 
-    const draw = (time) => { ctx.clearRect(0,0,w,h); drawGrid(); drawConns(); drawAgents(time); rot+=0.0018; raf=requestAnimationFrame(draw); };
-    resize(); onScroll(); draw(0);
+    const renderFrame = (time) => { ctx.clearRect(0,0,w,h); drawGrid(); drawConns(); drawAgents(time); };
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resize(); onScroll();
+    if (reducedMotion) {
+      renderFrame(0);
+      const redraw = () => renderFrame(0);
+      const onResize = () => { resize(); redraw(); };
+      const onScrollRM = () => { onScroll(); redraw(); };
+      window.addEventListener("resize", onResize);
+      window.addEventListener("scroll", onScrollRM, {passive:true});
+      return () => {
+        window.removeEventListener("resize", onResize);
+        window.removeEventListener("scroll", onScrollRM);
+      };
+    }
+    const draw = (time) => { renderFrame(time); rot+=0.0018; raf=requestAnimationFrame(draw); };
+    draw(0);
     window.addEventListener("resize",resize); window.addEventListener("scroll",onScroll,{passive:true});
     return ()=>{ cancelAnimationFrame(raf); window.removeEventListener("resize",resize); window.removeEventListener("scroll",onScroll); };
   },[]);
@@ -220,12 +235,15 @@ function App() {
       <main>
         <section className="hero shell" id="top">
           <div className="hero-content">
-            <p className="badge">Agent swarm orchestration · gstack team template</p>
+            <div className="badge-row">
+              <p className="badge">Agent swarm orchestration</p>
+              <p className="badge badge-stable">v1.0 stable</p>
+            </div>
             <h1>Coordinate any coding agent from one CLI</h1>
-            <p className="hero-sub">ClawTeam is the coordination layer for Claude Code, Codex, OpenClaw, nanobot, and any terminal-native client. One command hires the <strong>gstack team</strong> — 11 persistent specialists running parallel Think→Ship sprints with evidence gates and attention routing.</p>
+            <p className="hero-sub">ClawTeam is the coordination layer for Claude Code, Codex, OpenClaw, nanobot, and any terminal-native client.</p>
             <div className="hero-cta">
               <a className="btn-primary" href="https://github.com/HKUDS/ClawTeam#-quick-start" target="_blank" rel="noreferrer">Get started</a>
-              <a className="btn-ghost" href="skills/clawteam/references/cli-reference.md">CLI Reference</a>
+              <a className="btn-ghost" href="https://github.com/HKUDS/ClawTeam/blob/main/skills/clawteam/references/cli-reference.md" target="_blank" rel="noreferrer">CLI Reference</a>
             </div>
           </div>
           <div className="hero-visual"><TerminalMockup/></div>
@@ -233,10 +251,6 @@ function App() {
 
         <HalfGlobe/>
 
-        <section className="clients shell">
-          <span className="clients-label">Works with</span>
-          <div className="clients-list">{clients.map(c=>{ const Icon=clientIcons[c.key]; return <span key={c.key}><Icon/>{c.label}</span>; })}</div>
-        </section>
         <section className="features shell" id="features">
           <div className="section-header"><p className="section-label">Core capabilities</p><h2>Built for agent teams, not isolated sessions</h2></div>
           <div className="features-grid">{features.map(f=><article className="feature-card" key={f.title}><h3>{f.title}</h3><p>{f.body}</p></article>)}</div>
@@ -282,7 +296,7 @@ function App() {
       </main>
       <footer className="footer shell">
         <span>ClawTeam</span>
-        <div className="footer-links"><a href="https://github.com/HKUDS/ClawTeam">GitHub</a><a href="skills/clawteam/SKILL.md">Skill</a><a href="skills/clawteam/references/cli-reference.md">CLI Reference</a></div>
+        <div className="footer-links"><a href="https://github.com/HKUDS/ClawTeam" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/HKUDS/ClawTeam/blob/main/skills/clawteam/SKILL.md" target="_blank" rel="noreferrer">Skill</a><a href="https://github.com/HKUDS/ClawTeam/blob/main/skills/clawteam/references/cli-reference.md" target="_blank" rel="noreferrer">CLI Reference</a></div>
       </footer>
     </div>
   );
