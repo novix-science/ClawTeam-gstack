@@ -4550,6 +4550,40 @@ def launch_team(
             agent_name=agent.name,
         )
 
+        # v1.0 UAT fix 2026-04-23: when a team template declares no per-agent
+        # task (gstack.toml by design — D-04 pure roster declaration) AND a
+        # sprint-level goal is provided, synthesize a kickoff prompt for the
+        # team leader so they know (a) what the goal is, (b) that their job
+        # is to decompose + delegate, not to implement. Without this, the
+        # leader spawns with an empty first message and either idles or
+        # (worse) picks up the work themselves when the user types a goal
+        # into their pane — the exact failure mode observed during UAT
+        # ("CEO 一个人做完了 landing page").
+        if (
+            not rendered
+            and goal
+            and agent.name == tmpl.leader.name
+            and agent.role == "ceo"
+        ):
+            rendered = (
+                f"The team's sprint goal is: **{goal}**\n\n"
+                f"You are the team leader. Your first actions, in order:\n"
+                f"  1. Emit a /plan-ceo-review decision envelope "
+                f"(expansion / selective / hold / reduction) with a 1-2 "
+                f"sentence rationale for this scope.\n"
+                f"  2. Decompose the goal into concrete tasks and assign "
+                f"each to the correct specialist. Use:\n"
+                f"     `clawteam task create {t_name} \"<task subject>\" --owner <role>`\n"
+                f"     Candidate owners: designer, eng-mgr, engineer, "
+                f"reviewer, qa, security, shipper, sre, dx-lead, pm.\n"
+                f"  3. Only after tasks are assigned: `clawteam lifecycle "
+                f"idle {t_name}` while specialists work.\n\n"
+                f"**You do not implement.** If you find yourself about to "
+                f"open Edit/Write/Bash on project files, STOP and delegate "
+                f"the work instead. Your tools are decisions and task "
+                f"assignments only."
+            )
+
         # Workspace
         cwd = None
         ws_branch = ""
