@@ -166,14 +166,18 @@ def cmd_go(
         help="Team template (default: gstack — 11-specialist team)",
     ),
     attach: bool = typer.Option(
-        False, "--attach", "-a",
-        help="After launch, attach to the tmux session in the CURRENT terminal",
+        True, "--attach/--no-attach", "-a",
+        help="After launch, enter the tmux session automatically (default). "
+             "Uses a new terminal window when possible, falls back to "
+             "attaching in the current shell. Pass --no-attach to keep "
+             "your shell free.",
     ),
     window: bool = typer.Option(
-        False, "--window", "-w",
-        help="Spawn a NEW terminal window attached to the tmux session "
-             "(kitty/alacritty/wezterm/gnome-terminal/konsole/xterm auto-detected). "
-             "Your current shell stays free. Overrides --attach.",
+        True, "--window/--no-window", "-w",
+        help="When auto-attaching, prefer a NEW terminal window over the "
+             "current shell (default). Falls back to current shell if no "
+             "terminal emulator is detected or you're already inside tmux. "
+             "No effect when --no-attach.",
     ),
     tile: bool = typer.Option(
         True, "--tile/--windows",
@@ -240,24 +244,45 @@ def cmd_go(
     )
 
     session = f"clawteam-{team_name}"
-    if window:
-        # Poll until tmux session exists, then spawn terminal + attach.
-        import time as _time
-        deadline = _time.monotonic() + 10.0  # generous — first agent usually ~2s
-        spawned = False
-        while _time.monotonic() < deadline:
-            if subprocess.run(
-                ["tmux", "has-session", "-t", session],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            ).returncode == 0:
-                msg = _spawn_tmux_attach_window(team_name)
-                console.print(f"  {msg}")
-                spawned = True
-                break
-            _time.sleep(0.2)
-        if not spawned:
-            console.print(f"  [yellow]tmux session didn't appear within 10s; "
-                          f"skipping new-window attach[/yellow]")
+    # Resolve the attach strategy once. Auto-attach is the default (user
+    # wants to land in tmux without a second command). Decision tree:
+    #   --no-attach             → skip both
+    #   --no-window             → always attach in current shell at the end
+    #   --window + inside tmux  → "switch-client" inside tmux
+    #   --window + detected emu → spawn new terminal window now
+    #   --window + no emu       → fall back to current-shell attach at the end
+    attach_mode = "none"
+    spawned_window = False
+    if attach:
+        in_existing_tmux = bool(os.environ.get("TMUX"))
+        if window and not in_existing_tmux:
+            # Poll until tmux session exists, then spawn the detected
+            # terminal emulator with `tmux attach`.
+            import time as _time
+            deadline = _time.monotonic() + 10.0
+            while _time.monotonic() < deadline:
+                if subprocess.run(
+                    ["tmux", "has-session", "-t", session],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                ).returncode == 0:
+                    term = _find_terminal_emulator()
+                    if term is not None:
+                        msg = _spawn_tmux_attach_window(team_name)
+                        console.print(f"  {msg}")
+                        spawned_window = True
+                        attach_mode = "window"
+                    break
+                _time.sleep(0.2)
+            # If no terminal detected / session never showed up, fall back
+            # to attaching in the current shell at the end of launch.
+            if not spawned_window:
+                attach_mode = "current"
+        elif in_existing_tmux:
+            # Can't nest tmux; tell the user how to switch into the session
+            # from within their existing tmux at the end.
+            attach_mode = "nested"
+        else:
+            attach_mode = "current"
 
     # Wait for the background launch to finish.
     launch_stdout, launch_stderr = launch_proc.communicate()
@@ -319,13 +344,19 @@ def cmd_go(
         border_style="green",
     ))
 
-    # --window already opened a new terminal earlier; only honor --attach
-    # when --window wasn't set (they're mutually exclusive UX-wise).
-    if attach and not window:
+    # Apply the attach_mode resolved earlier.
+    if attach_mode == "current":
         console.print()
-        console.print(f"[dim]Attaching to tmux session clawteam-{team_name}... "
-                      f"(Ctrl+b d to detach)[/dim]")
-        subprocess.run(["tmux", "attach", "-t", f"clawteam-{team_name}"])
+        console.print(f"[dim]Attaching in current shell... "
+                      f"(Ctrl+b d to detach, your shell returns here)[/dim]")
+        subprocess.run(["tmux", "attach", "-t", session])
+    elif attach_mode == "nested":
+        console.print()
+        console.print(
+            f"[yellow]You're inside an existing tmux session — can't nest.[/yellow]\n"
+            f"Run this to switch the current tmux client to the new team:\n"
+            f"  [cyan]tmux switch-client -t {session}[/cyan]"
+        )
 
 
 # ---------------------------------------------------------------------------
