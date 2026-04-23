@@ -31,6 +31,17 @@ console = Console()
 
 
 # ---------------------------------------------------------------------------
+# Register solo-UX commands FIRST so the "🎯 Daily use (solo)" panel renders
+# at the top of `clawteam --help` instead of being buried under 20+ subgroups.
+# Typer groups commands into rich_help_panels by first-seen order.
+# ---------------------------------------------------------------------------
+from clawteam.solo import register_solo_commands as _register_solo_commands  # noqa: E402
+from clawteam.nudge import register_nudge_command as _register_nudge_command  # noqa: E402
+_register_solo_commands(app)
+_register_nudge_command(app)
+
+
+# ---------------------------------------------------------------------------
 # Global options via callback
 # ---------------------------------------------------------------------------
 
@@ -249,7 +260,7 @@ def _questionary_safe_ask(control):
 # ============================================================================
 
 config_app = typer.Typer(help="Configuration management")
-app.add_typer(config_app, name="config")
+app.add_typer(config_app, name="config", rich_help_panel="🔧 Configuration")
 
 
 @config_app.command("show")
@@ -333,10 +344,10 @@ def config_get(
 # ============================================================================
 
 preset_app = typer.Typer(help="Shared endpoint presets for generating client-scoped profiles")
-app.add_typer(preset_app, name="preset")
+app.add_typer(preset_app, name="preset", rich_help_panel="🔧 Configuration")
 
 profile_app = typer.Typer(help="Reusable agent runtime profiles")
-app.add_typer(profile_app, name="profile")
+app.add_typer(profile_app, name="profile", rich_help_panel="🔧 Configuration")
 
 
 @preset_app.command("list")
@@ -1227,7 +1238,7 @@ def config_health():
 # ============================================================================
 
 
-@app.command("doctor")
+@app.command("doctor", rich_help_panel="🔍 Diagnostics")
 def doctor(
     gc: bool = typer.Option(
         False,
@@ -1413,7 +1424,7 @@ def doctor(
 # ============================================================================
 
 team_app = typer.Typer(help="Team management commands")
-app.add_typer(team_app, name="team")
+app.add_typer(team_app, name="team", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
 
 @team_app.command("spawn-team")
@@ -2265,7 +2276,7 @@ def team_snapshot_delete(
 # ============================================================================
 
 inbox_app = typer.Typer(help="Inbox / messaging commands")
-app.add_typer(inbox_app, name="inbox")
+app.add_typer(inbox_app, name="inbox", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
 
 @inbox_app.command("send")
@@ -2477,7 +2488,7 @@ def inbox_watch(
 # ============================================================================
 
 runtime_app = typer.Typer(help="Tmux-only runtime routing and live injection")
-app.add_typer(runtime_app, name="runtime")
+app.add_typer(runtime_app, name="runtime", hidden=True)  # tmux-internal routing
 
 
 @runtime_app.command("inject")
@@ -2601,7 +2612,7 @@ def runtime_state(
 # ============================================================================
 
 task_app = typer.Typer(help="Task management commands")
-app.add_typer(task_app, name="task")
+app.add_typer(task_app, name="task", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
 
 @task_app.command("create")
@@ -2997,7 +3008,7 @@ def _print_incomplete_tasks(task_details: list[dict]):
 # ============================================================================
 
 session_app = typer.Typer(help="Session persistence for agent resume")
-app.add_typer(session_app, name="session")
+app.add_typer(session_app, name="session", rich_help_panel="🔧 Configuration")
 
 
 @session_app.command("save")
@@ -3096,7 +3107,7 @@ def session_clear(
 # ============================================================================
 
 plan_app = typer.Typer(help="Plan management commands")
-app.add_typer(plan_app, name="plan")
+app.add_typer(plan_app, name="plan", rich_help_panel="⚙️ Advanced (power user)")
 
 
 @plan_app.command("submit")
@@ -3182,7 +3193,7 @@ def plan_reject(
 # ============================================================================
 
 lifecycle_app = typer.Typer(help="Agent lifecycle commands (shutdown protocol)")
-app.add_typer(lifecycle_app, name="lifecycle")
+app.add_typer(lifecycle_app, name="lifecycle", hidden=True)  # spawn-internal keepalive
 
 
 @lifecycle_app.command("request-shutdown")
@@ -3452,7 +3463,7 @@ def lifecycle_check_zombies(
 # Spawn Command
 # ============================================================================
 
-@app.command("spawn")
+@app.command("spawn", rich_help_panel="⚙️ Advanced (power user)")
 def spawn_agent(
     backend: Optional[str] = typer.Argument(None, help="Backend: tmux (default) or subprocess"),
     command: list[str] = typer.Argument(None, help="Command and arguments to run (default: claude)"),
@@ -3692,7 +3703,7 @@ def spawn_agent(
 # ============================================================================
 
 identity_app = typer.Typer(help="Agent identity commands")
-app.add_typer(identity_app, name="identity")
+app.add_typer(identity_app, name="identity", rich_help_panel="⚙️ Advanced (power user)")
 
 
 @identity_app.command("show")
@@ -3759,7 +3770,7 @@ def identity_set(
 # ============================================================================
 
 board_app = typer.Typer(help="Team dashboard and kanban board.")
-app.add_typer(board_app, name="board")
+app.add_typer(board_app, name="board", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
 
 @board_app.command("show")
@@ -4017,7 +4028,7 @@ def board_gource(
 # ============================================================================
 
 workspace_app = typer.Typer(help="Git worktree workspace management")
-app.add_typer(workspace_app, name="workspace")
+app.add_typer(workspace_app, name="workspace", rich_help_panel="⚙️ Advanced (power user)")
 
 
 @workspace_app.command("list")
@@ -4167,7 +4178,7 @@ def workspace_status(
 # ============================================================================
 
 context_app = typer.Typer(help="Git context: diffs, file ownership, conflicts, cross-branch log")
-app.add_typer(context_app, name="context")
+app.add_typer(context_app, name="context", rich_help_panel="⚙️ Advanced (power user)")
 
 
 @context_app.command("diff")
@@ -4315,7 +4326,7 @@ def context_inject(
 # ============================================================================
 
 template_app = typer.Typer(help="Template management")
-app.add_typer(template_app, name="template")
+app.add_typer(template_app, name="template", rich_help_panel="🔧 Configuration")
 
 
 @template_app.command("list")
@@ -4388,7 +4399,7 @@ def template_show(
 # Launch Command
 # ============================================================================
 
-@app.command("launch")
+@app.command("launch", rich_help_panel="⚙️ Advanced (power user)")
 def launch_team(
     template: str = typer.Argument(..., help="Template name (e.g., hedge-fund)"),
     goal: str = typer.Option("", "--goal", "-g", help="Project goal injected into agent prompts"),
@@ -4707,7 +4718,7 @@ def launch_team(
 # ── Hook management ────────────────────────────────────────────────────
 
 hook_app = typer.Typer(help="Event hook management")
-app.add_typer(hook_app, name="hook")
+app.add_typer(hook_app, name="hook", rich_help_panel="🔧 Configuration")
 
 
 @hook_app.command("list")
@@ -4798,7 +4809,7 @@ def hook_test(
 # ── Plugin management ──────────────────────────────────────────────────
 
 plugin_app = typer.Typer(help="Plugin management")
-app.add_typer(plugin_app, name="plugin")
+app.add_typer(plugin_app, name="plugin", rich_help_panel="🔧 Configuration")
 
 
 @plugin_app.command("list")
@@ -4842,7 +4853,7 @@ def plugin_info(name: str = typer.Argument(..., help="Plugin name")) -> None:
 # ── Harness commands ───────────────────────────────────────────────────
 
 harness_app = typer.Typer(help="Plan-then-execute harness orchestration")
-app.add_typer(harness_app, name="harness")
+app.add_typer(harness_app, name="harness", rich_help_panel="⚙️ Advanced (power user)")
 
 
 @harness_app.command("start")
@@ -5036,7 +5047,7 @@ def harness_conduct(
 # ── Wrap / Run commands ────────────────────────────────────────────────
 
 
-@app.command("run")
+@app.command("run", rich_help_panel="⚙️ Advanced (power user)")
 def run_command(
     cli: str = typer.Argument(..., help="CLI agent to wrap (claude, codex, gemini, ...)"),
     goal: str = typer.Argument("", help="Task description"),
@@ -5173,7 +5184,7 @@ guard_app = typer.Typer(
     help="Sprint safety-rail primitives: freeze/unfreeze/guard/unguard.",
     no_args_is_help=True,
 )
-app.add_typer(guard_app, name="guard")
+app.add_typer(guard_app, name="guard", rich_help_panel="⚙️ Advanced (power user)")
 
 
 def _guard_emit_ok(data: dict, warnings: list[str] | None = None) -> None:
@@ -5378,7 +5389,7 @@ sprint_app = typer.Typer(
     help="Sprint lifecycle commands (start/status/show/list/pause/resume).",
     no_args_is_help=True,
 )
-app.add_typer(sprint_app, name="sprint")
+app.add_typer(sprint_app, name="sprint", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
 
 def _sprint_emit_ok(data: dict, warnings: list[str] | None = None) -> None:
@@ -5850,7 +5861,7 @@ learn_app = typer.Typer(
     help="Team memory operations (/learn skill surface — MEM-03, MEM-04).",
     no_args_is_help=True,
 )
-app.add_typer(learn_app, name="learn")
+app.add_typer(learn_app, name="learn", rich_help_panel="⚙️ Advanced (power user)")
 
 
 def _learn_ctx(team_name: str):
@@ -6093,7 +6104,7 @@ def learn_prune(
 # ============================================================================
 
 attend_app = typer.Typer(help="Cross-sprint attention queue")
-app.add_typer(attend_app, name="attend")
+app.add_typer(attend_app, name="attend", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
 
 def _render_attend_items_human(items: list) -> None:
@@ -6332,17 +6343,6 @@ def attend_pick(
             )
         ),
     )
-
-
-# ---------------------------------------------------------------------------
-# Solo UX: 4 top-level commands (go / status / answer / stop) for the 1-person
-# founder path. Wraps the general 28-command surface into a flow most users
-# only ever need. See clawteam/solo.py for rationale + implementation.
-# ---------------------------------------------------------------------------
-from clawteam.solo import register_solo_commands
-from clawteam.nudge import register_nudge_command
-register_solo_commands(app)
-register_nudge_command(app)
 
 
 if __name__ == "__main__":

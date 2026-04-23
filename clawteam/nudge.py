@@ -236,8 +236,14 @@ def cmd_nudge(
 
 
 def register_nudge_command(app: typer.Typer) -> None:
-    """Attach `clawteam nudge <pane_id>` as a top-level command."""
+    """Attach `clawteam nudge <pane_id>` as a hidden top-level command.
+
+    Hidden from default `--help` output because it's a tmux-hook internal,
+    not something users invoke directly. Still callable if the user knows
+    the name (`clawteam nudge --help` works).
+    """
     app.command(
         "nudge",
-        help="Inject a role-specific reminder into an agent pane (tmux hook target)",
+        help="(internal) tmux hook target — inject role reminder into agent pane",
+        hidden=True,
     )(cmd_nudge)

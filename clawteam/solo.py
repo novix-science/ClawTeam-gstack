@@ -778,7 +778,26 @@ def cmd_stop(
 
 def register_solo_commands(app: typer.Typer) -> None:
     """Attach `go`, `status`, `answer`, `stop` as top-level commands."""
-    app.command("go", help="Start work: create team + start sprint + launch agents (one-shot)")(cmd_go)
-    app.command("status", help="Dashboard: team state + sprint + questions + cost, no tmux needed")(cmd_status)
-    app.command("answer", help="Interactively answer a pending question in your $EDITOR")(cmd_answer)
-    app.command("stop", help="Clean shutdown: kill tmux + cleanup team data")(cmd_stop)
+    # Rich help panel: these 4 appear together under a "Daily use" header
+    # at the top of `clawteam --help`, ahead of all the power-user commands.
+    panel = "🎯 Daily use (solo)"
+    app.command(
+        "go",
+        help="Start work: create team + start sprint + launch agents (one-shot)",
+        rich_help_panel=panel,
+    )(cmd_go)
+    app.command(
+        "status",
+        help="Dashboard: team + sprints + questions + tmux state",
+        rich_help_panel=panel,
+    )(cmd_status)
+    app.command(
+        "answer",
+        help="Pick a pending question and write your answer in $EDITOR",
+        rich_help_panel=panel,
+    )(cmd_answer)
+    app.command(
+        "stop",
+        help="Clean shutdown: kill tmux + cleanup team data",
+        rich_help_panel=panel,
+    )(cmd_stop)
