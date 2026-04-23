@@ -415,8 +415,18 @@ def cmd_status(
     console.print()
 
 
+_SPRINT_PHASES = ("think", "plan", "build", "review", "test", "ship", "reflect")
+
+
 def _render_active_sprint(team: str) -> None:
-    """Show the most recent sprint's goal + phase + progress."""
+    """List all sprints for the team, highlighting active (running) ones.
+
+    A team can run multiple sprints in parallel (Phase 7 SprintConductor
+    allows up to 10 concurrent). Show the full sprint list so the user
+    sees every in-flight workstream, not just the most recently touched one.
+    Completed / paused sprints are dim; running ones render the phase bar.
+    """
+    import json
     from pathlib import Path
 
     sprints_dir = _data_dir() / "teams" / team / "sprints"
@@ -424,45 +434,70 @@ def _render_active_sprint(team: str) -> None:
         console.print("  [dim]No sprints yet.[/dim]")
         return
 
-    # Find most recent sprint by mtime of state.json
-    latest = None
-    latest_mtime = 0.0
+    # Collect all sprints with their state + mtime for stable sort order.
+    entries: list[tuple[float, dict]] = []
     for sprint_dir in sprints_dir.iterdir():
         state_file = sprint_dir / "state.json"
-        if state_file.is_file():
-            mtime = state_file.stat().st_mtime
-            if mtime > latest_mtime:
-                latest = state_file
-                latest_mtime = mtime
+        if not state_file.is_file():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            entries.append((state_file.stat().st_mtime, state))
+        except (OSError, json.JSONDecodeError):
+            continue
 
-    if not latest:
-        console.print("  [dim]No active sprint.[/dim]")
+    if not entries:
+        console.print("  [dim]No sprints yet.[/dim]")
         return
 
-    import json
-    try:
-        state = json.loads(latest.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        console.print("  [dim]Sprint state unreadable.[/dim]")
-        return
+    # Sort newest first so active work is at the top.
+    entries.sort(key=lambda kv: -kv[0])
+    active = [s for _, s in entries if s.get("status") == "running"]
+    other = [s for _, s in entries if s.get("status") != "running"]
 
-    phase = state.get("current_phase", "?")
-    sprint_id = state.get("sprint_id", "?")
-    goal = state.get("goal", "(no goal)")
-    status = state.get("status", "?")
+    # Header line with active count
+    count_line = f"{len(active)} active"
+    if other:
+        count_line += f" · {len(other)} inactive"
+    console.print(f"\n[bold]Sprints:[/bold] [dim]({count_line})[/dim]")
 
-    phases = ["think", "plan", "build", "review", "test", "ship", "reflect"]
-    phase_idx = phases.index(phase) if phase in phases else -1
-    progress = ""
-    if phase_idx >= 0:
-        filled = "█" * (phase_idx + 1)
-        empty = "░" * (len(phases) - phase_idx - 1)
-        progress = f"[{filled}{empty}] {phase} ({phase_idx + 1}/7)"
+    # Render each active sprint with its phase bar inline.
+    for s in active:
+        console.print(_format_sprint_line(s, running=True))
+    # Compact line for non-active sprints (up to 3 shown, older ones summarized).
+    if other:
+        for s in other[:3]:
+            console.print(_format_sprint_line(s, running=False))
+        if len(other) > 3:
+            console.print(f"  [dim]... +{len(other) - 3} older sprints[/dim]")
 
-    console.print(f"\n[bold]Sprint:[/bold]  {sprint_id[:8]}  [dim]{status}[/dim]")
-    console.print(f"[bold]Goal:[/bold]    {goal}")
-    if progress:
-        console.print(f"[bold]Phase:[/bold]   {progress}")
+
+def _format_sprint_line(state: dict, running: bool) -> str:
+    """Compose a single-line sprint summary for the status dashboard."""
+    sprint_id = (state.get("sprint_id") or "?")[:8]
+    goal = state.get("goal") or "(no goal)"
+    phase = state.get("current_phase") or "?"
+    status = state.get("status") or "?"
+    queue = state.get("queue_status") or ""
+
+    if running:
+        if phase in _SPRINT_PHASES:
+            idx = _SPRINT_PHASES.index(phase)
+            bar = "█" * (idx + 1) + "░" * (len(_SPRINT_PHASES) - idx - 1)
+            phase_str = f"[{bar}] [cyan]{phase}[/cyan] ({idx + 1}/7)"
+        else:
+            phase_str = f"[dim]{phase}[/dim]"
+        marker = "[green]▶[/green]"
+        q_suffix = f" [yellow]({queue})[/yellow]" if queue else ""
+        return (
+            f"  {marker} [bold]{sprint_id}[/bold]  {phase_str}  "
+            f"[dim]—[/dim] {goal}{q_suffix}"
+        )
+    # Non-running sprint: compact, dim
+    return (
+        f"  [dim]·[/dim] [dim]{sprint_id}  {status:<9}  "
+        f"{phase:<8} — {goal}[/dim]"
+    )
 
 
 def _render_pending_questions(team: str) -> None:
