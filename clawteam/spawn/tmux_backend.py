@@ -408,13 +408,14 @@ class TmuxBackend(SpawnBackend):
         num_panes = len(pane_count.stdout.strip().splitlines()) if pane_count.returncode == 0 else 0
 
         # If already tiled (1 window, multiple panes), refresh the UX
-        # affordances (border + mouse) and return.
+        # affordances (border + mouse + nudge hook) and return.
         if len(windows) <= 1 and num_panes > 1:
             _configure_pane_border_status(session)
             subprocess.run(
                 ["tmux", "set-option", "-t", session, "mouse", "on"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
+            _configure_nudge_hook(session)
             return f"Already tiled ({num_panes} panes) in {session}"
 
         # pane_map is built from post-tile readback. We deliberately do NOT
@@ -477,11 +478,17 @@ class TmuxBackend(SpawnBackend):
                 ["tmux", "select-pane", "-t", f"{session}:{first_idx}.0"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
+            # Wire the per-turn nudge hook: on pane silence (agent awaiting
+            # input), inject a role-specific reminder via `clawteam nudge`.
+            _configure_nudge_hook(session)
 
-            # Readback: list-panes with the final pane_index + pane_title
-            # (the latter is what `claude -n <role>` wrote). This is the
-            # authoritative post-layout mapping the user sees on the pane
-            # borders.
+            # Readback: list-panes post-layout. pane_title is what
+            # `claude -n <AGENT>` wrote originally, but claude's TUI
+            # overwrites it with dynamic status strings prefixed by spinner
+            # glyphs (⠂ ⠐ ⠈ ✳ ✢ ⏵ ⏴ etc.), so we normalize each title back
+            # to the canonical lowercase role name by matching the
+            # uppercase letters against the known merged window roster.
+            roster_upper = {name.upper(): name for _, name in windows}
             readback = subprocess.run(
                 ["tmux", "list-panes", "-t", f"{session}:{first_idx}",
                  "-F", "#{pane_index}:#{pane_title}"],
@@ -493,9 +500,21 @@ class TmuxBackend(SpawnBackend):
                         continue
                     idx_str, title = line.split(":", 1)
                     try:
-                        pane_map.append((int(idx_str), title.strip()))
+                        idx = int(idx_str)
                     except ValueError:
                         continue
+                    # Try exact match in the roster (uppercase form).
+                    upper = title.strip().upper()
+                    matched = roster_upper.get(upper)
+                    if matched is None:
+                        # Fall back: scan for any roster name as a substring
+                        # of the title (handles "⠐ CEO" / "✢ ENG-MGR" / etc.).
+                        for role_up, role_lower in roster_upper.items():
+                            if role_up in upper:
+                                matched = role_lower
+                                break
+                    if matched is not None:
+                        pane_map.append((idx, matched))
 
         # Persist pane map for downstream consumers (`clawteam status`,
         # `clawteam go` output, future `clawteam panes` command).
@@ -514,11 +533,14 @@ class TmuxBackend(SpawnBackend):
 
     @staticmethod
     def enable_mouse(team_name: str) -> None:
-        """Enable tmux mouse support + pane border status on the team's session.
+        """Enable tmux mouse + pane-border labels + per-turn nudge hook.
 
         Idempotent. Safe to call whether panes are tiled or kept as separate
-        windows. Mouse support lets the user click panes/windows to switch
-        focus instead of relying on ``Ctrl+b`` + arrow keys.
+        windows. Effects:
+          - mouse: on  → click panes/windows to focus
+          - pane-border-status top + pane-border-format with agent labels
+          - alert-silence hook → `clawteam nudge #{pane_id}` to remind the
+            agent of its role/tasks/skills on idle
         """
         session = TmuxBackend.session_name(team_name)
         check = subprocess.run(
@@ -532,6 +554,7 @@ class TmuxBackend(SpawnBackend):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         _configure_pane_border_status(session)
+        _configure_nudge_hook(session)
 
     @staticmethod
     def attach_all(team_name: str, tile_first: bool = True) -> str:
@@ -616,6 +639,52 @@ def read_pane_map(team_name: str) -> list[tuple[int, str]]:
         )
     except (OSError, _json.JSONDecodeError, ValueError):
         return []
+
+
+def _configure_nudge_hook(session: str) -> None:
+    """Wire a tmux alert-silence hook that calls `clawteam nudge #{pane_id}`.
+
+    tmux fires ``alert-silence`` when a pane has produced no output for
+    ``monitor-silence`` seconds — a good signal that the agent is awaiting
+    input (claude renders its ❯ prompt and then goes quiet). Our hook
+    spawns ``clawteam nudge <pane_id>`` in the background; that command
+    debounces (60s cooldown per pane) and injects a role-specific reminder
+    via ``tmux send-keys`` so the agent stays anchored to its role +
+    available skills across long sessions.
+
+    Controlled by ``CLAWTEAM_NUDGE_SECONDS`` env var (default 45s). Set to
+    ``0`` to disable the hook entirely.
+    """
+    import os as _os
+    try:
+        seconds = int(_os.environ.get("CLAWTEAM_NUDGE_SECONDS", "45"))
+    except ValueError:
+        seconds = 45
+    if seconds <= 0:
+        return
+
+    # monitor-silence is per-window; setting on session scope applies to
+    # all current + future windows. The silence trigger needs to be per
+    # pane in the current tmux; we set it on the window.
+    subprocess.run(
+        ["tmux", "set-option", "-t", session, "-w", "monitor-silence", str(seconds)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    # Resolve clawteam bin absolute path so the hook works even if the
+    # user's PATH differs from the clawteam-launch shell's.
+    import sys as _sys
+    clawteam_bin = _sys.executable.replace("python", "clawteam")
+    # Fall back to bare name if path mangling didn't produce a usable bin.
+    import shutil as _shutil
+    if not _shutil.which(clawteam_bin):
+        clawteam_bin = "clawteam"
+    # -b: run hook in background (don't block tmux)
+    # #{pane_id} is an interpolation resolved per-event, not a shell var
+    hook_cmd = f'run-shell -b "{clawteam_bin} nudge #{{pane_id}} 2>/dev/null"'
+    subprocess.run(
+        ["tmux", "set-hook", "-t", session, "alert-silence", hook_cmd],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
 
 
 def _log_tile_failures(session: str, failures: list[str]) -> None:

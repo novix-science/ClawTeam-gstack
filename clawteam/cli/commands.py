@@ -6309,7 +6309,9 @@ def attend_pick(
 # only ever need. See clawteam/solo.py for rationale + implementation.
 # ---------------------------------------------------------------------------
 from clawteam.solo import register_solo_commands
+from clawteam.nudge import register_nudge_command
 register_solo_commands(app)
+register_nudge_command(app)
 
 
 if __name__ == "__main__":
