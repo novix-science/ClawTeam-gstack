@@ -25,13 +25,15 @@ class TestBuildAgentPrompt:
             agent_name="w", agent_id="id", agent_type="t",
             team_name="team", leader_name="lead", task="do stuff",
         )
+        # Event-driven wake protocol (replaces the old polling loop).
+        assert "[wake:task]" in prompt
+        assert "[wake:inbox]" in prompt
+        assert "Do **NOT**" in prompt or "do NOT" in prompt.lower()
         assert "clawteam task list" in prompt
-        assert "If that list is empty" in prompt
         assert "clawteam task update" in prompt
-        assert "commit your changes" in prompt
         assert "git add -A && git commit" in prompt
         assert "clawteam inbox send" in prompt
-        # `clawteam cost report` line removed post-v1.0 UAT 2026-04-22.
+        # Dead code paths removed post-v1.0 UAT 2026-04-22.
         assert "clawteam cost report" not in prompt
         assert "clawteam session save" not in prompt
 
@@ -92,15 +94,22 @@ class TestBuildAgentPrompt:
         assert "clawteam inbox send my-team boss" in prompt
         # `clawteam cost report` removed post-v1.0 UAT 2026-04-22.
         assert "clawteam cost report" not in prompt
-        assert "commit your changes in this repository with git" in prompt
+        assert "commit" in prompt.lower()
 
-    def test_prompt_includes_worker_loop_protocol(self):
+    def test_prompt_describes_event_driven_wake_protocol(self):
+        """Replaces the old Worker Loop Protocol test: event-driven, not polling."""
         prompt = build_agent_prompt(
             agent_name="dev", agent_id="id", agent_type="t",
             team_name="my-team", leader_name="boss", task="task",
         )
-        assert "Worker Loop Protocol" in prompt
-        assert "Do not exit after the first task" in prompt
-        assert "scan `clawteam task list my-team`" in prompt
+        # Wake notifications describe how work arrives.
+        assert "[wake:task]" in prompt
+        assert "[wake:inbox]" in prompt
+        # Explicit "don't poll" guidance.
+        assert "do NOT" in prompt or "Do **NOT**" in prompt
+        # Commands still referenced for when agent reacts to a wake.
+        assert "clawteam task list my-team --owner dev" in prompt
         assert "clawteam inbox receive my-team --agent dev" in prompt
+        # Idle-between-wakes guidance.
+        assert "clawteam lifecycle idle" in prompt
         assert "clawteam lifecycle idle my-team" in prompt

@@ -2300,6 +2300,12 @@ def inbox_send(
         key=key,
     )
     data = _dump(msg)
+    # Event-driven delivery: wake the recipient's tmux pane so they
+    # process the message as a user turn instead of waiting for the
+    # next poll cycle. Silent no-op if recipient has no tmux pane
+    # (e.g. file-only transport) or debounce window is active.
+    from clawteam.wake import wake_agent as _wake_agent
+    _wake_agent(team, to, kind="inbox", preview=content)
     _output(data, lambda d: console.print(f"[green]OK[/green] Message sent to '{to}'"))
 
 
@@ -2325,6 +2331,10 @@ def inbox_broadcast(
         msg_type=mt,
         key=key,
     )
+    # Event-driven delivery: wake every recipient pane.
+    from clawteam.wake import wake_agent as _wake_agent
+    for m in messages:
+        _wake_agent(team, m.to, kind="inbox", preview=content)
     data = {"count": len(messages), "recipients": [m.to for m in messages]}
     _output(data, lambda d: console.print(f"[green]OK[/green] Broadcast to {d['count']} agents"))
 
@@ -2624,6 +2634,12 @@ def task_create(
     except ValueError as e:
         _output({"error": str(e)}, lambda d: console.print(f"[red]{d['error']}[/red]"))
         raise typer.Exit(1)
+
+    # Event-driven dispatch: wake the owner's tmux pane so they see the
+    # assignment immediately instead of polling `clawteam task list`.
+    if owner:
+        from clawteam.wake import wake_agent as _wake_agent
+        _wake_agent(team, owner, kind="task", preview=subject)
 
     data = _dump(task)
     _output(data, lambda d: (

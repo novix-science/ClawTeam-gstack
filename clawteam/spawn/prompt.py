@@ -81,25 +81,31 @@ def build_agent_prompt(
 
     lines.extend([
         "",
-        "## Coordination Protocol\n",
-        f"- Use `clawteam task list {team_name} --owner {agent_name}` to see your tasks.",
-        f"- If that list is empty, check `clawteam task list {team_name}` and your inbox before declaring yourself idle.",
-        f"- Starting a task: `clawteam task update {team_name} <task-id> --status in_progress`",
-        "- Before marking a task completed, commit your changes in this repository with git.",
-        '- Use a clear commit message, e.g. `git add -A && git commit -m "Implement <task summary>"`.',
-        f"- Finishing a task: `clawteam task update {team_name} <task-id> --status completed`",
-        "- When you finish all tasks, send a summary to the leader:",
-        f'  `clawteam inbox send {team_name} {leader_name} "All tasks completed. <brief summary>"`',
-        "- If you are blocked or need help, message the leader:",
-        f'  `clawteam inbox send {team_name} {leader_name} "Need help: <description>"`',
-        "- Do not exit after the first task unless the leader explicitly tells you to stop.",
+        "## Coordination Protocol (event-driven — do NOT poll)\n",
+        "Work arrives via tmux-injected wake notifications:",
         "",
-        "## Worker Loop Protocol\n",
-        f"- After finishing your current task batch, re-check `clawteam task list {team_name} --owner {agent_name}`.",
-        f"- If that still shows no tasks, scan `clawteam task list {team_name}` for pending work that matches your assignment before you go idle.",
-        f"- Then check for new instructions with `clawteam inbox receive {team_name} --agent {agent_name}`.",
-        f"- If you become idle, notify the leader with `clawteam lifecycle idle {team_name}` and continue checking for new work.",
-        "- Repeat this loop until the leader confirms shutdown or there is truly no more work to do.",
+        "  - `[wake:task] New task assigned: ...`  → pull with `clawteam task "
+        f"list {team_name} --owner {agent_name}`",
+        "  - `[wake:inbox] New message ...`        → pull with `clawteam "
+        f"inbox receive {team_name} --agent {agent_name}`",
+        "  - `[nudge] Reminder: ...`               → your role/skill reminder",
+        "",
+        "Do **NOT** run `task list` or `inbox receive` speculatively in a "
+        "loop — wait for a wake. The system pushes to you, you don't pull.",
+        "",
+        "When you pick up a task:",
+        f"  - Start: `clawteam task update {team_name} <task-id> --status in_progress`",
+        "  - Commit changes with git before marking completed",
+        '  - `git add -A && git commit -m "Implement <task summary>"`',
+        f"  - Finish: `clawteam task update {team_name} <task-id> --status completed`",
+        "",
+        "When you finish or are blocked, message the leader:",
+        f'  - Done: `clawteam inbox send {team_name} {leader_name} "All tasks completed. <brief>"`',
+        f'  - Blocked: `clawteam inbox send {team_name} {leader_name} "Need help: <desc>"`',
+        "",
+        f"After acting on a wake, signal `clawteam lifecycle idle {team_name}` "
+        "and wait for the next wake. Don't exit the process — the harness "
+        "keeps you alive for the next turn.",
         "",
     ])
     return "\n".join(lines)
