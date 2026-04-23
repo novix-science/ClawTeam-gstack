@@ -127,12 +127,13 @@ class SprintState(BaseModel):
             "Phase 7 D-01: reason the sprint is in a queued state. Empty "
             "string '' = active / running (normal case). Non-empty values: "
             "'queued_capacity' (acquire on max_concurrent_sprints semaphore "
-            "timed out after 60s — sprint waits for capacity), "
-            "'rate_limit_saturated' (RateLimitMonitor.is_saturated() true at "
-            "start_sprint — sprint waits for 429 window to clear). Cleared "
-            "back to '' when conductor promotes sprint to active. Persisted "
-            "so crash-recovery sees the queued sprint on resume. Open str "
-            "(not Literal) to keep field extensible (e.g. 'queued_disk_budget')."
+            "timed out — sprint waits for capacity). Cleared back to '' when "
+            "conductor promotes sprint to active. Persisted so crash-recovery "
+            "sees the queued sprint on resume. Open str (not Literal) to keep "
+            "field extensible (e.g. 'queued_disk_budget'). Note: "
+            "'rate_limit_saturated' was removed post-v1.0 UAT 2026-04-22 along "
+            "with the RateLimitMonitor — no production 429 detection path "
+            "existed under the tmux + claude-CLI architecture."
         ),
     )
 

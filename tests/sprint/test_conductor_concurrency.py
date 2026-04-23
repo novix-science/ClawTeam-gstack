@@ -23,7 +23,8 @@ import pytest
 
 from clawteam.events.bus import EventBus
 from clawteam.events.types import DormancyTransition
-from clawteam.rate_limit import RateLimitMonitor
+# RateLimitMonitor import removed post-v1.0 UAT 2026-04-22 — no production
+# 429 detection path existed under the tmux + claude-CLI architecture.
 from clawteam.sprint.conductor import SprintConductor
 from clawteam.templates import ConductorConfig
 
@@ -84,15 +85,8 @@ def test_over_cap_sprint_queued():
     assert s2.queue_status == "queued_capacity"
 
 
-def test_rate_limit_saturation_queues(monkeypatch):
-    c = _make_conductor()
-    monkeypatch.setattr(c._rate_limit_monitor, "is_saturated", lambda: True)
-
-    async def run():
-        return await c.start_sprint_async(goal="g")
-
-    state = asyncio.run(run())
-    assert state.queue_status == "rate_limit_saturated"
+# test_rate_limit_saturation_queues removed post-v1.0 UAT 2026-04-22 —
+# RateLimitMonitor had no production emitter and was deleted.
 
 
 def test_active_agents_empty_initially():

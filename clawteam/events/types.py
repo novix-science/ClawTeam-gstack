@@ -419,68 +419,10 @@ class MemoryBackfillComplete(HarnessEvent):
     entries_skipped_already_processed: int = 0
 
 
-# ── Phase 7 Wave 0 / Plan 07-01: concurrency + cost + rate-limit events ─────
-
-
-@dataclass
-class ToolCallCompleted(HarnessEvent):
-    """D-09: agent invoked a tool and it finished. Drives cost tracker rollup.
-
-    Emitted by clawteam.spawn.invoke.invoke_native_cli AFTER subprocess.run
-    returns. tokens_input/output are 0 when the wrapped CLI does not emit a
-    parseable token count (e.g. gh, lighthouse); cost_usd is computed from
-    the per-model pricing table in clawteam/cost/pricing.py (Plan 07-05).
-    """
-
-    agent: str = ""
-    tool_name: str = ""
-    sprint_id: str = ""
-    tokens_input: int = 0
-    tokens_output: int = 0
-    model: str = ""
-    cost_usd: float = 0.0
-    duration_ms: float = 0.0
-    model_fallback_applied: bool = False
-
-
-@dataclass
-class ClaudeApiResponse(HarnessEvent):
-    """D-12: Claude API response metadata for cache-hit-rate tracking."""
-
-    agent: str = ""
-    model: str = ""
-    cache_read_tokens: int = 0
-    cache_creation_tokens: int = 0
-    input_tokens: int = 0
-    output_tokens: int = 0
-
-
-@dataclass
-class BudgetAlarmReached(HarnessEvent):
-    """D-10: current_spend / budget_usd crossed a configured threshold.
-
-    Advisory — tracker (Plan 07-05) applies model fallback policy on
-    crossing fallback_at_percent; clawteam team show surfaces the alarm
-    as a colored banner per threshold.
-    """
-
-    percent: float = 0.0
-    spent_usd: float = 0.0
-    budget_usd: float = 0.0
-
-
-@dataclass
-class RateLimitSaturated(HarnessEvent):
-    """D-13: 429 window exceeded threshold; new sprints get queue_status.
-
-    Emitted by RateLimitMonitor (Plan 07-02) when recent_429_count > 3/min
-    (default). SprintConductor consults is_saturated() before acquiring the
-    concurrent-sprint semaphore.
-    """
-
-    recent_429_count: int = 0
-    threshold: int = 3
-    window_seconds: int = 60
+# ── Phase 7 Wave 0 / Plan 07-01: real events (ToolCallCompleted,
+# ClaudeApiResponse, BudgetAlarmReached, RateLimitSaturated removed post-v1.0
+# UAT 2026-04-22 — they had no production emitters under the tmux + claude-CLI
+# spawn architecture; see .planning/backlog/v1.0-post-uat-fixes.md) ─────────
 
 
 @dataclass
@@ -514,10 +456,6 @@ register_event_type(WebVitalRegressionDetected)
 register_event_type(MemoryWritePersisted)
 register_event_type(ConflictDetected)
 register_event_type(MemoryBackfillComplete)
-# Phase 7 Wave 0 / Plan 07-01
-register_event_type(ToolCallCompleted)
-register_event_type(ClaudeApiResponse)
-register_event_type(BudgetAlarmReached)
-register_event_type(RateLimitSaturated)
+# Phase 7 Wave 0 / Plan 07-01 (post-UAT trimmed 2026-04-22)
 register_event_type(ZombieWorktreeGced)
 register_event_type(DormancyTransition)

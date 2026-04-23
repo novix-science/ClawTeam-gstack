@@ -140,21 +140,8 @@ class BoardCollector:
         except Exception:
             pass
 
-        # Cost summary
-        cost_data = {}
-        try:
-            from clawteam.team.costs import CostStore
-            cost_store = CostStore(team_name)
-            cost_summary = cost_store.summary()
-            cost_data = {
-                "totalCostCents": cost_summary.total_cost_cents,
-                "totalInputTokens": cost_summary.total_input_tokens,
-                "totalOutputTokens": cost_summary.total_output_tokens,
-                "eventCount": cost_summary.event_count,
-                "byAgent": cost_summary.by_agent,
-            }
-        except Exception:
-            pass
+        # Cost summary removed post-v1.0 UAT — see Anthropic console for spend.
+        cost_data: dict = {}
 
         # Conflict/overlap data
         conflict_data = {}
@@ -180,7 +167,6 @@ class BoardCollector:
                 "leadAgentId": config.lead_agent_id,
                 "leaderName": leader_name,
                 "createdAt": config.created_at,
-                "budgetCents": config.budget_cents,
             },
             "members": members,
             "tasks": grouped,

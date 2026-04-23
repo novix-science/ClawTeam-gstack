@@ -153,6 +153,6 @@ def test_status_renders_team_name_and_agent_count(monkeypatch, tmp_path):
     assert "t1" in result.output
     # 3 agents (ceo + pm + engineer)
     assert "3 agents" in result.output
-    # Cost panel with known-gap caveat
-    assert "$0.00" in result.output
-    assert "999.001" in result.output or "emit path" in result.output
+    # Cost tracking was removed post-v1.0 UAT — dashboard now points at
+    # the Anthropic console for real spend data.
+    assert "console.anthropic.com" in result.output

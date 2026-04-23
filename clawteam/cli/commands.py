@@ -1884,103 +1884,6 @@ def _team_show_active_sprint(team: str) -> dict | None:
         return None
 
 
-def _team_show_cost_panel(team: str) -> dict:
-    """Build the cost panel for ``clawteam team show <team>`` (Plan 07-07).
-
-    Best-effort: any failure falls back to a neutral ``status='unavailable'``
-    shape so the command never crashes when cost substrate is absent
-    (e.g. non-gstack template, corrupt events bus, missing CostConfig).
-
-    Returns a dict with the same key set as
-    :func:`clawteam.cost.dashboard.render_team` plus a ``status`` field
-    that callers can branch on (``ok`` = live render, ``unavailable`` =
-    fallback).
-    """
-    try:
-        from clawteam.cost import CacheTracker, CostTracker, render_team
-        from clawteam.events.global_bus import get_event_bus
-        from clawteam.team.manager import TeamManager
-        from clawteam.templates import load_template
-
-        cfg = TeamManager.get_team(team)
-        budget_usd = 100.0
-        alarm_percent: list[float] = [50.0, 80.0, 100.0]
-        if cfg and getattr(cfg, "template", None):
-            try:
-                tmpl = load_template(cfg.template)
-                if getattr(tmpl, "cost", None) is not None:
-                    budget_usd = tmpl.cost.budget_usd
-                    alarm_percent = list(tmpl.cost.alarm_percent)
-            except Exception:
-                # Template load failure is fine — defaults preserved.
-                pass
-
-        bus = get_event_bus()
-        tracker = CostTracker(
-            team=team,
-            bus=bus,
-            budget_usd=budget_usd,
-            alarm_percent=alarm_percent,
-        )
-        cache_tracker = CacheTracker(team=team, bus=bus)
-
-        try:
-            # Best-effort: fetch active agents from the team's conductor.
-            actives: list[str] = []
-            try:
-                from clawteam.sprint.conductor import SprintConductor
-
-                conductor = SprintConductor(team_name=team)
-                actives = conductor.active_agents()
-            except Exception:
-                # Conductor unavailable (no sprint substrate, broken
-                # state) — fall through with empty active list; panel
-                # still renders.
-                pass
-
-            return render_team(
-                team, tracker, cache_tracker, active_agents=actives,
-            )
-        finally:
-            # WR-02: unsubscribe both trackers from the global event bus
-            # so short-lived CLI invocations don't leak one handler per
-            # call. Long-running consumers (test harness reusing the CLI
-            # in-process, future daemon mode) would otherwise accumulate
-            # unbounded subscriptions — each future event would fan out
-            # to every zombie tracker forever.
-            try:
-                tracker.close()
-            except Exception:
-                pass
-            try:
-                cache_tracker.close()
-            except Exception:
-                pass
-    except Exception:
-        # WR-06: log before returning the defensive fallback so real
-        # failures (schema mismatch, Bus import error, missing
-        # dependency) are discoverable in ops logs. Without this the
-        # user just sees "Cost: unavailable" and has no way to debug.
-        # The fallback itself is correct and kept intact.
-        _log.exception("cost panel failed, falling back to 'unavailable'")
-        return {
-            "status": "unavailable",
-            "cost_usd": 0.0,
-            "budget_usd": 0.0,
-            "spend_percent": 0.0,
-            "per_agent": {},
-            "per_sprint": {},
-            "tokens_opus": 0,
-            "tokens_sonnet": 0,
-            "tokens_haiku": 0,
-            "cache_hit_rate": 0.0,
-            "cache_healthy": False,
-            "alarms_fired": [],
-            "active_agents": [],
-            "active_agent_count": 0,
-        }
-
-
 def _team_show_phases_for_template(team: str) -> list[str]:
     """Return the declared phase order for this team's template (empty on miss).
 
@@ -2061,11 +1964,10 @@ def team_show(
             ),
             "placeholderEntries": memory_placeholder_count,
         },
-        # Phase 7 Plan 07-07: real cost dashboard replaces the earlier
-        # Phase 3 placeholder. Best-effort helper — on any failure the
-        # panel's ``status`` field is ``unavailable`` and shape stays
-        # stable so JSON consumers never crash.
-        "costRollup": _team_show_cost_panel(team),
+        # Cost panel removed post-v1.0 UAT 2026-04-22 — Phase 7's event-driven
+        # cost tracking had no production emit path under the tmux + claude-CLI
+        # spawn architecture (always $0). For real API spend, see the Anthropic
+        # console at https://console.anthropic.com/settings/usage.
     }
 
     def _human(d):
@@ -2132,39 +2034,12 @@ def team_show(
                 "\nMemory: [dim]N/A (non-gstack template)[/dim]"
             )
 
-        # Cost rollup panel (Phase 7 Plan 07-07)
-        cost = d.get("costRollup", {})
-        if cost.get("status") == "ok":
-            from clawteam.cost.dashboard import render_text
-
-            console.print(f"\nCost: {render_text(cost)}")
-            per_agent = cost.get("per_agent", {})
-            if per_agent:
-                cost_table = Table(title="Cost by Agent")
-                cost_table.add_column("Agent", style="cyan")
-                cost_table.add_column("USD", justify="right", style="green")
-                for a, usd in sorted(per_agent.items(), key=lambda kv: -kv[1]):
-                    cost_table.add_row(a, f"${usd:.4f}")
-                console.print(cost_table)
-            alarms = cost.get("alarms_fired", [])
-            if alarms:
-                alarm_style = (
-                    "red" if 100 in alarms
-                    else ("yellow" if 80 in alarms else "green")
-                )
-                console.print(
-                    f"[{alarm_style}]Budget alarms fired: "
-                    + ", ".join(f"{int(p)}%" for p in alarms)
-                    + f"[/{alarm_style}]"
-                )
-            actives = cost.get("active_agents", [])
-            if actives:
-                console.print(
-                    f"Active agents ({cost.get('active_agent_count', 0)}): "
-                    + ", ".join(actives)
-                )
-        else:
-            console.print("\nCost: [dim]unavailable[/dim]")
+        # Cost/budget tracking removed post-v1.0 UAT — for real API spend,
+        # see https://console.anthropic.com/settings/usage
+        console.print(
+            "\n[dim]Cost tracking: see Anthropic console "
+            "(https://console.anthropic.com/settings/usage)[/dim]"
+        )
 
     _output(data, _human)
 
@@ -2941,145 +2816,15 @@ def task_stats(
 
 
 # ============================================================================
-# Cost Commands
+# Cost Commands (REMOVED post-v1.0 UAT 2026-04-22)
+#
+# Both the upstream agent-self-report path and Phase 7's event-driven tracker
+# were deleted because neither worked for solo users:
+#   - upstream: relied on agents honestly reporting tokens via CLI (unreliable)
+#   - Phase 7:  subscribed to ToolCallCompleted events that were never emitted
+#               under the tmux + claude-CLI spawn architecture (always $0)
+# For real API spend, see: https://console.anthropic.com/settings/usage
 # ============================================================================
-
-cost_app = typer.Typer(help="Cost tracking and budget management")
-app.add_typer(cost_app, name="cost")
-
-
-@cost_app.command("report")
-def cost_report(
-    team: str = typer.Argument(..., help="Team name"),
-    input_tokens: int = typer.Option(0, "--input-tokens", help="Input tokens consumed"),
-    output_tokens: int = typer.Option(0, "--output-tokens", help="Output tokens consumed"),
-    cost_cents: float = typer.Option(0.0, "--cost-cents", help="Cost in cents"),
-    provider: str = typer.Option("", "--provider", help="Provider name (e.g. anthropic)"),
-    model: str = typer.Option("", "--model", help="Model name"),
-    agent: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent name (default: from env)"),
-):
-    """Report token usage and cost for an agent."""
-    from clawteam.identity import AgentIdentity
-    from clawteam.team.costs import CostStore
-    from clawteam.team.manager import TeamManager
-
-    agent_name = agent or AgentIdentity.from_env().agent_name
-    store = CostStore(team)
-    event = store.report(
-        agent_name=agent_name,
-        provider=provider,
-        model=model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost_cents=cost_cents,
-    )
-    data = _dump(event)
-
-    def _human(d):
-        console.print(f"[green]OK[/green] Cost reported: ${d.get('costCents', 0) / 100:.4f}")
-
-    _output(data, _human)
-
-    # Check budget
-    config = TeamManager.get_team(team)
-    if config and config.budget_cents > 0:
-        summary = store.summary()
-        if summary.total_cost_cents > config.budget_cents:
-            budget_dollars = config.budget_cents / 100
-            spent_dollars = summary.total_cost_cents / 100
-            if not _json_output:
-                console.print(
-                    f"[yellow]WARNING: Budget exceeded! "
-                    f"Spent ${spent_dollars:.2f} / ${budget_dollars:.2f}[/yellow]"
-                )
-
-
-@cost_app.command("show")
-def cost_show(
-    team: str = typer.Argument(..., help="Team name"),
-    agent: Optional[str] = typer.Option(None, "--agent", "-a", help="Filter by agent"),
-):
-    """Show cost summary and event history."""
-    from clawteam.team.costs import CostStore
-    from clawteam.team.manager import TeamManager
-
-    store = CostStore(team)
-    summary = store.summary()
-    events = store.list_events(agent_name=agent or "")
-    config = TeamManager.get_team(team)
-    budget = config.budget_cents if config else 0.0
-
-    data = {
-        "summary": _dump(summary),
-        "budget_cents": budget,
-        "events": [_dump(e) for e in events],
-    }
-
-    def _human(d):
-        s = d["summary"]
-        total = s.get("totalCostCents", 0)
-        console.print(f"\nCost Summary — [cyan]{team}[/cyan]")
-        if budget > 0:
-            console.print(f"  Total: ${total / 100:.4f} / ${budget / 100:.2f}")
-        else:
-            console.print(f"  Total: ${total / 100:.4f}")
-        console.print(f"  Input tokens:  {s.get('totalInputTokens', 0):,}")
-        console.print(f"  Output tokens: {s.get('totalOutputTokens', 0):,}")
-        console.print(f"  Events: {s.get('eventCount', 0)}")
-        by_agent = s.get("byAgent", {})
-        if by_agent:
-            console.print("  By agent:")
-            for a, c in sorted(by_agent.items()):
-                console.print(f"    {a}: ${c / 100:.4f}")
-
-        evts = d["events"]
-        if evts:
-            table = Table(title="Recent Events")
-            table.add_column("Time", style="dim")
-            table.add_column("Agent", style="cyan")
-            table.add_column("In Tokens", justify="right")
-            table.add_column("Out Tokens", justify="right")
-            table.add_column("Cost", justify="right")
-            table.add_column("Model", style="dim")
-            for e in evts[-20:]:  # show last 20
-                table.add_row(
-                    format_timestamp(e.get("reportedAt")),
-                    e.get("agentName", ""),
-                    f"{e.get('inputTokens', 0):,}",
-                    f"{e.get('outputTokens', 0):,}",
-                    f"${e.get('costCents', 0) / 100:.4f}",
-                    e.get("model", ""),
-                )
-            console.print(table)
-
-    _output(data, _human)
-
-
-@cost_app.command("budget")
-def cost_budget(
-    team: str = typer.Argument(..., help="Team name"),
-    dollars: float = typer.Argument(..., help="Budget in dollars (0 = unlimited)"),
-):
-    """Set team budget in dollars."""
-    from clawteam.team.manager import TeamManager
-
-    config = TeamManager.get_team(team)
-    if not config:
-        _output({"error": f"Team '{team}' not found"}, lambda d: console.print(f"[red]{d['error']}[/red]"))
-        raise typer.Exit(1)
-
-    config.budget_cents = dollars * 100
-    # Save config back
-    from clawteam.team.manager import _save_config
-    _save_config(config)
-
-    _output(
-        {"status": "set", "team": team, "budgetDollars": dollars},
-        lambda d: console.print(
-            f"[green]OK[/green] Budget set to ${dollars:.2f}" if dollars > 0
-            else "[green]OK[/green] Budget removed (unlimited)"
-        ),
-    )
 
 
 @task_app.command("wait")

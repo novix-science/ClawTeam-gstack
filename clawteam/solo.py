@@ -337,16 +337,11 @@ def _extract_first_heading(path: Path) -> str:
 
 
 def _render_cost_panel(team: str) -> None:
-    """Best-effort cost panel. Flags known v1.x emit-path gap."""
-    try:
-        from clawteam.cost.tracker import CostTracker
-        # We can't easily retrieve the tracker without re-attaching to event bus,
-        # but if the event emit path is unwired (999.001), value is always 0.
-        # Show a line hinting at this rather than hiding it.
-        console.print(f"\n[bold]Cost:[/bold]    $0.00 / $100.00  "
-                      f"[dim]cache: 0% (emit path unwired — backlog 999.001)[/dim]")
-    except ImportError:
-        pass
+    """Cost panel removed post-v1.0 UAT 2026-04-22 — point user at Anthropic console."""
+    console.print(
+        f"\n[bold]Cost:[/bold]    [dim]not tracked locally — see "
+        f"https://console.anthropic.com/settings/usage[/dim]"
+    )
 
 
 def _render_tmux_indicator(team: str) -> None:

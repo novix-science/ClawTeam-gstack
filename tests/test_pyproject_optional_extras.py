@@ -105,21 +105,12 @@ def test_existing_extras_unchanged_phase7():
 
 
 def test_three_new_packages_importable():
-    """Plan 07-01 Task 1: clawteam.attention / clawteam.cost / clawteam.rate_limit
-    are importable as packages (no playwright/watchdog import side-effects)."""
+    """clawteam.attention importable (clawteam.cost + clawteam.rate_limit
+    removed post-v1.0 UAT 2026-04-22)."""
     import clawteam.attention  # noqa: F401
-    import clawteam.cost  # noqa: F401
-    import clawteam.rate_limit  # noqa: F401
-
     import clawteam.attention as _att
-    import clawteam.cost as _cost
-    import clawteam.rate_limit as _rl
 
     assert hasattr(_att, "__path__"), "clawteam.attention must be a package"
-    assert hasattr(_cost, "__path__"), "clawteam.cost must be a package"
-    assert hasattr(_rl, "__path__"), "clawteam.rate_limit must be a package"
-    assert _att.__all__ == []
-    assert _cost.__all__ == []
-    # Plan 07-02 landed RateLimitMonitor; attention and cost remain empty
-    # placeholders for their respective Wave 1/2 plans.
-    assert _rl.__all__ == ["RateLimitMonitor"]
+    # Plan 07-03 populated the AttentionQueue API; __all__ is non-empty now.
+    assert "AttentionItem" in _att.__all__
+    assert "AttentionQueue" in _att.__all__

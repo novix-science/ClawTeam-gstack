@@ -22,7 +22,6 @@ from pydantic import ValidationError
 from clawteam.templates import (
     AttentionConfig,
     ConductorConfig,
-    CostConfig,
     TemplateDef,
     _parse_toml,
     load_template,
@@ -48,7 +47,6 @@ def test_bc_gstack_parses_without_phase7_blocks():
     assert isinstance(tmpl, TemplateDef)
     assert tmpl.conductor is None
     assert tmpl.attention is None
-    assert tmpl.cost is None
 
 
 @pytest.mark.parametrize("name", PACKAGED_TEMPLATES)
@@ -56,7 +54,6 @@ def test_bc_packaged_template_parses(name: str):
     tmpl = load_template(name)
     assert tmpl.conductor is None
     assert tmpl.attention is None
-    assert tmpl.cost is None
 
 
 # ── Helper ───────────────────────────────────────────────────────────────
@@ -150,43 +147,16 @@ def test_attention_defaults(tmp_path):
 # ── [cost] parsing ───────────────────────────────────────────────────────
 
 
-def test_cost_block_parsed(tmp_path):
-    p = _write_base_template(
-        tmp_path,
-        (
-            "[cost]\n"
-            "budget_usd = 200.0\n"
-            "fallback_at_percent = 90.0\n"
-            "alarm_percent = [60.0, 90.0, 100.0]\n"
-        ),
-    )
-    tmpl = _parse_toml(p)
-    assert isinstance(tmpl.cost, CostConfig)
-    assert tmpl.cost.budget_usd == 200.0
-    assert tmpl.cost.fallback_at_percent == 90.0
-    assert tmpl.cost.alarm_percent == [60.0, 90.0, 100.0]
-
-
-def test_cost_defaults(tmp_path):
-    p = _write_base_template(tmp_path, "[cost]\nbudget_usd = 50.0")
-    tmpl = _parse_toml(p)
-    assert tmpl.cost is not None
-    assert tmpl.cost.budget_usd == 50.0
-    assert tmpl.cost.fallback_at_percent == 80.0  # default
-    assert tmpl.cost.alarm_percent == [50.0, 80.0, 100.0]  # default
-
-
-def test_cost_fallback_at_percent_over_100_rejected(tmp_path):
-    p = _write_base_template(tmp_path, "[cost]\nfallback_at_percent = 110.0")
-    with pytest.raises(ValidationError):
-        _parse_toml(p)
+# [cost] block + CostConfig removed post-v1.0 UAT 2026-04-22. The 3 prior
+# tests (cost_block_parsed, cost_defaults, cost_fallback_at_percent_over_100_rejected)
+# are deleted; cross-regression test below no longer touches cost.
 
 
 # ── Phase 5 / Phase 6 cross-regression ──────────────────────────────────
 
 
 def test_phase5_6_blocks_still_work_with_phase7(tmp_path):
-    """TOML with [ship] + [memory] + [cost] — Phase 5/6/7 sub-blocks coexist."""
+    """TOML with [ship] + [memory] — Phase 5/6 sub-blocks coexist."""
     p = _write_base_template(
         tmp_path,
         (
@@ -195,9 +165,6 @@ def test_phase5_6_blocks_still_work_with_phase7(tmp_path):
             "\n"
             "[memory]\n"
             "conflict_threshold = 0.8\n"
-            "\n"
-            "[cost]\n"
-            "budget_usd = 150.0\n"
         ),
     )
     tmpl = _parse_toml(p)
@@ -205,7 +172,5 @@ def test_phase5_6_blocks_still_work_with_phase7(tmp_path):
     assert tmpl.ship.coverage_threshold == 0.6
     assert tmpl.memory is not None
     assert tmpl.memory.conflict_threshold == 0.8
-    assert tmpl.cost is not None
-    assert tmpl.cost.budget_usd == 150.0
     # Phase 6 memory_layout (legacy dict field) unaffected.
     assert tmpl.memory_layout == {}

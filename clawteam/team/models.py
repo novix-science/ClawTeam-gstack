@@ -84,7 +84,6 @@ class TeamConfig(BaseModel):
     lead_agent_id: str = Field(default="", alias="leadAgentId")
     created_at: str = Field(default_factory=_now_iso, alias="createdAt")
     members: list[TeamMember] = Field(default_factory=list)
-    budget_cents: float = Field(default=0.0, alias="budgetCents")
     # Phase 3 Wave 0 (Plan 03-01, Pattern 4 / 03-07 key_link): optional fields
     # populated from TemplateDef at create_team time. Default "" preserves BC
     # for all existing TeamConfig construction sites.

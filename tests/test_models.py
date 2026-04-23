@@ -68,13 +68,14 @@ class TestTeamConfig:
         cfg = TeamConfig(name="alpha", members=[member], lead_agent_id="abc123")
         assert cfg.name == "alpha"
         assert len(cfg.members) == 1
-        assert cfg.budget_cents == 0.0
+        # budget_cents removed post-v1.0 UAT 2026-04-22 — cost tracking
+        # delegated to Anthropic console.
 
     def test_alias_fields(self):
-        cfg = TeamConfig(name="t", lead_agent_id="x", budget_cents=500.0)
+        cfg = TeamConfig(name="t", lead_agent_id="x")
         data = json.loads(cfg.model_dump_json(by_alias=True))
         assert data["leadAgentId"] == "x"
-        assert data["budgetCents"] == 500.0
+        assert "budgetCents" not in data
 
 
 class TestTeamMessage:

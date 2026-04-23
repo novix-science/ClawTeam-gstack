@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-from clawteam.team.costs import CostStore
 from clawteam.team.manager import TeamManager
 from clawteam.team.models import get_data_dir
 from clawteam.team.snapshot import SnapshotManager, SnapshotMeta, _snapshots_root
@@ -31,8 +30,8 @@ def team_with_data(team_name):
     ts.create("task one", owner="leader")
     ts.create("task two", owner="worker")
 
-    cs = CostStore(team_name)
-    cs.report("leader", provider="openai", model="gpt-4", cost_cents=12.5)
+    # CostStore + cost events removed post-v1.0 UAT 2026-04-22 —
+    # snapshots now capture 0 cost events from the empty costs/ dir.
 
     # drop a message into the event log via mailbox
     from clawteam.team.mailbox import MailboxManager
@@ -50,7 +49,7 @@ class TestSnapshotCreate:
         assert meta.team_name == team_with_data
         assert meta.member_count == 1
         assert meta.task_count == 2
-        assert meta.cost_event_count == 1
+        assert meta.cost_event_count == 0  # costs removed post-v1.0 UAT
         assert meta.event_count >= 1
 
     def test_with_tag(self, team_with_data):
@@ -232,18 +231,10 @@ class TestSnapshotRestore:
         with pytest.raises(ValueError, match="not found"):
             SnapshotManager(team_with_data).restore("nope")
 
-    def test_restore_costs(self, team_with_data):
-        mgr = SnapshotManager(team_with_data)
-        meta = mgr.create()
-
-        # wipe costs
-        costs_dir = get_data_dir() / "costs" / team_with_data
-        for f in costs_dir.glob("cost-*.json"):
-            f.unlink()
-        assert CostStore(team_with_data).list_events() == []
-
-        mgr.restore(meta.id)
-        assert len(CostStore(team_with_data).list_events()) == 1
+    # test_restore_costs removed post-v1.0 UAT 2026-04-22 — CostStore
+    # + agent-self-report cost tracking deleted (see Anthropic console
+    # for real API spend). Snapshot's costs/ dir handling remains but
+    # is always empty since nothing writes to it.
 
     def test_restore_replaces_newer_state_instead_of_overlaying(self, team_with_data):
         mgr = SnapshotManager(team_with_data)

@@ -130,20 +130,9 @@ def test_per_agent_semaphore_blocks_siblings(isolated_conductor):
         assert exit_idx == enter_idx + 1, f"{letter} got interleaved: {timeline}"
 
 
-def test_rate_limit_saturation_queues_sprints(isolated_conductor, monkeypatch):
-    """D-13: is_saturated()=True at entry → queue_status='rate_limit_saturated'."""
-    factory, _ = isolated_conductor
-    c = factory()
-    monkeypatch.setattr(c._rate_limit_monitor, "is_saturated", lambda: True)
-
-    async def run():
-        return await c.start_sprint_async(goal="g")
-
-    s = asyncio.run(run())
-    assert s.queue_status == "rate_limit_saturated"
-    # Persisted (crash-recovery invariant).
-    loaded = load_sprint_state("loadtest", s.sprint_id)
-    assert loaded.queue_status == "rate_limit_saturated"
+# test_rate_limit_saturation_queues_sprints removed post-v1.0 UAT 2026-04-22
+# — RateLimitMonitor had no production 429 emitter under the tmux +
+# claude-CLI architecture and the entire rate_limit package was deleted.
 
 
 def test_pause_resume_across_queue_cycle(isolated_conductor):

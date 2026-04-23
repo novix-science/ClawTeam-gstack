@@ -111,14 +111,7 @@ class BoardRenderer:
             f"Members: [cyan]{len(members)}[/cyan]  |  "
             f"Created: [dim]{format_timestamp(team['createdAt'])}[/dim]"
         )
-        cost = data.get("cost", {})
-        total_cents = cost.get("totalCostCents", 0)
-        if total_cents > 0:
-            budget_cents = team.get("budgetCents", 0)
-            if budget_cents > 0:
-                header_text += f"  |  Cost: [yellow]${total_cents / 100:.2f} / ${budget_cents / 100:.2f}[/yellow]"
-            else:
-                header_text += f"  |  Cost: [yellow]${total_cents / 100:.2f}[/yellow]"
+        # Cost/budget display removed post-v1.0 UAT — see Anthropic console.
         desc = team.get("description", "")
         if desc:
             header_text = f"{desc}\n{header_text}"

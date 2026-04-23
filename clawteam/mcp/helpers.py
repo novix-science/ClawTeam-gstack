@@ -5,7 +5,6 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, TypeVar
 
-from clawteam.team.costs import CostStore
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.manager import TeamManager
 from clawteam.team.plan import PlanManager
@@ -121,6 +120,4 @@ def plan_manager(team_name: str) -> PlanManager:
 
 
 
-def cost_store(team_name: str) -> CostStore:
-    require_team(team_name)
-    return CostStore(team_name)
+# cost_store helper removed post-v1.0 UAT 2026-04-22 — see Anthropic console.

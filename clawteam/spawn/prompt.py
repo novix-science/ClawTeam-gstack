@@ -92,7 +92,6 @@ def build_agent_prompt(
         f'  `clawteam inbox send {team_name} {leader_name} "All tasks completed. <brief summary>"`',
         "- If you are blocked or need help, message the leader:",
         f'  `clawteam inbox send {team_name} {leader_name} "Need help: <description>"`',
-        f"- After finishing work, report your costs: `clawteam cost report {team_name} --input-tokens <N> --output-tokens <N> --cost-cents <N>`",
         "- Do not exit after the first task unless the leader explicitly tells you to stop.",
         "",
         "## Worker Loop Protocol\n",

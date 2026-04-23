@@ -1,7 +1,6 @@
 """MCP tool registry for ClawTeam."""
 
 from clawteam.mcp.tools.board import board_overview, board_team
-from clawteam.mcp.tools.cost import cost_summary
 from clawteam.mcp.tools.mailbox import (
     mailbox_broadcast,
     mailbox_peek,
@@ -47,7 +46,6 @@ TOOL_FUNCTIONS = [
     plan_reject,
     board_overview,
     board_team,
-    cost_summary,
     workspace_agent_diff,
     workspace_file_owners,
     workspace_cross_branch_log,

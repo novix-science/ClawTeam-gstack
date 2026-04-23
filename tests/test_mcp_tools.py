@@ -6,7 +6,6 @@ import pytest
 
 from clawteam.mcp.helpers import to_payload
 from clawteam.mcp.tools.board import board_overview, board_team
-from clawteam.mcp.tools.cost import cost_summary
 from clawteam.mcp.tools.mailbox import (
     mailbox_peek,
     mailbox_peek_count,
@@ -135,13 +134,9 @@ def test_plan_tools(team_name):
     }
 
 
-def test_cost_summary_defaults_to_empty(team_name):
-    TeamManager.create_team(team_name, "leader", "leader001")
-
-    summary = cost_summary(team_name)
-    assert summary["teamName"] == team_name
-    assert summary["eventCount"] == 0
-    assert summary["totalCostCents"] == 0
+# test_cost_summary_defaults_to_empty removed post-v1.0 UAT 2026-04-22 —
+# cost_summary MCP tool deleted (CostStore/team.costs gone). See
+# https://console.anthropic.com/settings/usage for real API spend.
 
 
 def test_board_tools(team_name):

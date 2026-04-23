@@ -299,31 +299,10 @@ class AttentionConfig(BaseModel):
     )
 
 
-class CostConfig(BaseModel):
-    """[cost] TOML block — budget + fallback + alarm thresholds (D-10)."""
-
-    budget_usd: float = Field(
-        default=100.0,
-        ge=0.0,
-        description=(
-            "Per-team monthly budget. Set to 0 to disable budget tracking."
-        ),
-    )
-    fallback_at_percent: float = Field(
-        default=80.0,
-        ge=0.0,
-        le=100.0,
-        description=(
-            "Percent-of-budget at which model_fallback_ladder kicks in "
-            "(opus→sonnet→haiku)."
-        ),
-    )
-    alarm_percent: list[float] = Field(
-        default_factory=lambda: [50.0, 80.0, 100.0],
-        description=(
-            "Budget threshold list; emits BudgetAlarmReached on each crossing."
-        ),
-    )
+# CostConfig removed post-v1.0 UAT 2026-04-22 — see .planning/backlog/v1.0-post-uat-fixes.md.
+# The full Phase 7 cost-tracking stack (pricing, tracker, cache tracker, fallback ladder,
+# dashboard) had no production emit path under the tmux + claude-CLI spawn architecture.
+# For real API spend, solo users should use the Anthropic console.
 
 
 class TemplateDef(BaseModel):
@@ -367,11 +346,11 @@ class TemplateDef(BaseModel):
     memory: MemoryConfig | None = None
     design_shotgun: DesignShotgunConfig | None = None
     browser: BrowserConfig | None = None
-    # Phase 7 Wave 0 (Plan 07-01 Task 4): concurrency + attention + cost
-    # sub-blocks. Default None so existing templates parse unchanged.
+    # Phase 7 Wave 0 (Plan 07-01 Task 4): concurrency + attention sub-blocks.
+    # Default None so existing templates parse unchanged. `cost` removed
+    # post-v1.0 UAT 2026-04-22.
     conductor: ConductorConfig | None = None
     attention: AttentionConfig | None = None
-    cost: CostConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -458,7 +437,6 @@ def _parse_toml(path: Path) -> TemplateDef:
     # templates — none of which declare these blocks today).
     conductor_raw = raw.get("conductor")
     attention_raw = raw.get("attention")
-    cost_raw = raw.get("cost")
 
     return TemplateDef(
         name=tmpl.get("name", path.stem),
@@ -504,7 +482,6 @@ def _parse_toml(path: Path) -> TemplateDef:
         attention=(
             AttentionConfig(**attention_raw) if attention_raw is not None else None
         ),
-        cost=CostConfig(**cost_raw) if cost_raw is not None else None,
     )
 
 

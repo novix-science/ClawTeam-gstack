@@ -52,7 +52,6 @@ from clawteam.team.models import get_data_dir
 
 if TYPE_CHECKING:  # pragma: no cover — type-check only
     from clawteam.events.bus import EventBus
-    from clawteam.rate_limit import RateLimitMonitor
     from clawteam.templates import ConductorConfig
 
 
@@ -246,7 +245,6 @@ class SprintConductor:
         bus: "EventBus | None" = None,
         plugin_manager=None,
         conductor_config: "ConductorConfig | None" = None,
-        rate_limit_monitor: "RateLimitMonitor | None" = None,
     ) -> None:
         if not team_name:
             raise MissingTeamError()
@@ -284,12 +282,9 @@ class SprintConductor:
             default_bytes=500 * 1024,
         )
 
-        # ── Phase 7 Plan 07-02: concurrency caps + rate-limit monitor ──
-        # Lazy imports to avoid tightening module-load ordering for legacy
-        # Phase 2-6 callers that never touch the async path.
-        from clawteam.rate_limit import RateLimitMonitor as _RateLimitMonitor
-        from clawteam.templates import ConductorConfig as _ConductorConfig
-
+        # ── Phase 7 Plan 07-02: concurrency caps (rate-limit monitor
+        # removed post-v1.0 UAT 2026-04-22 — no production emit path under
+        # the tmux + claude-CLI spawn architecture). ──
         if conductor_config is None:
             conductor_config = self._resolve_conductor_config()
         self._conductor_config = conductor_config
@@ -298,10 +293,6 @@ class SprintConductor:
         self._per_agent_sems: dict[str, _asyncio.Semaphore] = {}
         self._active_agents_set: set[str] = set()
         self._active_agents_lock = RLock()
-        self._rate_limit_monitor = rate_limit_monitor or _RateLimitMonitor(
-            team_name=team_name,
-            bus=self.bus,
-        )
 
     def _resolve_conductor_config(self):
         """Load ConductorConfig from the team's template; default if missing."""
@@ -352,18 +343,13 @@ class SprintConductor:
     async def start_sprint_async(
         self, goal: str, auto_advance: bool = True
     ) -> SprintState:
-        """Async entry point — consults rate-limit + acquires sprint semaphore.
+        """Async entry point — acquires sprint semaphore with bounded timeout.
 
-        On :class:`RateLimitMonitor` saturation OR sprint-semaphore acquire
-        timeout, writes ``queue_status`` to the newly-created SprintState and
-        returns without holding the semaphore. The existing sync
-        :meth:`start_sprint` remains untouched for Phase 2-6 callers (BC).
+        On sprint-semaphore acquire timeout, writes ``queue_status`` to the
+        newly-created SprintState and returns without holding the semaphore.
+        The existing sync :meth:`start_sprint` remains untouched for Phase
+        2-6 callers (BC).
         """
-        if self._rate_limit_monitor.is_saturated():
-            state = self.start_sprint(goal, auto_advance=auto_advance)
-            state.queue_status = "rate_limit_saturated"
-            save_sprint_state(state)
-            return state
         try:
             await _asyncio.wait_for(
                 self._sprint_sem.acquire(),

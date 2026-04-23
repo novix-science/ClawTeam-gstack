@@ -31,7 +31,8 @@ class TestBuildAgentPrompt:
         assert "commit your changes" in prompt
         assert "git add -A && git commit" in prompt
         assert "clawteam inbox send" in prompt
-        assert "clawteam cost report" in prompt
+        # `clawteam cost report` line removed post-v1.0 UAT 2026-04-22.
+        assert "clawteam cost report" not in prompt
         assert "clawteam session save" not in prompt
 
     def test_prompt_includes_user_when_provided(self):
@@ -89,7 +90,8 @@ class TestBuildAgentPrompt:
         )
         assert "clawteam task list my-team --owner dev" in prompt
         assert "clawteam inbox send my-team boss" in prompt
-        assert "clawteam cost report my-team" in prompt
+        # `clawteam cost report` removed post-v1.0 UAT 2026-04-22.
+        assert "clawteam cost report" not in prompt
         assert "commit your changes in this repository with git" in prompt
 
     def test_prompt_includes_worker_loop_protocol(self):

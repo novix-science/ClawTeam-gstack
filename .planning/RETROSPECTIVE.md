@@ -63,6 +63,7 @@ Immediately after `/gsd-complete-milestone` tagged v1.0, a live walkthrough surf
 | `c254315` | high | Documented flow `team spawn → launch` hard-failed with "Team already exists" |
 | `bb18c8e` | high | Each agent spawn burned full 30s timeout in trust confirmer — 11-agent launch ~12 min → ~23s with early-exit |
 | `a45ed53` | feat | Added 4 top-level solo-UX commands (go/status/answer/stop) — reduced 10-command happy path to 4 |
+| (refactor) | trim | **Deleted Phase 7 cost + rate-limit observability stack** (−2514 LOC). Neither system 1 (agent self-report, unreliable honesty) nor system 2 (event-driven, no emitter under tmux + claude-CLI) worked for solo users. Cost tracking now delegates to Anthropic console. |
 
 **Key process lesson:** milestone close should require a live walkthrough as its final gate, not just automated artifacts. All 5 of these issues would have been caught by running `clawteam launch gstack` on the target machine once before tagging v1.0.
 
@@ -80,7 +81,7 @@ Full index with repro commands + test coverage: `.planning/backlog/v1.0-post-uat
 | Duration | 8 days active |
 | REQs shipped | 80 (79 complete + 1 partial QUALITY-12) |
 | Post-close backlog | 4 items (999.001-004) |
-| Post-close in-place UAT fixes | 5 commits (4e1bd29, 8090af7, c254315, bb18c8e, a45ed53) |
+| Post-close in-place UAT fixes | 5 commits (4e1bd29, 8090af7, c254315, bb18c8e, a45ed53) + 1 refactor commit (cost/rate-limit stack deletion, −2514 LOC) |
 | Pre-existing test-isolation failures at close | 9 (registry pollution) |
 | Phases with retroactive VERIFICATION.md | 3 (Phases 4/5/6) |
 | Live-walkthrough-surfaced blockers missed by automated gates | 4 blocker/high, 1 feature gap |

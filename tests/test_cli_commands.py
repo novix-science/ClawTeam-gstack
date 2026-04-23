@@ -659,13 +659,10 @@ def test_team_show_gstack_dashboard_renders_11_roles_and_placeholders(tmp_path):
     # Memory placeholder: Phase 6 pending + count of 2.
     assert "Phase 6 pending" in result.output
     assert "2 entries" in result.output
-    # Cost rollup panel (Phase 7 Plan 07-07): the old "pending Phase 7"
-    # placeholder text is replaced by the live "Cost:" one-liner from
-    # clawteam.cost.dashboard.render_text. Either variant of the panel is
-    # acceptable depending on whether the cost substrate loads cleanly.
-    assert ("Cost:" in result.output) or (
-        "Cost: [dim]unavailable" in result.output
-    )
+    # Cost tracking removed post-v1.0 UAT 2026-04-22 — team show now points
+    # users at the Anthropic console for real spend data instead of rendering
+    # a local $0 panel that never got real data under tmux + claude CLI.
+    assert "console.anthropic.com" in result.output
 
 
 def test_team_show_not_found_returns_exit_code_1(tmp_path):
@@ -746,15 +743,7 @@ def test_team_show_json_output_shape_matches_contract(tmp_path):
     assert "activeSprint" in data  # None is OK — no sprint started
     assert data["memory"]["status"] == "pending_phase_6"
     assert data["memory"]["placeholderEntries"] == 0
-    # Phase 7 Plan 07-07: the "pending_phase_7" placeholder is replaced by
-    # a live dashboard dict from clawteam.cost.dashboard.render_team. Status
-    # is "ok" on live render or "unavailable" on best-effort fallback;
-    # either satisfies the contract that the placeholder is gone.
-    cost_panel = data["costRollup"]
-    assert cost_panel["status"] in {"ok", "unavailable"}
-    assert cost_panel["status"] != "pending_phase_7"
-    # Live dashboard dict keys replace the old perAgent/totalTokens/totalUsd
-    # triple; new shape is cost_usd / per_agent / per_sprint / etc.
-    assert "cost_usd" in cost_panel
-    assert "per_agent" in cost_panel
-    assert "active_agents" in cost_panel
+    # Cost dashboard removed post-v1.0 UAT 2026-04-22 — costRollup is no
+    # longer emitted. See https://console.anthropic.com/settings/usage for
+    # real API spend.
+    assert "costRollup" not in data

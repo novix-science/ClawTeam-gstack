@@ -24,7 +24,6 @@ Your identity: **{agent_name}** in team **{team}**.
 - `clawteam inbox send {team} <to> "<message>"` — Message a teammate
 - `clawteam workspace checkpoint {team}` — Commit current progress
 - `clawteam lifecycle idle {team}` — Signal you're ready for more work
-- `clawteam cost report {team} --input-tokens <N> --output-tokens <N> --cost-cents <N>` — Report costs
 
 ### Protocol
 1. Check your tasks: `clawteam task list {team} --owner {agent_name}`
