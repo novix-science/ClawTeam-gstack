@@ -103,9 +103,10 @@ def build_agent_prompt(
         f'  - Done: `clawteam inbox send {team_name} {leader_name} "All tasks completed. <brief>"`',
         f'  - Blocked: `clawteam inbox send {team_name} {leader_name} "Need help: <desc>"`',
         "",
-        f"After acting on a wake, signal `clawteam lifecycle idle {team_name}` "
-        "and wait for the next wake. Don't exit the process — the harness "
-        "keeps you alive for the next turn.",
+        "After acting on a wake, wait silently for the next wake. "
+        "Don't exit the process — the harness keeps you alive for the "
+        "next turn. Don't announce idleness — leader doesn't need it "
+        "(the push-based wake system doesn't route by idle status).",
         "",
     ])
     return "\n".join(lines)

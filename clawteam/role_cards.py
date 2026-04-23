@@ -55,7 +55,6 @@ _UNIVERSAL_CMDS = """\
 - `clawteam task update {team} <id> --status in_progress|completed`
 - `clawteam inbox receive {team} --agent {agent}` — pull messages (on [wake:inbox])
 - `clawteam inbox send {team} <to> "<msg>"` — message a teammate
-- `clawteam lifecycle idle {team}` — signal you've processed the current wake
 - `clawteam workspace checkpoint {team}` — commit WIP via git
 """
 

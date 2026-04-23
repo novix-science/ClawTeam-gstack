@@ -30,14 +30,14 @@ The system pushes; you wait. Polling wastes API calls and adds latency.
 - `clawteam task update {team} <id> --status in_progress|completed`
 - `clawteam inbox send {team} <to> "<message>"` — message a teammate
 - `clawteam workspace checkpoint {team}` — commit WIP
-- `clawteam lifecycle idle {team}` — signal you've processed the current wake
 
 ### Protocol
 1. Wait for a wake (task / inbox / nudge).
 2. On wake, fetch details via the matching `clawteam` command.
 3. Update task status → do the work → commit with git → mark completed.
 4. Notify leader if done or blocked: `clawteam inbox send {team} <leader> "..."`
-5. Signal `clawteam lifecycle idle {team}` and wait for the next wake.
+5. Wait silently for the next wake — don't announce idleness. The leader
+   doesn't poll idle status; task creation is the only scheduling channel.
 6. The harness keeps you alive across wakes — don't exit.
 """
 

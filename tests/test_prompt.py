@@ -110,6 +110,8 @@ class TestBuildAgentPrompt:
         # Commands still referenced for when agent reacts to a wake.
         assert "clawteam task list my-team --owner dev" in prompt
         assert "clawteam inbox receive my-team --agent dev" in prompt
-        # Idle-between-wakes guidance.
-        assert "clawteam lifecycle idle" in prompt
-        assert "clawteam lifecycle idle my-team" in prompt
+        # Silent-wait guidance (agents no longer announce idleness —
+        # push-based wake system doesn't route by idle status, idle
+        # notifications were mailbox noise).
+        assert "clawteam lifecycle idle" not in prompt
+        assert "wait" in prompt.lower()
