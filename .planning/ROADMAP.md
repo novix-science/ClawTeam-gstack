@@ -4,8 +4,15 @@
 
 - ✅ **v1.0 — hire-your-team + parallel-sprint gstack integration** (Phases 0-7) — shipped 2026-04-22 — see `.planning/milestones/v1.0-ROADMAP.md`
 - ✅ **v1.1 — Reliability / integration-tested 11-agent delivery** (Phases 8-12) — shipped 2026-04-24 — see `.planning/milestones/v1.1-ROADMAP.md`
+- 🚧 **v1.2 — Workspace Semantics** (Phases 13-15) — started 2026-04-24
 
 ## Phases
+
+### 🚧 v1.2 (Phases 13-15) — ACTIVE
+
+- [ ] **Phase 13: Workspace Entry Point** — `clawteam open` lands users in a live team with no goal; launch stops injecting kickoff prompts; `sprint start` owns the kickoff; `go` demoted to shortcut.
+- [ ] **Phase 14: Session Continuity** — Agent `claude` session ids persist across re-opens; `clawteam open <existing-team>` resumes every pane's prior conversation; sprint kickoff arrives as continuation when the user has pre-chatted with CEO.
+- [ ] **Phase 15: Quiet & Progressive Team** — Idle agents (no active sprint) do not poll or auto-wake; team launch shows progressive pane appearance in a single window instead of the 11-windows-then-tile flash.
 
 ### ✅ v1.1 (Phases 8-12) — SHIPPED 2026-04-24
 
@@ -46,6 +53,43 @@ Note: Post-UAT deletion of Phase 7 cost/rate-limit observability stack (2514 LOC
 
 </details>
 
+## Phase Details
+
+### Phase 13: Workspace Entry Point
+**Goal**: Users can open a team without committing to a goal; kickoff prompts move from launch-time to sprint-start time; `go` becomes a documented shortcut rather than the primary flow.
+**Depends on**: Phase 12 (v1.1 closed — event-driven sprint loop is the surface this phase reshapes)
+**Requirements**: WS-01, WS-02, WS-03, WS-04
+**Success Criteria** (what must be TRUE):
+  1. Running `clawteam open gstack -n foo` with no goal argument enters a team with 11 `claude` panes, and inspecting each pane shows a clean REPL with zero messages sent — no turn-1 tokens consumed.
+  2. On a team that was opened without a goal, the user can run `clawteam sprint start foo --goal "build CSV CLI"` and the kickoff prompt arrives in every agent pane at that moment (not at launch).
+  3. `clawteam go "build X"` still works end-to-end (creates team + starts sprint + launches panes with kickoff), but `clawteam go --help` and the README describe it as a shortcut for `open` + `sprint start`, not the primary flow.
+  4. Launching a team via `clawteam launch gstack` (the underlying primitive) without `--goal` produces agents with no injected `post_launch_prompt`; `launch --goal X` still injects (backwards compatibility for in-flight callers).
+  5. Phase VALIDATION.md exists at `.planning/phases/phase-13-VALIDATION.md` with Nyquist-style live-UAT steps exercising all four behaviors above.
+**Plans**: TBD
+
+### Phase 14: Session Continuity
+**Goal**: Agent conversations survive terminal close / laptop reboot; opening a team again restores every pane's prior dialogue and lets a pre-sprint CEO chat flow directly into the kickoff.
+**Depends on**: Phase 13 (requires `open` command and clean-REPL launch path to attach session-resume into)
+**Requirements**: RELI-05, RELI-06, WS-05
+**Success Criteria** (what must be TRUE):
+  1. After `clawteam open gstack -n foo`, the file `~/.clawteam/teams/foo/sessions.json` exists and contains an entry per agent mapping agent name to a non-empty `claude` session id.
+  2. Closing the tmux session, then running `clawteam open foo` again, restores the same 11-pane layout and each agent pane shows its prior conversation history (verified by typing in any pane — the agent responds with memory of earlier exchanges, not as a fresh session).
+  3. Opening a team, chatting with the CEO pane for several turns in idle mode, then running `clawteam sprint start foo --goal "..."` results in the CEO receiving the kickoff message as the next turn of the existing dialogue (verified by asking CEO to recall prior conversation context — it does).
+  4. v1.1 teams opened for the first time under v1.2 start fresh without error (forward-only migration — no retroactive `sessions.json` scan is attempted).
+  5. Phase VALIDATION.md exists at `.planning/phases/phase-14-VALIDATION.md` documenting the close-terminal → reopen → resume-verified walkthrough.
+**Plans**: TBD
+
+### Phase 15: Quiet & Progressive Team
+**Goal**: Idle teams stay quiet (no background polling, no auto-wake) and team launch feels progressive instead of flashing through 11 separate windows before merging.
+**Depends on**: Phase 13 (idle mode depends on clean-REPL launch); Phase 14 (session-continuity wake semantics must already be stable before idle-mode suppression is layered on)
+**Requirements**: RELI-07, UX-04
+**Success Criteria** (what must be TRUE):
+  1. On a team opened without an active sprint, observing any agent pane for 5 minutes shows zero unsolicited output — the pane only responds when the user types into it.
+  2. Running `clawteam open gstack -n foo` with `--tile` shows panes appearing progressively inside a single tmux window (first agent creates the window, agents 2–11 split into it), and there is no visible "11 windows then merge" flash at the end.
+  3. Starting a sprint on a previously idle team re-enables wake behavior cleanly — `TaskCompleted` / `PhaseCompletionWatcher` events fire and agents respond to them as they did in v1.1.
+  4. Phase VALIDATION.md exists at `.planning/phases/phase-15-VALIDATION.md` covering the 5-minute quiet-pane observation and the single-window progressive-launch walkthrough.
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans | Status | Completed |
@@ -63,7 +107,10 @@ Note: Post-UAT deletion of Phase 7 cost/rate-limit observability stack (2514 LOC
 | 10. UX Polish (attend / status) | v1.1 | 1/1 | Complete    | 2026-04-24 |
 | 11. E2E Integration Test | v1.1 | 1/1 | Complete    | 2026-04-24 |
 | 12. Documentation Refresh | v1.1 | 2/2 | Complete    | 2026-04-24 |
+| 13. Workspace Entry Point | v1.2 | 0/TBD | Not started | — |
+| 14. Session Continuity | v1.2 | 0/TBD | Not started | — |
+| 15. Quiet & Progressive Team | v1.2 | 0/TBD | Not started | — |
 
 ---
 
-*v1.1 shipped 2026-04-24. Start the next milestone with `$gsd-new-milestone`.*
+*v1.2 Workspace Semantics active (started 2026-04-24). Roadmap drafted with 3 phases covering 9 REQs. Next: `/gsd-plan-phase 13`.*

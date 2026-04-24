@@ -69,15 +69,15 @@ Explicit exclusions for v1.2 with reasoning:
 
 | REQ-ID | Phase | Plan |
 |--------|-------|------|
-| WS-01 | TBD | TBD |
-| WS-02 | TBD | TBD |
-| WS-03 | TBD | TBD |
-| WS-04 | TBD | TBD |
-| WS-05 | TBD | TBD |
-| RELI-05 | TBD | TBD |
-| RELI-06 | TBD | TBD |
-| RELI-07 | TBD | TBD |
-| UX-04 | TBD | TBD |
+| WS-01 | Phase 13 | TBD |
+| WS-02 | Phase 13 | TBD |
+| WS-03 | Phase 13 | TBD |
+| WS-04 | Phase 13 | TBD |
+| WS-05 | Phase 14 | TBD |
+| RELI-05 | Phase 14 | TBD |
+| RELI-06 | Phase 14 | TBD |
+| RELI-07 | Phase 15 | TBD |
+| UX-04 | Phase 15 | TBD |
 
 ---
 
