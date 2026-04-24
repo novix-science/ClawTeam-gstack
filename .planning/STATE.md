@@ -223,7 +223,12 @@ Recent decisions affecting current work:
 
 [From .planning/todos/pending/ — ideas captured during sessions]
 
-None yet.
+- 2026-04-24 · sprint-conductor · Workflow contract 3-in-1 refactor
+  (PHASE_REQUIREMENTS artifacts + TaskCompleted→PhaseCompletionWatcher
+  event loop + 1 integration test with mock claude). Est +550 LOC.
+  Solves bug classes A (toothless state machine) + B (open feedback
+  loop) + C (no E2E coverage). See
+  .planning/todos/pending/2026-04-24-workflow-contract-3in1-refactor.md
 
 ### Blockers/Concerns
 
