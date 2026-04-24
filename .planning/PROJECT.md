@@ -12,7 +12,24 @@ v1.1 closed the three architectural gaps diagnosed during v1.0 UAT:
 
 **Current user entrypoint:** `clawteam go`, `clawteam status`, `clawteam answer`, and `clawteam stop` are the documented primary flow. Lower-level `team spawn`, `launch`, and `sprint start` remain power-user escape hatches.
 
-**Next milestone not started.** Use `$gsd-new-milestone` to define v1.2 requirements before adding new active phases.
+**Current milestone:** v1.2 Workspace Semantics (started 2026-04-24) — see below.
+
+## Current Milestone: v1.2 Workspace Semantics
+
+**Goal:** Shift the team from a one-shot task runner to a persistent workspace — users open the team first, commit to a goal later, and conversations survive across terminal re-opens.
+
+**Target features:**
+- `clawteam open [template]` — no-goal entry point; clean REPL mode for every agent
+- Session continuity — persist agent → claude session id map; resume conversations on reopen via `claude --resume`
+- Idle-mode agents — no polling, no auto-wake when no active sprint
+- Progressive pane layout — `split-window` flow replaces the "11 windows → tile" flash
+- `sprint start` owns kickoff-prompt injection (removed from `launch`)
+- `go` demoted from primary path to shortcut over `open` + `sprint start`
+
+**Key context:**
+- Scoped from live code inspection of v1.1-shipped `clawteam/spawn/tmux_backend.py`, `solo.py`, `keepalive.py` during the v1.1 post-ship UX review
+- Full sketch + code references: `.planning/backlog/v1.2-workspace-semantics.md`
+- Phase numbering continues from v1.1 (phase 12 → v1.2 starts at phase 13)
 
 ## What This Is
 
@@ -188,4 +205,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-04-24 — v1.1 Reliability milestone shipped and archived. Prior: 2026-04-22 v1.0 milestone archived.*
+*Last updated: 2026-04-24 — v1.2 Workspace Semantics milestone started. Prior: 2026-04-24 v1.1 Reliability shipped. 2026-04-22 v1.0 archived.*
