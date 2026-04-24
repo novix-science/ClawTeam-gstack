@@ -1,30 +1,40 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v1.0 SHIPPED 2026-04-22 — 8 phases / 78 plans / ~70.7k LOC / 80 REQs (QUALITY-12 REMOVED — see below). POST-UAT FIXES IN-PLACE 2026-04-22 (6 commits on gstack-integration, no version bump per user preference): 4e1bd29 fish shell compat, 8090af7 launch role-prompt injection, c254315 team spawn→launch composition, bb18c8e trust-confirmer early-exit (30× spawn speedup), a45ed53 solo-UX 4 top-level commands (go/status/answer/stop), plus DELETION of Phase 7 cost/rate-limit observability stack (2514 LOC removed — clawteam/cost/, clawteam/rate_limit/, clawteam/team/costs.py, cost_app CLI subcommands, CostStore/CacheTracker/CostTracker/RateLimitMonitor classes, ToolCallCompleted/ClaudeApiResponse/BudgetAlarmReached/RateLimitSaturated events, and related tests). Neither the upstream agent-self-report nor the Phase 7 event-driven path worked for solo users (unreliable agent honesty for system 1; no emit path under tmux + claude-CLI for system 2). Cost tracking now delegates entirely to Anthropic console (https://console.anthropic.com/settings/usage). Index: .planning/backlog/v1.0-post-uat-fixes.md. Archive: .planning/milestones/v1.0-ROADMAP.md. Next: /gsd-new-milestone for v1.x.
-stopped_at: Completed 07-09 (Phase 7 Wave 6 — 18 integration tests across 3 files close the D-14/D-15/D-16 delivery gates. tests/integration/test_phase7_ten_sprint_load.py ships 7 tests exercising already-shipped Plan 07-02 primitives (start_sprint_async/dispatch_turn/active_agents/RateLimitMonitor): test_ten_concurrent_sprints (asyncio.gather 10 sprints, distinct ids, queue_status=''), test_eleventh_sprint_queued_capacity (11th over max=10 times out at 0.05s → queue_status='queued_capacity', persisted to state.json), test_active_agent_cap_under_load (max_active_agents=3 observed peak never exceeds 3; post-run set empty), test_per_agent_semaphore_blocks_siblings (5 concurrent dispatch_turn('pm') serialize — each exit immediately follows its enter, timeline invariant), test_rate_limit_saturation_queues_sprints (monkeypatch is_saturated=True → queue_status='rate_limit_saturated', persisted), test_pause_resume_across_queue_cycle (CORE-07 lifecycle — paused then running), test_no_data_races_on_state_saves (10 concurrent writes load cleanly, list_sprints returns 10). tests/integration/test_phase7_attention_ranking.py ships 5 tests exercising Plan 07-03 AttentionQueue + compute_priority: test_thirty_questions_ranked_by_formula (30 fixtures across 5x3 sprints/teams, monotonic priority_score desc, top urgency>=2), test_cross_team_queue_aggregates (snapshot spans 3 teams), test_adversarial_critical_at_30s_beats_normal_at_8h (D-15 explicit fixture — crit@30s ≈30.008 vs norm@8h=18.0, 12-pt spread), test_tag_weights_shift_priority (tag_weights={security:10} reorders), test_compute_priority_matches_observed (per-item score matches pure fn within 0.1h tolerance). tests/integration/test_phase7_cost_dashboard.py ships 6 tests exercising Plans 07-05/06/07 together: test_100_events_rollup (100 ToolCallCompleted across 5 agents, precomputed sums match), test_budget_alarm_threshold_crossings (BudgetAlarmReached fires once at 50/80/100% no re-fires on 10 subsequent events), test_fallback_activates_at_80 (apply_fallback ladder: <80 unchanged, =80 opus→sonnet, >80 sonnet→haiku), test_dashboard_snapshot_at_each_threshold (render_team reflects alarms_fired+spend_percent at 0/50/100), test_cache_hit_rate_tracked (5x800read+5x200create / 5x1000create = 0.4 < HEALTHY_THRESHOLD), test_integrated_rollup_flow (cost_usd=0.0 triggers pricing backstop, 3 agents + 3 sprints populated, cache merged at render time). Plan acceptance: 7+5+6=18 green in 0.38s. Zero deviations (plan executed exactly as written). Zero new production code — test-only plan locking the Phase 7 delivery gate. TDD gates strict RED→GREEN per task: (1435e73→94531c4) / (459eea5→27bb63e) / (f1b10c4→55a1e74). 11 pre-existing test-ordering failures at tests/test_evidence_schemas_phase5/test_gstack_plugin/test_plugin_hooks/test_browse/test_pyproject_optional_extras remain out of scope per deferred-items.md (first logged Plan 07-02, re-confirmed failing identically on baseline 81c8b8d). Phase 7 requirements closed: CORE-06 (10-sprint concurrent correctness), INT-03 (cross-sprint attention queue), QUALITY-04 (active-agent cap observable), QUALITY-12 (cost dashboard + fallback activation); adjacent INT-04/INT-05/QUALITY-05/UX-06 closed in earlier waves. Phase 7 9/9 plans complete; ready for nyquist-validation + phase close-out. Prior: 07-08 complete (doctor --gc); 07-07 (dashboard); 07-06 (fallback+cache); 07-05 (tracker); 07-04 (attend CLI); 07-03 (AttentionQueue); 07-02 (concurrency); 07-01 (substrate). Next: /gsd-verify-phase 7 + milestone close-out.)
-last_updated: "2026-04-23T10:35:54Z"
+milestone: v1.1
+milestone_name: reliability
+status: v1.1 Reliability milestone initialized 2026-04-24. Goal — close the 3 architectural gaps revealed by v1.0 UAT (toothless state machine, open feedback loop, no end-to-end tests) so `clawteam go "build X"` reliably produces a working X through 11-agent coordination. 14 requirements across 5 categories (RELI / EVT / UX / TEST / DOC) mapped to 5 phases (8-12). Ready to plan Phase 8.
+stopped_at: "v1.1 milestone initialized — REQUIREMENTS.md written (14 REQs), ROADMAP.md drafted (Phases 8-12), PROJECT.md refreshed with current milestone header. v1.0 closed 2026-04-22 (8 phases / 78 plans / ~70.7k LOC / 80 REQs). Next: /gsd-plan-phase 8 or /gsd-discuss-phase 8."
+last_updated: "2026-04-24T12:00:00Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 78
-  completed_plans: 78
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-22 after v1.0 milestone)
+See: .planning/PROJECT.md (updated 2026-04-24 with v1.1 Reliability milestone header)
 
 **Core value:** You hire a virtual engineering team, and over time they get better at working with you.
-**Current focus:** v1.0 shipped. Planning v1.x (observability + UX polish) — run `/gsd-new-milestone` to start.
+**Current focus:** v1.1 Reliability — close the 3 architectural gaps from v1.0 UAT so `clawteam go` actually coordinates 11 agents to shipped code (not just progresses nominally).
 
 ## Current Position
 
-Milestone v1.0 archived 2026-04-22. See `.planning/MILESTONES.md` and `.planning/milestones/v1.0-ROADMAP.md`.
+**Milestone:** v1.1 Reliability
+**Phase:** 8 (not started)
+**Plans:** 0 / TBD complete
+**Status:** Ready to plan Phase 8.
+
+**Milestone inputs:**
+- `.planning/REQUIREMENTS.md` — 14 REQs across 5 categories (RELI / EVT / UX / TEST / DOC)
+- `.planning/ROADMAP.md` — 5 phases (8-12) drafted
+- `.planning/todos/pending/2026-04-24-workflow-contract-3in1-refactor.md` — design spec for Phases 8+9+11
+
+**Prior milestone:** v1.0 archived 2026-04-22. See `.planning/MILESTONES.md` and `.planning/milestones/v1.0-ROADMAP.md`.
 
 ## Deferred Items
 
@@ -254,33 +264,24 @@ Items acknowledged and carried forward to v1.x or v2:
 
 ## Session Continuity
 
-Last session: 2026-04-22T15:15:00Z
-Stopped at: Completed 07-08 (Phase 7 Wave 5 zombie-worktree GC — clawteam/workspace/gc.py find_zombie_worktrees + gc_zombies + disk_usage_report (168 LOC, 3 pure functions + SOFT_BYTES=5GB/HARD_BYTES=10GB module constants) + clawteam/cli/commands.py doctor() gains --gc flag that walks get_data_dir()/teams/ per team, preserves active SprintState workspace_branches via preserve-on-doubt fallback, calls find_zombie_worktrees + gc_zombies(bus=get_event_bus()) + disk_usage_report, renders GC complete summary with per-team soft/hard disk badges. ROADMAP §Phase 7 SC #10 CLOSED for doctor-entry half. Two deviations: (1) Rule 3 cross-executor stash interaction — Task 1 GREEN content swept into fix(06) WR-05 commit c3f14ad (same pattern as Plans 04-10/05-03/05-06/05-09/06-04/06-07/06-08/06-10); (2) Rule 1 fixture bug — two gc tests re-apply os.utime AFTER populating because writing child bumps parent mtime. 4 commits: dcbd7f7 Task 1 RED, c3f14ad Task 1 GREEN (cross-attributed), cc3368a Task 2 RED, 3df5728 Task 2 GREEN. 45 plan-scoped tests + 24 broader CLI tests green. Next: 07-09 (10-sprint integration load test D-14/15/16) — phase close-out.)
+Last session: 2026-04-24T12:00:00Z
+Stopped at: v1.1 Reliability milestone initialized. PROJECT.md refreshed, REQUIREMENTS.md + ROADMAP.md written, ready for `/gsd-plan-phase 8`.
+
 Resume files:
 
-  - Phase 7 Wave 5 07-08 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-08-SUMMARY.md
-  - Phase 7 Wave 5 07-07 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-07-SUMMARY.md
-  - Phase 7 Wave 4 07-06 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-06-SUMMARY.md
-  - Phase 7 Wave 4 07-05 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-05-SUMMARY.md
-  - Phase 7 Wave 3 07-04 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-04-SUMMARY.md
-  - Phase 7 Wave 2 07-03 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-03-SUMMARY.md
-  - Phase 7 Wave 1 07-02 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-02-SUMMARY.md
-  - Phase 7 Wave 0 07-01 complete: .planning/phases/07-parallel-sprints-attentionqueue-ux-cost-controls/07-01-SUMMARY.md
-  - Phase 6 Wave 3 06-10 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-10-SUMMARY.md
-  - Phase 6 Wave 3 06-09 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-09-SUMMARY.md
-  - Phase 6 Wave 3 06-08 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-08-SUMMARY.md
-  - Phase 6 Wave 2 06-07 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-07-SUMMARY.md
-  - Phase 6 Wave 1 COMPLETE (06-03): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-03-SUMMARY.md
-  - Phase 6 Wave 2 06-06 complete: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-06-SUMMARY.md
-  - Phase 6 Wave 1 (06-04 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-04-SUMMARY.md
-  - Phase 6 Wave 1 (06-02 COMPLETE): .planning/phases/06-browser-skills-design-pipeline-team-memory/06-02-SUMMARY.md
-  - Phase 6 Wave 0 substrate: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-01-SUMMARY.md
-  - Phase 6 context: .planning/phases/06-browser-skills-design-pipeline-team-memory/06-CONTEXT.md + 06-RESEARCH.md
-  - Phase 5 COMPLETE: .planning/phases/05-tool-heavy-skills-ship-sre-codex/05-10-SUMMARY.md
+  - v1.1 Requirements: .planning/REQUIREMENTS.md (14 REQs / 5 categories / 5 phases)
+  - v1.1 Roadmap: .planning/ROADMAP.md (Phases 8-12)
+  - v1.1 Project context: .planning/PROJECT.md (top section — Current Milestone)
+  - v1.1 Workflow contract design: .planning/todos/pending/2026-04-24-workflow-contract-3in1-refactor.md
+  - v1.0 Archive: .planning/milestones/v1.0-ROADMAP.md + .planning/milestones/v1.0.md
+  - v1.0 Post-UAT fixes index: .planning/backlog/v1.0-post-uat-fixes.md
 
 ## Recent Activity
 
-- 2026-04-20 -- Phase 3 RESEARCH.md written (1010 lines, commit c2e28e1) — pure-rubric vs interactive split locked, 3 open research questions resolved, 8 assumptions logged
-- 2026-04-20 -- Phase 3 CONTEXT.md written (commit 74f55b2) — 14 decisions across 4 gray areas (methodology depth, gstack.toml shape, file format + envelope location, verification stringency); 5 plan-prep verification tasks queued for Wave 0 of `/gsd-plan-phase 3`
+- 2026-04-24 -- v1.1 Reliability milestone initialized (`/gsd-new-milestone --auto`). PROJECT.md header updated, REQUIREMENTS.md written (14 REQs — RELI-01..04 / EVT-01..04 / UX-01..03 / TEST-01 / DOC-01..02), ROADMAP.md drafted (Phases 8-12). Ready for `/gsd-plan-phase 8`.
+- 2026-04-24 -- Captured todo `2026-04-24-workflow-contract-3in1-refactor.md` (+550 LOC design — PHASE_REQUIREMENTS artifacts + TaskCompleted→PhaseCompletionWatcher event loop + E2E integration test with mock claude). Solves root causes of v1.0 post-UAT whack-a-mole bug pattern.
+- 2026-04-23 -- Diagnostic chat surfaced 3 architectural root causes (Class A state-machine teeth / Class B feedback loop / Class C integration coverage) accounting for ~60% of remaining post-v1.0 bugs.
+- 2026-04-22 -- v1.0 SHIPPED (8 phases / 78 plans). Post-UAT in-place fixes: fish shell compat, launch role-prompt injection, spawn→launch composition, trust-confirmer early-exit (30× spawn speedup), solo-UX top-level commands (go/status/answer/stop), event-driven wake system replacing polling.
+- 2026-04-22 -- DELETED Phase 7 cost/rate-limit observability stack (2514 LOC removed) — neither agent self-report nor event-driven path worked under tmux+claude-CLI architecture. Cost tracking delegated to Anthropic console.
 
-**Planned Phase:** 3 (gstack-team-template-methodology-port) — 9 plans — 2026-04-20T14:39:47.207Z
+**Planned Phase:** 8 (workflow contract — RELI-01..04) — TBD plans — queued for `/gsd-plan-phase 8`

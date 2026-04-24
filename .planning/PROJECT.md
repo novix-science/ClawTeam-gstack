@@ -1,5 +1,26 @@
 # ClawTeam-gstack
 
+## Current Milestone: v1.1 Reliability
+
+**Goal:** Close the three architectural gaps diagnosed during v1.0 UAT so that `clawteam go "build X"` reliably produces a working X through 11-agent coordination — not just infrastructure, but observable end-to-end delivery.
+
+**The three gaps (from 2026-04-23 diagnostic chat):**
+
+1. **State machine has no teeth** — `EvidenceGate(artifact_names=[])` always passes because gstack.toml never registered required artifacts per phase. Sprints nominally traverse 7 phases but there's no concrete signal that a phase was actually completed.
+2. **Feedback loop is open** — `task update --status completed` doesn't fire a TaskCompleted event. CEO has no trigger to advance; agents don't know when work is done collectively. The push architecture (wake system) is half-built — wakes exist for inbox/task creation but not for phase completion.
+3. **No end-to-end coverage** — 1,740 unit tests, 0 integration tests that spawn real agents and verify think→ship delivery. Every regression surfaces via manual UAT.
+
+**Target features:**
+
+- Phase artifact requirements + `clawteam artifact write` CLI + EvidenceGate enforcement
+- `TaskCompleted` event emission + `PhaseCompletionWatcher` that wakes leader on phase completion
+- `[wake:phase]` wake kind — third push channel alongside wake:task / wake:inbox
+- attend UX polish (Urg column, digest title, watcher sync — v1.0 backlog items 999.002–004)
+- One mock-claude integration test that exercises full sprint cycle
+- Docs refresh reflecting solo-UX commands and event-driven wake architecture
+
+**Success smell:** After v1.1, `clawteam go "add a /healthcheck endpoint"` runs to `reflect` phase without human intervention at any phase boundary, and if a regression sneaks in next milestone, the integration test catches it in CI.
+
 ## What This Is
 
 A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) — Garry Tan's 30+ slash-command toolkit that turns Claude Code into a virtual engineering team — into ClawTeam's multi-agent harness as a first-class team template and sprint model. The product narrative: **one command spawns your own persistent 11-specialist team** (pm, ceo, eng-mgr, designer, dx-lead, engineer, reviewer, qa, security, shipper, sre) that runs gstack's Think → Plan → Build → Review → Test → Ship → Reflect sprint loop with file-backed state, phase gates, and artifacts. A single team can run multiple sprints in parallel, learning your codebase and taste over time.
@@ -167,4 +188,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-04-22 after v1.0 milestone (8 phases, 78 plans, 80 REQs delivered, ~70.7k LOC; emit-path gap QUALITY-12 deferred to v1.x backlog 999.001).*
+*Last updated: 2026-04-24 — v1.1 Reliability milestone started (close the 3 UAT-discovered architectural gaps: state-machine teeth, event-feedback loop, end-to-end integration test). Prior: 2026-04-22 v1.0 milestone archived.*

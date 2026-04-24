@@ -4,6 +4,38 @@ Historical record of shipped versions.
 
 ---
 
+## v1.1 — Reliability (in progress)
+
+**Started:** 2026-04-24
+**Phases planned:** 5 (Phase 8-12) | **Requirements:** 14 | **Status:** Ready to plan Phase 8
+
+### Why this milestone
+
+v1.0 shipped a feature-complete 11-agent substrate but post-close UAT revealed that `clawteam go "build X"` doesn't reliably coordinate agents to produce a working X. Six rounds of whack-a-mole bug fixing after v1.0 close surfaced three architectural root causes that no individual patch could fix:
+
+- **Class A — state machine has no teeth.** `EvidenceGate(artifact_names=[])` short-circuits to True because `gstack.toml` never registers artifact types per phase; every `sprint advance` passes regardless of whether any work happened.
+- **Class B — feedback loop is open.** `clawteam task update --status completed` fires no event; CEO has no trigger to advance the phase and either idles or blindly tries `sprint advance` hoping for the best.
+- **Class C — no end-to-end test.** 1740+ unit tests but zero integration tests spawning a real multi-agent sprint, so every regression hides until a human runs `clawteam go` by hand.
+
+### Scope (14 REQs, 5 phases)
+
+- **Phase 8 — Workflow Contract** (RELI-01..04): `PHASE_REQUIREMENTS` registry + `clawteam artifact write` CLI + wire into `EvidenceGate` + named-artifact error messages.
+- **Phase 9 — Event-driven Coordination** (EVT-01..04): `TaskCompleted` emission + `PhaseCompletionWatcher` + `wake:phase` kind + auto-register at team-launch.
+- **Phase 10 — UX polish** (UX-01..03): attend "Urg" column / attend --summary title / pending_question_ids sync.
+- **Phase 11 — End-to-End Integration Test** (TEST-01): subprocess backend + scripted claude mock + 7-phase assertion suite.
+- **Phase 12 — Documentation Refresh** (DOC-01..02): README solo-UX-first rewrite + `docs/architecture/event-driven-wake.md`.
+
+### Out of scope
+
+- **Cost observability rewire** — cost stack was DELETED post-v1.0-UAT (commit `716c5a8`); Anthropic console is the source of truth indefinitely.
+- **Gstack skill CLI wrappers** (`/ship`, `/canary`, `/benchmark` etc.) — deferred to v1.2 pending CLI-subcommand vs claude-plugin-dir design decision.
+- **Real multi-sprint load test** (HUMAN-UAT #1 from v1.0) — requires live API spend + instrumentation; v1.2 candidate.
+- **Agent-to-agent artifact-quality verification** (beyond Phase 4's review-only verification) — v1.2 stretch.
+
+Full scope: `.planning/REQUIREMENTS.md` + `.planning/ROADMAP.md`.
+
+---
+
 ## v1.0 — hire-your-team + parallel-sprint gstack integration
 
 **Shipped:** 2026-04-22
