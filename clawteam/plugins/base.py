@@ -111,6 +111,18 @@ class HarnessPlugin(ABC):
         """
         return {}
 
+    # ── Phase 8 / workflow contracts ─────────────────────────────────
+
+    def contribute_phase_requirements(self) -> dict[str, list[str]]:
+        """Contribute required artifact names per sprint phase.
+
+        Keys are phase names such as ``"think"`` or ``"ship"``. Values are
+        artifact filenames stored in ``SprintState.artifacts`` and enforced by
+        ``EvidenceGate``. Empty-dict default preserves the historical
+        permissive gate path for templates that do not declare requirements.
+        """
+        return {}
+
     # ── Phase 4 / Plan 04-05 hook ─────────────────────────────────────
 
     def contribute_verification_pairs(self) -> list[VerificationPair]:

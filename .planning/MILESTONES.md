@@ -4,10 +4,11 @@ Historical record of shipped versions.
 
 ---
 
-## v1.1 — Reliability (in progress)
+## v1.1 — Reliability / integration-tested 11-agent delivery
 
 **Started:** 2026-04-24
-**Phases planned:** 5 (Phase 8-12) | **Requirements:** 14 | **Status:** Ready to plan Phase 8
+**Shipped:** 2026-04-24
+**Phases:** 5 (Phase 8-12) | **Plans:** 8 | **Requirements:** 14/14 | **Status:** Shipped
 
 ### Why this milestone
 
@@ -32,7 +33,23 @@ v1.0 shipped a feature-complete 11-agent substrate but post-close UAT revealed t
 - **Real multi-sprint load test** (HUMAN-UAT #1 from v1.0) — requires live API spend + instrumentation; v1.2 candidate.
 - **Agent-to-agent artifact-quality verification** (beyond Phase 4's review-only verification) — v1.2 stretch.
 
-Full scope: `.planning/REQUIREMENTS.md` + `.planning/ROADMAP.md`.
+Archive: `.planning/milestones/v1.1-ROADMAP.md` + `.planning/milestones/v1.1-REQUIREMENTS.md`
+Audit: `.planning/v1.1-MILESTONE-AUDIT.md`
+
+### What Shipped
+
+1. **Workflow contract teeth** — gstack phase requirements now flow through `GstackSprintPlugin.contribute_phase_requirements()` into `SprintConductor` and `EvidenceGate`; missing artifacts produce named gate-block errors.
+2. **Artifact write CLI** — `clawteam artifact write <team> <sprint> <artifact_type>` validates frontmatter, persists state and artifact files, and emits `ArtifactPersisted`.
+3. **Event-driven phase completion** — `TaskCompleted` emission, `PhaseCompletionWatcher`, and `wake_agent(kind="phase")` close the feedback loop when phase tasks and artifacts are done.
+4. **Attend/status UX polish** — numeric urgency, H1 representative titles, and read-side pending-question reconciliation are covered by focused tests.
+5. **Subprocess lifecycle regression shield** — `tests/integration/test_gstack_sprint_end_to_end.py` launches the gstack roster with a scripted `claude`, drives the seven-phase sprint, asserts six phase transitions, seven artifacts, wake delivery, and final `completed` state.
+6. **Docs refresh** — README now leads with `clawteam go/status/answer/stop`; `docs/architecture/event-driven-wake.md` documents wake and nudge architecture.
+
+### Known Deferred Items at Close
+
+- Open artifact audit found legacy v1.0 UAT/verification items and one pending todo; acknowledged and carried in `.planning/STATE.md` Deferred Items.
+- Nyquist `*-VALIDATION.md` files are absent for phases 8-12; phase-specific `VERIFICATION.md` files and regression tests passed.
+- Git commit and tag could not be created in this sandbox because `.git` is read-only.
 
 ---
 

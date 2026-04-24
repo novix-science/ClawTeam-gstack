@@ -149,11 +149,13 @@ class EvidenceGate(ArtifactRequiredGate):
         self,
         artifact_names: list[str],
         *,
+        phase: str = "",
         required_sections: dict[str, list[str]] | None = None,
         deploy_url_checker: Callable[[str, int], tuple[int, dict]] | None = None,
         subprocess_runner: Callable[..., subprocess.CompletedProcess] | None = None,
     ) -> None:
         super().__init__(artifact_names)
+        self.phase = phase
         self._required_sections = required_sections or {}
         self._head_check = deploy_url_checker or _default_head_check
         self._subprocess_run = subprocess_runner or _default_subprocess_runner
@@ -164,6 +166,12 @@ class EvidenceGate(ArtifactRequiredGate):
         # Layer 1: presence — inherited (returns "Missing artifacts: ..." reason).
         ok, reason = super().check(state)
         if not ok:
+            missing = [n for n in self.artifact_names if n not in state.artifacts]
+            phase = self.phase or getattr(state, "current_phase", "")
+            if missing and phase:
+                return False, (
+                    f"missing artifact {missing[0]!r} for phase {phase!r}"
+                )
             return ok, reason
 
         for name in self.artifact_names:

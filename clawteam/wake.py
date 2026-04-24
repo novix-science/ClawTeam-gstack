@@ -138,7 +138,7 @@ def wake_agent(
 
     :param team: Team name.
     :param agent: Recipient agent role (e.g. "engineer").
-    :param kind: Wake kind: ``"inbox"``, ``"task"``, or ``"custom"``.
+    :param kind: Wake kind: ``"inbox"``, ``"task"``, ``"phase"``, or ``"custom"``.
     :param preview: Short preview of the triggering event (first line of
         message, task subject, etc.) — included in the injected text so
         the agent can react without fetching.
@@ -183,6 +183,12 @@ def wake_agent(
                     f"[wake:task] New task assigned. Run `clawteam task "
                     f"list {team} --owner {agent}`."
                 )
+        elif kind == "phase":
+            text = (
+                f"[wake:phase] {preview[:240]}"
+                if preview
+                else f"[wake:phase] Phase work complete for team {team}."
+            )
         else:
             text = f"[wake:{kind}] {preview[:200]}" if preview else f"[wake:{kind}]"
 

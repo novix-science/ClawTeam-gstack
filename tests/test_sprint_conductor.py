@@ -160,6 +160,50 @@ def test_auto_advance_true_no_questions_skips_interaction_gate(monkeypatch, tmp_
     assert "InteractionGate" not in names, names
 
 
+def test_build_gate_chain_uses_plugin_phase_requirements(monkeypatch, tmp_path):
+    """Plugin phase requirements make EvidenceGate block on missing artifacts."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.harness.evidence_schemas import reset_registry as reset_schema_registry
+    from clawteam.harness.phase_registry import reset_registry as reset_phase_registry
+    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
+    from clawteam.plugins.manager import PluginManager
+    from clawteam.sprint.conductor import SprintConductor
+
+    reset_phase_registry()
+    reset_schema_registry()
+    pm = PluginManager()
+    pm._instantiate_and_register(GstackSprintPlugin)
+
+    c = SprintConductor(team_name="t", bus=EventBus(), plugin_manager=pm)
+    state = c.start_sprint(goal="g", auto_advance=True)
+    chain = c._build_gate_chain(state)
+
+    evidence_gate = chain[0]
+    assert type(evidence_gate).__name__ == "EvidenceGate"
+    assert evidence_gate.artifact_names == ["delegation.json"]
+
+    ok, reason = evidence_gate.check(state)
+    assert ok is False
+    assert "missing artifact 'delegation.json' for phase 'think'" in reason
+
+
+def test_build_gate_chain_without_plugin_keeps_permissive_artifact_default(
+    monkeypatch, tmp_path
+):
+    """No plugin manager keeps the Phase 2 empty-artifact compatibility path."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="g", auto_advance=True)
+    chain = c._build_gate_chain(state)
+
+    evidence_gate = chain[0]
+    assert type(evidence_gate).__name__ == "EvidenceGate"
+    assert evidence_gate.artifact_names == []
+    assert evidence_gate.check(state) == (True, "")
+
+
 def test_auto_advance_true_with_pending_questions_inserts_interaction_gate(monkeypatch, tmp_path):
     """auto_advance=True + unanswered question → InteractionGate inserted."""
     _setup_hermetic_fs(monkeypatch, tmp_path)
@@ -492,6 +536,9 @@ def test_status_dict_shape(monkeypatch, tmp_path):
     state = c.start_sprint(goal="ship dark mode")
     state.participants = ["engineer", "reviewer"]
     state.pending_question_ids = ["q1"]
+    qdir = tmp_path / "teams" / "t" / "sprints" / state.sprint_id / "questions"
+    qdir.mkdir(parents=True, exist_ok=True)
+    (qdir / "q1.md").write_text("question", encoding="utf-8")
     state.artifacts["design-doc.md"] = "body"
     d = c.status_dict(state)
     assert set(d.keys()) == {
@@ -507,6 +554,31 @@ def test_status_dict_shape(monkeypatch, tmp_path):
     assert d["pending_questions_count"] == 1
     assert d["most_recent_artifact"] == "design-doc.md"
     assert d["team"] == "t"
+
+
+def test_status_dict_reconciles_pending_question_ids(monkeypatch, tmp_path):
+    """status_dict mirrors unanswered question files before rendering UX-03."""
+    _setup_hermetic_fs(monkeypatch, tmp_path)
+    from clawteam.sprint.conductor import SprintConductor
+    from clawteam.sprint.state import load_sprint_state
+
+    c = SprintConductor(team_name="t", bus=EventBus())
+    state = c.start_sprint(goal="ship dark mode")
+    state.pending_question_ids = ["stale"]
+    base = tmp_path / "teams" / "t" / "sprints" / state.sprint_id
+    qdir = base / "questions"
+    adir = base / "answers"
+    qdir.mkdir(parents=True, exist_ok=True)
+    adir.mkdir(parents=True, exist_ok=True)
+    (qdir / "open.md").write_text("question", encoding="utf-8")
+    (qdir / "answered.md").write_text("question", encoding="utf-8")
+    (adir / "answered.md").write_text("answer", encoding="utf-8")
+
+    d = c.status_dict(state)
+
+    assert d["pending_questions_count"] == 1
+    assert state.pending_question_ids == ["open"]
+    assert load_sprint_state("t", state.sprint_id).pending_question_ids == ["open"]
 
 
 def test_show_dict_shape(monkeypatch, tmp_path):

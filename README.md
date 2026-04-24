@@ -272,7 +272,7 @@ Human prompt: "Use 8 GPUs to optimize train.py. Read program.md for instructions
 
 🦞 Leader agent's actions:
 ├── 📖 Read program.md, understand the experiment protocol
-├── 🏗️ clawteam team spawn-team autoresearch
+├── 🏗️ clawteam team spawn autoresearch --name autoresearch
 ├── 🚀 Assigned each GPU a research direction:
 │   ├── GPU 0: clawteam spawn --task "Explore model depth (DEPTH 10-16)"
 │   ├── GPU 1: clawteam spawn --task "Explore model width (ASPECT_RATIO 80-128)"
@@ -304,7 +304,7 @@ You tell Claude Code: *"Build me a full-stack todo app."* Claude realizes this i
 Human prompt: "Build a full-stack todo app with auth, database, and React frontend."
 
 🦞 Leader agent's actions:
-├── 🏗️ clawteam team spawn-team webapp -d "Full-stack todo app"
+├── 🏗️ clawteam team spawn gstack --name webapp
 ├── 📋 Created tasks with dependency chains:
 │   ├── T1: "Design REST API schema"          → architect
 │   ├── T2: "Implement JWT auth" --blocked-by T1  → backend1
@@ -381,12 +381,9 @@ All `spawn` examples assume the agent CLI you name is already installed and avai
 
 ## 🚀 Quick Start
 
-If you're new to ClawTeam, follow this order:
-
-1. Make sure `tmux` and your agent CLI run standalone on this machine.
-2. Pick one path below: let an agent drive, or drive it manually.
-3. Use the supported-agent table to choose the right `spawn` command.
-4. If you're integrating a new agent, check the adapter notes before debugging.
+If you're new to ClawTeam, start with the solo workflow. It creates the team,
+starts the sprint, launches the agents, tracks the active team, and gives you
+one dashboard command for day-to-day use.
 
 ### ✅ Before You Start
 
@@ -404,9 +401,31 @@ nanobot --help
 
 If the agent CLI does not run correctly by itself, `clawteam spawn` will not fix it.
 
-### ⚡ Option 1: Let the Agent Drive (Recommended)
+### ⚡ Primary Flow
 
-ClawTeam ships with a reusable skill in `skills/clawteam/`.
+```bash
+# Start a gstack team and sprint for one goal
+clawteam go "Build the auth module"
+
+# Check phase, tasks, agents, and pending questions
+clawteam status
+
+# Answer agent questions when status shows pending questions
+clawteam answer
+
+# Stop the active team and clean up when the sprint is done
+clawteam stop
+```
+
+`clawteam go` defaults to the gstack template, opens/attaches to the tmux team
+view when possible, and writes the active-team pointer used by `status`,
+`answer`, and `stop`. Pass `--no-attach` if you want to keep your current shell
+free and use `clawteam status` as the main dashboard.
+
+### 🤖 Agent-Assisted Flow
+
+ClawTeam also ships with a reusable skill in `skills/clawteam/` so Claude Code
+or Codex can operate the same workflow for you.
 
 **Claude Code**
 
@@ -426,25 +445,32 @@ Use $clawteam to split this task across multiple agents and coordinate the team 
 
 The agent will automatically create a team, spawn workers, assign tasks, and coordinate — using `clawteam` CLI commands under the hood.
 
-### 🔧 Option 2: Drive It Manually
+### 🔧 Advanced Manual Flow
+
+Use this path when you need explicit control over team creation, launch backend,
+sprint lifecycle, or individual agent commands.
 
 ```bash
-# 1. Create a team (you become the leader)
-clawteam team spawn-team my-team -d "Build the auth module" -n leader
+# 1. Create the gstack roster without launching agents
+clawteam team spawn gstack --name my-team
 
-# 2. Spawn worker agents — each gets a git worktree, tmux window, and identity
-clawteam spawn --team my-team --agent-name alice --task "Implement the OAuth2 flow"
-clawteam spawn --team my-team --agent-name bob   --task "Write unit tests for auth"
+# 2. Launch the existing team with a specific backend/profile
+clawteam launch gstack --team my-team --goal "Build the auth module"
 
-# 3. Workers auto-receive a coordination prompt that teaches them to:
-#    ✅ Check tasks:    clawteam task list my-team --owner alice
-#    ✅ Update status:  clawteam task update my-team <id> --status completed
-#    ✅ Message leader: clawteam inbox send my-team leader "Done!"
-#    ✅ Report idle:    clawteam lifecycle idle my-team
+# 3. Start or inspect a sprint directly
+clawteam sprint start --team my-team --goal "Build the auth module"
+clawteam sprint status <sprint-id> --team my-team
 
-# 4. Watch them work side-by-side
+# 4. Spawn one-off workers by hand when needed
+clawteam spawn tmux claude --team my-team --agent-name alice --task "Implement OAuth2"
+clawteam spawn tmux codex  --team my-team --agent-name bob   --task "Write tests"
+
+# 5. Watch the team
 clawteam board attach my-team
 ```
+
+The manual commands are power-user escape hatches. For normal single-team work,
+prefer `go`, `status`, `answer`, and `stop`.
 
 ### 🧩 Profiles and Presets
 
@@ -636,11 +662,22 @@ This means **any CLI agent** can participate in a ClawTeam team — it just need
 <summary><h3>🔧 Core Commands</h3></summary>
 
 ```bash
+# ⭐ Solo workflow
+clawteam go "Build X"                    # create team + sprint + launch
+clawteam status                          # active-team dashboard
+clawteam answer                          # answer pending questions
+clawteam stop                            # clean shutdown
+
 # 🏗️ Team lifecycle
-clawteam team spawn-team <team> -d "description" -n <leader>
+clawteam team spawn gstack --name <team>
 clawteam team discover                    # List all teams
 clawteam team status <team>               # Show members
 clawteam team cleanup <team> --force      # Delete team
+
+# 🔄 Sprint lifecycle
+clawteam sprint start --team <team> --goal "Build X"
+clawteam sprint status <sprint-id> --team <team>
+clawteam sprint advance <sprint-id> --team <team>
 
 # 🚀 Spawn agents
 clawteam spawn --team <team> --agent-name <name> --task "do this"

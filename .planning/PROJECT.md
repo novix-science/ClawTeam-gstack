@@ -1,25 +1,18 @@
 # ClawTeam-gstack
 
-## Current Milestone: v1.1 Reliability
+## Current State
 
-**Goal:** Close the three architectural gaps diagnosed during v1.0 UAT so that `clawteam go "build X"` reliably produces a working X through 11-agent coordination — not just infrastructure, but observable end-to-end delivery.
+**Shipped:** v1.1 Reliability / integration-tested 11-agent delivery (2026-04-24)
 
-**The three gaps (from 2026-04-23 diagnostic chat):**
+v1.1 closed the three architectural gaps diagnosed during v1.0 UAT:
 
-1. **State machine has no teeth** — `EvidenceGate(artifact_names=[])` always passes because gstack.toml never registered required artifacts per phase. Sprints nominally traverse 7 phases but there's no concrete signal that a phase was actually completed.
-2. **Feedback loop is open** — `task update --status completed` doesn't fire a TaskCompleted event. CEO has no trigger to advance; agents don't know when work is done collectively. The push architecture (wake system) is half-built — wakes exist for inbox/task creation but not for phase completion.
-3. **No end-to-end coverage** — 1,740 unit tests, 0 integration tests that spawn real agents and verify think→ship delivery. Every regression surfaces via manual UAT.
+1. **State-machine teeth** — gstack phase artifact requirements now feed `EvidenceGate`; phase advance blocks on named missing artifacts.
+2. **Event-driven feedback loop** — `TaskCompleted` events plus `PhaseCompletionWatcher` wake the leader when current-phase tasks and artifacts are complete.
+3. **End-to-end coverage** — `tests/integration/test_gstack_sprint_end_to_end.py` launches gstack through the subprocess backend with a scripted `claude` mock and verifies the full seven-phase lifecycle.
 
-**Target features:**
+**Current user entrypoint:** `clawteam go`, `clawteam status`, `clawteam answer`, and `clawteam stop` are the documented primary flow. Lower-level `team spawn`, `launch`, and `sprint start` remain power-user escape hatches.
 
-- Phase artifact requirements + `clawteam artifact write` CLI + EvidenceGate enforcement
-- `TaskCompleted` event emission + `PhaseCompletionWatcher` that wakes leader on phase completion
-- `[wake:phase]` wake kind — third push channel alongside wake:task / wake:inbox
-- attend UX polish (Urg column, digest title, watcher sync — v1.0 backlog items 999.002–004)
-- One mock-claude integration test that exercises full sprint cycle
-- Docs refresh reflecting solo-UX commands and event-driven wake architecture
-
-**Success smell:** After v1.1, `clawteam go "add a /healthcheck endpoint"` runs to `reflect` phase without human intervention at any phase boundary, and if a regression sneaks in next milestone, the integration test catches it in CI.
+**Next milestone not started.** Use `$gsd-new-milestone` to define v1.2 requirements before adding new active phases.
 
 ## What This Is
 
@@ -95,17 +88,24 @@ A fork of ClawTeam that integrates [gstack](https://github.com/garrytan/gstack) 
 - ✓ Zombie worktree GC via `doctor --gc` with 5/10 GB disk budget — v1.0 Phase 7 (CORE-06)
 - ⚠ Cost + cache observability — infrastructure + UI shipped, emit-path gap deferred to v1.x backlog 999.001 (QUALITY-12 partial)
 
+### Validated (v1.1 shipped 2026-04-24)
+
+- ✓ Phase artifact requirements registered per gstack phase via `PHASE_REQUIREMENTS` — v1.1 Phase 8 (RELI-01)
+- ✓ `clawteam artifact write <team> <sprint> <artifact_type>` validates and persists required artifacts — v1.1 Phase 8 (RELI-02)
+- ✓ `GstackSprintPlugin.contribute_phase_requirements()` wires requirements into sprint gates — v1.1 Phase 8 (RELI-03)
+- ✓ Named missing-artifact gate errors for `sprint advance` — v1.1 Phase 8 (RELI-04)
+- ✓ `TaskCompleted` event emission and `PhaseCompletionWatcher` wake loop — v1.1 Phase 9 (EVT-01..04)
+- ✓ `[wake:phase]` joins task/inbox wake kinds — v1.1 Phase 9 (EVT-03)
+- ✓ `clawteam attend` numeric urgency, H1 summary titles, and pending-question state reconciliation — v1.1 Phase 10 (UX-01..03)
+- ✓ Subprocess-backed full gstack lifecycle integration test — v1.1 Phase 11 (TEST-01)
+- ✓ README solo-UX primary flow and event-driven wake architecture doc — v1.1 Phase 12 (DOC-01..02)
+
 ### Active (v1.x candidates)
 
 <!-- v1.x scope: fix observability emit-path gaps + UX polish from v1.0 UAT walkthrough. See .planning/backlog/ for detail. -->
 
 **Observability emit-path wiring (critical, unblocks QUALITY-12):**
 - [ ] 999.001 — Wire `ClaudeApiResponse` + `ToolCallCompleted` emit path from `claude` CLI stream-json output through `TmuxBackend` / `invoke_native_cli` to the event bus. Unblocks real cost + cache metrics in `clawteam team show`.
-
-**attend CLI UX polish (surfaced in v1.0 UAT walkthrough):**
-- [ ] 999.002 — `attend` "Urg" column currently shows `norm` for all questions regardless of frontmatter `urgency:` — map numeric values or display raw.
-- [ ] 999.003 — `attend --summary` "Representative title" shows qid instead of first-H1-from-body — digest UX value depends on this.
-- [ ] 999.004 — Sprint `state.json::pending_question_ids` not synced until `AttentionWatcher` runs — either auto-start watcher on `sprint start` or do one-shot reconciliation on `sprint status`.
 
 **Real-environment dogfood (requires live API + tmux sessions):**
 - [ ] Real 10-sprint 5-minute / 4 GB RAM load (ROADMAP SC #1)
@@ -188,4 +188,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state (users, feedback, metrics)
 
 ---
-*Last updated: 2026-04-24 — v1.1 Reliability milestone started (close the 3 UAT-discovered architectural gaps: state-machine teeth, event-feedback loop, end-to-end integration test). Prior: 2026-04-22 v1.0 milestone archived.*
+*Last updated: 2026-04-24 — v1.1 Reliability milestone shipped and archived. Prior: 2026-04-22 v1.0 milestone archived.*

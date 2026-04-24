@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: reliability
-status: v1.1 Reliability milestone initialized 2026-04-24. Goal — close the 3 architectural gaps revealed by v1.0 UAT (toothless state machine, open feedback loop, no end-to-end tests) so `clawteam go "build X"` reliably produces a working X through 11-agent coordination. 14 requirements across 5 categories (RELI / EVT / UX / TEST / DOC) mapped to 5 phases (8-12). Ready to plan Phase 8.
-stopped_at: "v1.1 milestone initialized — REQUIREMENTS.md written (14 REQs), ROADMAP.md drafted (Phases 8-12), PROJECT.md refreshed with current milestone header. v1.0 closed 2026-04-22 (8 phases / 78 plans / ~70.7k LOC / 80 REQs). Next: /gsd-plan-phase 8 or /gsd-discuss-phase 8."
-last_updated: "2026-04-24T12:00:00Z"
+milestone_name: — Reliability / integration-tested 11-agent delivery
+status: completed
+stopped_at: v1.1 Reliability milestone initialized. PROJECT.md refreshed, REQUIREMENTS.md + ROADMAP.md written, ready for `/gsd-plan-phase 8`.
+last_updated: "2026-04-24T12:17:26.430Z"
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 5
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -25,11 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-24 with v1.1 Reliability milestone he
 ## Current Position
 
 **Milestone:** v1.1 Reliability
-**Phase:** 8 (not started)
+**Phase:** 12
 **Plans:** 0 / TBD complete
-**Status:** Ready to plan Phase 8.
+**Status:** Milestone complete
 
 **Milestone inputs:**
+
 - `.planning/REQUIREMENTS.md` — 14 REQs across 5 categories (RELI / EVT / UX / TEST / DOC)
 - `.planning/ROADMAP.md` — 5 phases (8-12) drafted
 - `.planning/todos/pending/2026-04-24-workflow-contract-3in1-refactor.md` — design spec for Phases 8+9+11
@@ -49,13 +50,13 @@ Items acknowledged and deferred at v1.0 close on 2026-04-22:
 | Tech debt | QUALITY-12 emit-path gap | partial | Backlog 999.001 — wire ClaudeApiResponse/ToolCallCompleted from claude CLI stream-json |
 
 ---
-Plan: 07-09 complete (Wave 6 — three integration test files (tests/integration/test_phase7_ten_sprint_load.py / test_phase7_attention_ranking.py / test_phase7_cost_dashboard.py) lock D-14 / D-15 / D-16 delivery gates. 7+5+6=18 new integration tests across already-shipped Plan 07-02/03/05/06/07 production primitives. Task 1 (D-14/CORE-06/QUALITY-04): 10-sprint load — test_ten_concurrent_sprints/test_eleventh_sprint_queued_capacity/test_active_agent_cap_under_load/test_per_agent_semaphore_blocks_siblings/test_rate_limit_saturation_queues_sprints/test_pause_resume_across_queue_cycle/test_no_data_races_on_state_saves. Hermetic fixture factory constructs SprintConductor with ConductorConfig(max_concurrent_sprints=10, max_tasks_per_agent=1, max_active_agents=6, acquire_timeout_seconds=0.1); 11th over-cap uses 0.05s timeout so the 11th gets a tick to attempt acquire before timing out. Task 2 (D-15/INT-03): attention ranking — test_thirty_questions_ranked_by_formula (30 fixture questions across 5x3 sprints/teams, monotonic priority_score desc), test_cross_team_queue_aggregates, test_adversarial_critical_at_30s_beats_normal_at_8h (EXPLICIT D-15 fixture — critical@30s scores ≈30.008 vs normal@8h=18.0 with 10-pt safety margin), test_tag_weights_shift_priority (tag_weights={security:10} reorders), test_compute_priority_matches_observed (per-item score matches pure fn within 0.1h clock-jitter tolerance). Task 3 (D-16/QUALITY-12): cost dashboard — test_100_events_rollup (100 ToolCallCompleted across 5 agents; precomputed sums match), test_budget_alarm_threshold_crossings (BudgetAlarmReached fires exactly once at 50/80/100; 10 subsequent over-threshold events don't re-fire), test_fallback_activates_at_80 (opus→sonnet at 80%, sonnet→haiku above, unchanged below), test_dashboard_snapshot_at_each_threshold (render_team.alarms_fired reflects crossings), test_cache_hit_rate_tracked (5x800read/5x1000create = 0.4 < HEALTHY_THRESHOLD), test_integrated_rollup_flow (cost_usd=0.0 triggers pricing backstop, 3 agents + 3 sprints populated, cache.cache_hit_rate()==0.8 merged at render time). Zero deviations (plan executed exactly as written). Zero new production code — test-only plan locking Phase 7 delivery gate. TDD RED→GREEN gates strict per task: (1435e73 test stub → 94531c4 7-test suite) / (459eea5 stub → 27bb63e 5-test suite) / (f1b10c4 stub → 55a1e74 6-test suite); each RED verified failing with assert False before GREEN landed. Regression matrix: 1835 tests pass full suite, 11 pre-existing test-ordering failures (tests/test_evidence_schemas_phase5 + test_gstack_plugin + test_plugin_hooks + test_browse + test_pyproject_optional_extras) are documented in deferred-items.md and confirmed pre-existing by re-running against baseline 81c8b8d (same 11 fail identically). All 18 Plan 07-09 tests pass in isolation AND in full suite. Phase 7 requirements closed: CORE-06 / INT-03 / QUALITY-04 / QUALITY-12 via D-14/15/16 integration tests. Phase 7 9/9 plans complete; phase ready for /gsd-verify-phase close-out. Prior: 07-08 (doctor --gc); 07-07 (dashboard); 07-06 (fallback+cache); 07-05 (tracker); 07-04 (attend CLI); 07-03 (AttentionQueue); 07-02 (concurrency); 07-01 (substrate). Next: /gsd-verify-phase 7 + milestone rollup.
+Plan: Not started
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 39
+- Total plans completed: 47
 - Average duration: —
 - Total execution time: 0.0 hours
 
@@ -75,6 +76,11 @@ Plan: 07-09 complete (Wave 6 — three integration test files (tests/integration
 | 01 | 5 | - | - |
 | 02 | 13 | - | - |
 | 03 | 9 | - | - |
+| 8 | 3 | - | - |
+| 9 | 1 | - | - |
+| 10 | 1 | - | - |
+| 11 | 1 | - | - |
+| 12 | 2 | - | - |
 
 **Recent Trend:**
 
@@ -261,6 +267,12 @@ Items acknowledged and carried forward to v1.x or v2:
 | Features | Multi-team Conductor UI / board sprint panels | v2 per PROJECT.md | Roadmap creation |
 | Features | Quick-sprint heuristic / template customization hooks | v2/v3 per FEATURES.md P3 | Roadmap creation |
 | Upstream | Land Phases 0+1+2 as upstream ClawTeam PR | v1 post-ship per REQUIREMENTS.md UP-01 | Roadmap creation |
+| UAT | Phase 00 00-UAT.md | diagnosed, 0 pending scenarios | v1.1 close audit 2026-04-24 |
+| UAT | Phase 02 02-UAT.md | testing, 5 pending scenarios | v1.1 close audit 2026-04-24 |
+| UAT | Phase 04 04-UAT.md | partial, 0 pending scenarios | v1.1 close audit 2026-04-24 |
+| UAT | Phase 07 07-HUMAN-UAT.md | partial, 5 pending scenarios | v1.1 close audit 2026-04-24 |
+| Verification | Phase 07 07-VERIFICATION.md | human_needed | v1.1 close audit 2026-04-24 |
+| Todo | 2026-04-24-workflow-contract-3in1-refactor.md | acknowledged as implemented/deferred cleanup | v1.1 close audit 2026-04-24 |
 
 ## Session Continuity
 

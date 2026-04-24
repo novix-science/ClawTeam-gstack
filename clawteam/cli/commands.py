@@ -35,8 +35,9 @@ console = Console()
 # at the top of `clawteam --help` instead of being buried under 20+ subgroups.
 # Typer groups commands into rich_help_panels by first-seen order.
 # ---------------------------------------------------------------------------
-from clawteam.solo import register_solo_commands as _register_solo_commands  # noqa: E402
 from clawteam.nudge import register_nudge_command as _register_nudge_command  # noqa: E402
+from clawteam.solo import register_solo_commands as _register_solo_commands  # noqa: E402
+
 _register_solo_commands(app)
 _register_nudge_command(app)
 
@@ -2711,11 +2712,14 @@ def task_update(
     force: bool = typer.Option(False, "--force", "-f", help="Force override task lock"),
 ):
     """Update a task (TaskUpdate)."""
+    from clawteam.events.global_bus import get_event_bus
     from clawteam.identity import AgentIdentity
+    from clawteam.sprint.phase_completion_watcher import register_phase_completion_watcher
     from clawteam.team.models import TaskPriority, TaskStatus
     from clawteam.team.tasks import TaskLockError, TaskStore
 
     store = TaskStore(team)
+    register_phase_completion_watcher(team, get_event_bus())
     ts = TaskStatus(status) if status else None
     tp = TaskPriority(priority) if priority else None
     blocks_list = [b.strip() for b in add_blocks.split(",") if b.strip()] if add_blocks else None
@@ -4649,6 +4653,7 @@ def launch_team(
         if getattr(agent, "prompt_file", ""):
             try:
                 from pathlib import Path as _Path
+
                 import clawteam.templates as _templates_module
                 templates_root = _Path(_templates_module.__file__).parent
                 role_prompt_path = templates_root / agent.prompt_file
@@ -5394,6 +5399,9 @@ sprint_app = typer.Typer(
 )
 app.add_typer(sprint_app, name="sprint", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
 
+artifact_app = typer.Typer(help="Sprint artifact commands", no_args_is_help=True)
+app.add_typer(artifact_app, name="artifact", rich_help_panel="🧑‍🤝‍🧑 Team workflow")
+
 
 def _sprint_emit_ok(data: dict, warnings: list[str] | None = None) -> None:
     """Uniform {ok, data, warnings, error} success envelope (D-26)."""
@@ -5714,6 +5722,134 @@ def sprint_advance(
     except Exception:
         reloaded = state
     _sprint_emit_ok(c.status_dict(reloaded))
+
+
+def _artifact_name_for_type(artifact_type: str) -> str:
+    if "." in artifact_type:
+        return artifact_type
+    try:
+        from clawteam.templates.gstack.phase_contracts import ARTIFACT_TYPE_TO_NAME
+
+        mapped = ARTIFACT_TYPE_TO_NAME.get(artifact_type)
+        if mapped:
+            return mapped
+    except Exception:  # noqa: BLE001 — fallback below is safe
+        pass
+    return f"{artifact_type}.md"
+
+
+def _ensure_gstack_artifact_schemas_loaded() -> None:
+    """Load gstack plugin schemas for standalone artifact commands."""
+    try:
+        from clawteam.harness.evidence_schemas import get_schema, register_schema
+        from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
+
+        for schema_name, schema_cls in (
+            GstackSprintPlugin().contribute_evidence_schemas() or {}
+        ).items():
+            if get_schema(schema_name) is None:
+                register_schema(schema_name, schema_cls)
+    except Exception:  # noqa: BLE001 — validation below reports missing schema
+        return
+
+
+@artifact_app.command("write")
+def artifact_write(
+    team: str = typer.Argument(..., help="Team name."),
+    sprint_id: str = typer.Argument(..., help="Sprint id or unambiguous prefix."),
+    artifact_type: str = typer.Argument(..., help="Artifact type discriminator."),
+) -> None:
+    """Persist a sprint artifact from stdin and emit ArtifactPersisted."""
+    from clawteam.events.global_bus import get_event_bus
+    from clawteam.events.types import ArtifactPersisted
+    from clawteam.fileutil import atomic_write_text
+    from clawteam.harness.evidence_schemas import get_schema
+    from clawteam.sprint.state import save_sprint_state
+    from clawteam.team.envelope import MalformedEnvelopeError, parse_frontmatter
+    from clawteam.team.models import get_data_dir
+
+    _ensure_gstack_artifact_schemas_loaded()
+    raw = sys.stdin.read()
+    if not raw.strip():
+        _sprint_emit_err("ARTIFACT_EMPTY", "Artifact content must be provided on stdin")
+        return
+
+    try:
+        meta, _body = parse_frontmatter(raw)
+    except MalformedEnvelopeError as exc:
+        _sprint_emit_err("ARTIFACT_MALFORMED", str(exc))
+        return
+
+    declared_type = str(meta.get("artifact_type", ""))
+    if not declared_type:
+        _sprint_emit_err("ARTIFACT_TYPE_MISSING", "frontmatter missing artifact_type")
+        return
+    if declared_type != artifact_type:
+        _sprint_emit_err(
+            "ARTIFACT_TYPE_MISMATCH",
+            f"argument {artifact_type!r} does not match frontmatter {declared_type!r}",
+        )
+        return
+
+    schema_cls = get_schema(artifact_type)
+    if schema_cls is None:
+        _ensure_gstack_artifact_schemas_loaded()
+        schema_cls = get_schema(artifact_type)
+    if schema_cls is None:
+        _sprint_emit_err(
+            "ARTIFACT_TYPE_UNREGISTERED",
+            f"Unregistered artifact_type {artifact_type!r}",
+        )
+        return
+    try:
+        schema_cls.model_validate(meta)
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("ARTIFACT_FRONTMATTER_INVALID", str(exc))
+        return
+
+    resolved_team = _resolve_team_arg(team)
+    c, state = _resolve_sprint_or_err(resolved_team, sprint_id)
+    if c is None or state is None:
+        return
+
+    artifact_name = _artifact_name_for_type(artifact_type)
+    state.artifacts[artifact_name] = raw
+    try:
+        save_sprint_state(state)
+        artifact_path = (
+            get_data_dir()
+            / "teams"
+            / state.team
+            / "sprints"
+            / state.sprint_id
+            / "artifacts"
+            / artifact_name
+        )
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(artifact_path, raw)
+    except Exception as exc:  # noqa: BLE001
+        _sprint_emit_err("ARTIFACT_SAVE_FAILED", str(exc))
+        return
+
+    get_event_bus().emit(
+        ArtifactPersisted(
+            team_name=state.team,
+            sprint_id=state.sprint_id,
+            phase=state.current_phase,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            size_bytes=len(raw.encode("utf-8")),
+        )
+    )
+    _sprint_emit_ok(
+        {
+            "status": "artifact_written",
+            "team": state.team,
+            "sprint_id": state.sprint_id,
+            "artifact_name": artifact_name,
+            "artifact_type": artifact_type,
+        }
+    )
 
 
 @sprint_app.command("approve")
@@ -6170,11 +6306,11 @@ def _render_attend_items_human(items: list) -> None:
     table.add_column("Age", justify="right")
     table.add_column("Rev", width=6)
     table.add_column("Title")
-    urgency_labels = {3: "CRIT", 2: "HIGH", 1: "norm", 0: "low"}
+    urgency_levels = {3: "4", 2: "3", 1: "2", 0: "1"}
     for i, item in enumerate(items, start=1):
         age_s = f"{item.age_hours:.1f}h"
-        u_lbl = urgency_labels.get(item.urgency, "?")
-        u_style = {"CRIT": "bold red", "HIGH": "yellow"}.get(u_lbl, "")
+        u_lbl = urgency_levels.get(item.urgency, "?")
+        u_style = {3: "bold red", 2: "yellow"}.get(item.urgency, "")
         urgency_cell = f"[{u_style}]{u_lbl}[/{u_style}]" if u_style else u_lbl
         table.add_row(
             str(i),

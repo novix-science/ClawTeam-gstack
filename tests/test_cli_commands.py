@@ -136,6 +136,102 @@ def test_inbox_send_reads_content_from_stdin_when_argument_missing(tmp_path):
     assert messages[0].content == "HELLO FROM STDIN"
 
 
+def _valid_review_report(sprint_id: str) -> str:
+    return (
+        "---\n"
+        "artifact_type: review-report\n"
+        "review_sha: abcdef1\n"
+        "verdict: approved\n"
+        "findings:\n"
+        "  - looks good\n"
+        "reviewer_persona: reviewer\n"
+        f"sprint_id: {sprint_id}\n"
+        'created_at: "2026-04-24T00:00:00Z"\n'
+        "---\n\n"
+        "# Review report\n\n"
+        "## Findings\n\n"
+        "This is a substantive review body with enough implementation detail to be useful.\n"
+    )
+
+
+def test_artifact_write_persists_stdin_and_emits_event(tmp_path):
+    from clawteam.events.global_bus import get_event_bus, reset_event_bus
+    from clawteam.events.types import ArtifactPersisted
+    from clawteam.sprint.state import SprintState, load_sprint_state, save_sprint_state
+
+    runner = CliRunner()
+    env = {
+        "HOME": str(tmp_path),
+        "CLAWTEAM_DATA_DIR": str(tmp_path / ".clawteam"),
+    }
+    state = SprintState(
+        sprint_id="abc12345",
+        goal="g",
+        team="demo",
+        current_phase="review",
+    )
+    save_sprint_state(state)
+
+    reset_event_bus()
+    captured: list[ArtifactPersisted] = []
+    get_event_bus().subscribe(ArtifactPersisted, captured.append)
+
+    result = runner.invoke(
+        app,
+        ["artifact", "write", "demo", "abc12345", "review-report"],
+        input=_valid_review_report("abc12345"),
+        env=env,
+    )
+
+    assert result.exit_code == 0, result.output
+    updated = load_sprint_state("demo", "abc12345")
+    assert "review-report.md" in updated.artifacts
+    assert "artifact_type: review-report" in updated.artifacts["review-report.md"]
+    artifact_path = (
+        tmp_path
+        / ".clawteam"
+        / "teams"
+        / "demo"
+        / "sprints"
+        / "abc12345"
+        / "artifacts"
+        / "review-report.md"
+    )
+    assert artifact_path.read_text(encoding="utf-8") == _valid_review_report("abc12345")
+    assert len(captured) == 1
+    assert captured[0].artifact_name == "review-report.md"
+    assert captured[0].artifact_type == "review-report"
+    reset_event_bus()
+
+
+def test_artifact_write_rejects_mismatched_type_without_mutation(tmp_path):
+    from clawteam.sprint.state import SprintState, load_sprint_state, save_sprint_state
+
+    runner = CliRunner()
+    env = {
+        "HOME": str(tmp_path),
+        "CLAWTEAM_DATA_DIR": str(tmp_path / ".clawteam"),
+    }
+    state = SprintState(
+        sprint_id="abc12345",
+        goal="g",
+        team="demo",
+        current_phase="review",
+    )
+    save_sprint_state(state)
+
+    result = runner.invoke(
+        app,
+        ["artifact", "write", "demo", "abc12345", "retro"],
+        input=_valid_review_report("abc12345"),
+        env=env,
+    )
+
+    assert result.exit_code == 1
+    assert "ARTIFACT_TYPE_MISMATCH" in result.output
+    assert load_sprint_state("demo", "abc12345").artifacts == {}
+
+
 def test_lifecycle_should_keepalive_stops_when_shutdown_approved(tmp_path):
     runner = CliRunner()
     env = {

@@ -62,7 +62,7 @@ def test_seven_phases_registered():
 
 def test_seven_phases_registered_in_order():
     """Plugin registers all 7 gstack phases via PluginManager -> PhaseRegistry."""
-    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin, GSTACK_PHASES
+    from clawteam.plugins.gstack_sprint_plugin import GSTACK_PHASES, GstackSprintPlugin
     from clawteam.plugins.manager import PluginManager
 
     pm = PluginManager()
@@ -106,9 +106,9 @@ def test_six_schemas_registered():
 
 def test_six_evidence_schemas_registered():
     """Plugin contributes all six gstack artifact schemas via Phase 2 registry."""
+    from clawteam.harness.evidence_schemas import get_schema, reset_registry
     from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
     from clawteam.plugins.manager import PluginManager
-    from clawteam.harness.evidence_schemas import get_schema, reset_registry
 
     reset_registry()
     PluginManager()._instantiate_and_register(GstackSprintPlugin)
@@ -130,7 +130,7 @@ def test_six_evidence_schemas_registered():
 
 def test_prompts_resolve_for_all_eleven_roles():
     """All 11 gstack roles return prompt content with the SIGNATURE line."""
-    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin, GSTACK_ROLES
+    from clawteam.plugins.gstack_sprint_plugin import GSTACK_ROLES, GstackSprintPlugin
 
     plugin = GstackSprintPlugin()
     assert len(GSTACK_ROLES) == 11
@@ -357,6 +357,44 @@ def test_contribute_gates_attaches_ship_approval_gate():
     assert any(isinstance(g, ShipApprovalGate) for g in gates["ship"])
 
 
+def test_contribute_phase_requirements_declares_artifact_contract():
+    plugin = _fresh_plugin()
+    requirements = plugin.contribute_phase_requirements()
+
+    assert requirements["think"] == ["delegation.json"]
+    assert requirements["plan"] == ["architecture-lock.md"]
+    assert requirements["build"] == ["diff.patch"]
+    assert requirements["review"] == ["review-report.md"]
+    assert requirements["test"] == ["test-report.json"]
+    assert requirements["ship"] == ["ship-approval.md"]
+    assert requirements["reflect"] == ["retro.md"]
+
+
+def test_plugin_manager_aggregates_phase_requirements():
+    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
+    from clawteam.plugins.manager import PluginManager
+
+    pm = PluginManager()
+    pm._instantiate_and_register(GstackSprintPlugin)
+
+    assert pm.get_phase_requirements("think") == ["delegation.json"]
+    assert pm.get_phase_requirements("ship") == ["ship-approval.md"]
+    assert pm.get_phase_requirements("unknown") == []
+
+
+def test_phase_contract_artifact_schemas_registered():
+    from clawteam.harness.evidence_schemas import get_schema
+    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
+    from clawteam.plugins.manager import PluginManager
+
+    PluginManager()._instantiate_and_register(GstackSprintPlugin)
+
+    assert get_schema("delegation") is not None
+    assert get_schema("architecture-lock") is not None
+    assert get_schema("diff") is not None
+    assert get_schema("ship_approval") is not None
+
+
 def test_review_prompts_append_decorrelation_supplement():
     plugin = _fresh_plugin()
     supplemented = plugin.contribute_prompts(phase="review", role="designer")
@@ -425,9 +463,8 @@ def test_non_gstack_template_does_not_load_gstack_plugin(tmp_path, monkeypatch):
     event handler itself is no-op when the TeamConfig.template != 'gstack'.
     This is the core invariant QUALITY-14 + T-07-01 rest on.
     """
-    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
-
     import clawteam.team.models as team_models
+    from clawteam.plugins.gstack_sprint_plugin import GstackSprintPlugin
     monkeypatch.setattr(team_models, "get_data_dir", lambda: tmp_path)
     import clawteam.team.manager as team_manager
 

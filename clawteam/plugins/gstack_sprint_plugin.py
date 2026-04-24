@@ -19,8 +19,21 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# Phase 6 Plan 06-05: /browse skill (SKILL-10, engineer/qa/dx-lead).
+# Playwright probe routed through clawteam.browser so this module never
+# top-level-imports playwright itself (D-02 invariant). If Plans 06-06 /
+# 06-07 executors also alias ``playwright_available``, Python dedupes —
+# the module-level name resolves to the same function object.
+from clawteam.browser import playwright_available as _playwright_available
 from clawteam.plugins.base import HarnessPlugin
 from clawteam.plugins.skill_registration import SkillRegistration
+from clawteam.templates.gstack.phase_contracts import (
+    PHASE_REQUIREMENTS,
+    ArchitectureLockArtifact,
+    DelegationArtifact,
+    DiffArtifact,
+    ShipApprovalArtifact,
+)
 from clawteam.templates.gstack.schemas import (
     BenchmarkReport,
     CanaryReport,
@@ -33,38 +46,53 @@ from clawteam.templates.gstack.schemas import (
     ShipNotes,
     TestReport,
 )
-from clawteam.templates.gstack.skills.codex.handler import (
-    codex_handler as _codex_handler,
-    tool_available as _codex_tool_available,
-)
-from clawteam.templates.gstack.skills.ship.handler import (
-    gh_available as _ship_gh_available,
-    ship_handler as _ship_handler,
-)
-from clawteam.templates.gstack.skills.setup_deploy.handler import (
-    setup_deploy_handler as _setup_deploy_handler,
-)
-from clawteam.templates.gstack.skills.land_and_deploy.handler import (
-    land_and_deploy_handler as _land_and_deploy_handler,
-)
-from clawteam.templates.gstack.skills.document_release.handler import (
-    document_release_handler as _document_release_handler,
-)
 from clawteam.templates.gstack.skills.benchmark.handler import (
     benchmark_handler as _benchmark_handler,
+)
+from clawteam.templates.gstack.skills.browse.handler import (
+    browse_handler as _browse_handler,
 )
 from clawteam.templates.gstack.skills.canary.handler import (
     canary_handler as _canary_handler,
 )
+from clawteam.templates.gstack.skills.codex.handler import (
+    codex_handler as _codex_handler,
+)
+from clawteam.templates.gstack.skills.codex.handler import (
+    tool_available as _codex_tool_available,
+)
 
-# Phase 6 Plan 06-05: /browse skill (SKILL-10, engineer/qa/dx-lead).
-# Playwright probe routed through clawteam.browser so this module never
-# top-level-imports playwright itself (D-02 invariant). If Plans 06-06 /
-# 06-07 executors also alias ``playwright_available``, Python dedupes —
-# the module-level name resolves to the same function object.
-from clawteam.browser import playwright_available as _playwright_available
-from clawteam.templates.gstack.skills.browse.handler import (
-    browse_handler as _browse_handler,
+# Phase 6 Plan 06-09: /design-html (SKILL-12, designer-only). Pure
+# filesystem work — framework detection from package.json + source
+# emission; no Playwright / CLI dependency so no tool_available probe.
+from clawteam.templates.gstack.skills.design_html.handler import (
+    design_html_handler as _design_html_handler,
+)
+
+# Phase 6 Plan 06-08: /design-shotgun (SKILL-11, designer-only).
+# Multi-turn state machine (INITIALIZED → VARIANTS_GENERATING →
+# BOARD_RENDERED → USER_PICKING → REFINING → CONVERGED|ABANDONED) that
+# generates N variants (default 4 per D-12), writes a comparison board,
+# captures the user's pick as a taste-observation MemoryEntry in the
+# designer's per-role memory scope, then optionally loops for refinement.
+# Pure Python — no external CLI / Playwright — so tool_available is None.
+from clawteam.templates.gstack.skills.design_shotgun.handler import (
+    shotgun_handler as _shotgun_handler,
+)
+from clawteam.templates.gstack.skills.document_release.handler import (
+    document_release_handler as _document_release_handler,
+)
+from clawteam.templates.gstack.skills.land_and_deploy.handler import (
+    land_and_deploy_handler as _land_and_deploy_handler,
+)
+
+# Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per D-07).
+# No tool_available probe — handler is pure Python (JSONL + regex), always
+# available. install_hint intentionally empty. Roles = frozenset(GSTACK_ROLES)
+# is the single role-enforcement point for /learn; the handler itself does
+# not gate on role.
+from clawteam.templates.gstack.skills.learn.handler import (
+    learn_handler as _learn_handler,
 )
 
 # Phase 6 Plan 06-06: /open-gstack-browser (SKILL-10, headed mode). Same
@@ -81,32 +109,14 @@ from clawteam.templates.gstack.skills.open_gstack_browser.handler import (
 from clawteam.templates.gstack.skills.setup_browser_cookies.handler import (
     setup_cookies_handler as _setup_cookies_handler,
 )
-
-# Phase 6 Plan 06-08: /design-shotgun (SKILL-11, designer-only).
-# Multi-turn state machine (INITIALIZED → VARIANTS_GENERATING →
-# BOARD_RENDERED → USER_PICKING → REFINING → CONVERGED|ABANDONED) that
-# generates N variants (default 4 per D-12), writes a comparison board,
-# captures the user's pick as a taste-observation MemoryEntry in the
-# designer's per-role memory scope, then optionally loops for refinement.
-# Pure Python — no external CLI / Playwright — so tool_available is None.
-from clawteam.templates.gstack.skills.design_shotgun.handler import (
-    shotgun_handler as _shotgun_handler,
+from clawteam.templates.gstack.skills.setup_deploy.handler import (
+    setup_deploy_handler as _setup_deploy_handler,
 )
-
-# Phase 6 Plan 06-09: /design-html (SKILL-12, designer-only). Pure
-# filesystem work — framework detection from package.json + source
-# emission; no Playwright / CLI dependency so no tool_available probe.
-from clawteam.templates.gstack.skills.design_html.handler import (
-    design_html_handler as _design_html_handler,
+from clawteam.templates.gstack.skills.ship.handler import (
+    gh_available as _ship_gh_available,
 )
-
-# Phase 6 Plan 06-10: /learn (MEM-03, MEM-04, role-agnostic per D-07).
-# No tool_available probe — handler is pure Python (JSONL + regex), always
-# available. install_hint intentionally empty. Roles = frozenset(GSTACK_ROLES)
-# is the single role-enforcement point for /learn; the handler itself does
-# not gate on role.
-from clawteam.templates.gstack.skills.learn.handler import (
-    learn_handler as _learn_handler,
+from clawteam.templates.gstack.skills.ship.handler import (
+    ship_handler as _ship_handler,
 )
 
 if TYPE_CHECKING:
@@ -199,7 +209,15 @@ class GstackSprintPlugin(HarnessPlugin):
             "canary-report": CanaryReport,
             "benchmark-report": BenchmarkReport,
             "codex-review": CodexReview,
+            "delegation": DelegationArtifact,
+            "architecture-lock": ArchitectureLockArtifact,
+            "diff": DiffArtifact,
+            "ship_approval": ShipApprovalArtifact,
         }
+
+    def contribute_phase_requirements(self) -> dict[str, list[str]]:
+        """Return required artifact names for each gstack sprint phase."""
+        return {phase: list(artifacts) for phase, artifacts in PHASE_REQUIREMENTS.items()}
 
     # -- Phase 5 / Plan 05-03+ hooks (skill registrations) -------------
 
@@ -634,8 +652,8 @@ class GstackSprintPlugin(HarnessPlugin):
         Returns empty string if none found or on any error. Best-effort only.
         """
         try:
-            from clawteam.team.models import get_data_dir
             from clawteam.sprint.state import load_sprint_state
+            from clawteam.team.models import get_data_dir
         except Exception:
             return ""
 

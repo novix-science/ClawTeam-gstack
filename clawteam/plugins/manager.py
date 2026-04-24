@@ -26,6 +26,10 @@ class PluginManager:
         # plugin.contribute_gates. Consumed by SprintConductor._build_gate_chain
         # (Plan 10 Task 3). Preserves plugin-load order per phase.
         self._plugin_gates: dict[str, list[Any]] = {}
+        # Phase 8 additive: aggregated {phase: [artifact_name, ...]} from
+        # plugin.contribute_phase_requirements. Consumed by
+        # SprintConductor._build_gate_chain so EvidenceGate has a real contract.
+        self._phase_requirements: dict[str, list[str]] = {}
 
     # ── Discovery ─────────────────────────────────────────────────────
 
@@ -226,6 +230,36 @@ class PluginManager:
             bucket = self._plugin_gates.setdefault(phase_name, [])
             for gate in (gate_list or []):
                 bucket.append(gate)
+        # Phase 8: aggregate required artifact names per phase. Defensive shape
+        # mirrors contribute_gates: bad plugin output logs and is skipped.
+        try:
+            requirements_map = plugin.contribute_phase_requirements() or {}
+        except Exception as exc:  # noqa: BLE001 — plugin load must not crash
+            _logger.warning(
+                "Plugin %s: contribute_phase_requirements raised: %s",
+                plugin.name,
+                exc,
+            )
+            requirements_map = {}
+        for phase_name, artifact_names in requirements_map.items():
+            if not isinstance(phase_name, str) or not phase_name:
+                _logger.warning(
+                    "Plugin %s: contribute_phase_requirements invalid phase key %r skipped",
+                    plugin.name,
+                    phase_name,
+                )
+                continue
+            bucket = self._phase_requirements.setdefault(phase_name, [])
+            for artifact_name in artifact_names or []:
+                if isinstance(artifact_name, str) and artifact_name:
+                    bucket.append(artifact_name)
+                else:
+                    _logger.warning(
+                        "Plugin %s: invalid phase requirement %r for phase %s skipped",
+                        plugin.name,
+                        artifact_name,
+                        phase_name,
+                    )
         self._loaded[plugin.name] = plugin
         return plugin
 
@@ -254,6 +288,15 @@ class PluginManager:
         gates for this phase. Order preserves plugin-load order.
         """
         return list(self._plugin_gates.get(phase, []))
+
+    def get_phase_requirements(self, phase: str) -> list[str]:
+        """Return required artifact names for ``phase``.
+
+        Consumed by SprintConductor._build_gate_chain so gstack's EvidenceGate
+        receives a concrete artifact contract instead of the historical
+        ``list(state.artifacts.keys())`` permissive default.
+        """
+        return list(dict.fromkeys(self._phase_requirements.get(phase, [])))
 
     def get_plugin_skills(self) -> dict[str, SkillRegistration]:
         """Aggregate slash-skill registrations from all loaded plugins (§05-CONTEXT D-04).

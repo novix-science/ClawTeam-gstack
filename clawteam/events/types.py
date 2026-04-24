@@ -175,6 +175,17 @@ class PhaseTransition(HarnessEvent):
     artifacts: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ArtifactPersisted(HarnessEvent):
+    """Fired after a sprint artifact is persisted to SprintState."""
+
+    sprint_id: str = ""
+    phase: str = ""
+    artifact_name: str = ""
+    artifact_type: str = ""
+    size_bytes: int = 0
+
+
 # ── Transport / Board ─────────────────────────────────────────────────
 
 
@@ -459,3 +470,4 @@ register_event_type(MemoryBackfillComplete)
 # Phase 7 Wave 0 / Plan 07-01 (post-UAT trimmed 2026-04-22)
 register_event_type(ZombieWorktreeGced)
 register_event_type(DormancyTransition)
+register_event_type(ArtifactPersisted)

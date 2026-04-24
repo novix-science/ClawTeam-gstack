@@ -167,6 +167,22 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _resolve_gstack_plugin_manager(team_name: str):
+    """Return a gstack-loaded PluginManager for gstack teams, else None."""
+    try:
+        from clawteam.plugins.manager import PluginManager
+        from clawteam.team.manager import TeamManager
+
+        cfg = TeamManager.get_team(team_name)
+        if getattr(cfg, "template", "") != "gstack":
+            return None
+        pm = PluginManager()
+        pm.load_from_module("clawteam.plugins.gstack_sprint_plugin")
+        return pm
+    except Exception:  # pragma: no cover — fallback preserves legacy behavior
+        return None
+
+
 # ── Gate chain composition ──────────────────────────────────────────────────
 
 
@@ -262,9 +278,11 @@ class SprintConductor:
         self.bus = bus
 
         # Phase 4 Plan 04-10 Task 3: optional plugin_manager for gate-chain
-        # aggregation. When None, _build_gate_chain falls back to the Phase 2
-        # three-gate composition (BC — Phase 2 tests do NOT pass a plugin_manager).
-        self._plugin_manager = plugin_manager
+        # aggregation. Phase 8 auto-loads gstack's plugin manager for gstack
+        # teams so CLI-created conductors enforce phase artifact contracts.
+        self._plugin_manager = plugin_manager or _resolve_gstack_plugin_manager(
+            team_name
+        )
 
         # Activate safety rails (Plan 02-10). Idempotent — safe to double-call
         # per T-02-17 mitigation (see freeze_registry._subscribers_registered).
@@ -598,6 +616,30 @@ class SprintConductor:
             return ""
         return list(state.artifacts.keys())[-1]
 
+    def _reconcile_pending_question_ids(self, state: SprintState) -> SprintState:
+        """Mirror unanswered question files into state before read-side views."""
+        sprint_dir = (
+            get_data_dir()
+            / "teams"
+            / state.team
+            / "sprints"
+            / state.sprint_id
+        )
+        questions_dir = sprint_dir / "questions"
+        answers_dir = sprint_dir / "answers"
+        if not questions_dir.is_dir():
+            pending: list[str] = []
+        else:
+            pending = sorted(
+                q_path.stem
+                for q_path in questions_dir.glob("*.md")
+                if not (answers_dir / q_path.name).exists()
+            )
+        if pending != state.pending_question_ids:
+            state.pending_question_ids = pending
+            save_sprint_state(state)
+        return state
+
     def status_dict(self, state: SprintState) -> dict:
         """Shape consumed by ``clawteam sprint status`` (UX-03, §02-CONTEXT D-24).
 
@@ -605,6 +647,7 @@ class SprintConductor:
         ``most_recent_artifact`` field surfaces the only per-status artifact
         signal needed for the compact status view.
         """
+        state = self._reconcile_pending_question_ids(state)
         return {
             "sprint_id": state.sprint_id,
             "team": state.team,
@@ -625,6 +668,7 @@ class SprintConductor:
         Phase 2 CLI; a future phase may add ``clawteam sprint artifact <id>
         <name>`` to stream individual bodies.
         """
+        state = self._reconcile_pending_question_ids(state)
         return {
             "sprint_id": state.sprint_id,
             "team": state.team,
@@ -729,11 +773,26 @@ class SprintConductor:
         from clawteam.harness.interaction_gate import InteractionGate
 
         chain: list = []
-        # EvidenceGate — Phase 2 ships a permissive default: the 4-check
-        # protocol only applies to registered artifacts. With an empty
-        # artifact_names list, the gate's super().check short-circuits to
-        # True. Phase 3 GstackSprintPlugin populates the real artifact list.
-        chain.append(EvidenceGate(artifact_names=list(state.artifacts.keys())))
+        # EvidenceGate — when plugins contribute phase requirements, enforce
+        # those names. Legacy/no-plugin paths retain the historical permissive
+        # default: validate only artifacts that are already present.
+        artifact_names = list(state.artifacts.keys())
+        if self._plugin_manager is not None:
+            try:
+                required = (
+                    self._plugin_manager.get_phase_requirements(state.current_phase)
+                    or []
+                )
+            except Exception as exc:  # noqa: BLE001
+                import logging as _lg
+
+                _lg.getLogger(__name__).warning(
+                    "plugin_manager.get_phase_requirements raised: %s", exc
+                )
+                required = []
+            if required:
+                artifact_names = required
+        chain.append(EvidenceGate(artifact_names=artifact_names, phase=state.current_phase))
         chain.append(forced_progress_gate())
 
         # Phase 4 Plan 04-10 Task 3 — plugin contributions (ISS-03 + ISS-07).

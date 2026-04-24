@@ -138,9 +138,10 @@ class AttentionQueue:
         except OSError:
             return None
         try:
-            meta, _body = parse_frontmatter(raw)
+            meta, body = parse_frontmatter(raw)
         except Exception:
             meta = {}
+            body = raw
         urgency_str = str(meta.get("urgency", "normal")).lower()
         urgency = URGENCY_MAP.get(urgency_str, URGENCY_MAP["normal"])
         blocking = bool(meta.get("blocking", False))
@@ -152,7 +153,7 @@ class AttentionQueue:
         except TypeError:
             tags = ()
         reversibility = str(meta.get("reversibility", "medium")).lower()
-        title = str(meta.get("title", q_path.stem))
+        title = _extract_first_h1(body) or str(meta.get("title", q_path.stem))
         try:
             mtime = q_path.stat().st_mtime
         except OSError:
@@ -182,3 +183,14 @@ class AttentionQueue:
 
 
 __all__ = ["AttentionItem", "AttentionQueue", "compute_priority", "URGENCY_MAP"]
+
+
+def _extract_first_h1(body: str) -> str:
+    """Return the first markdown H1 text from a question body, if present."""
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# ") and not stripped.startswith("## "):
+            title = stripped[2:].strip()
+            if title:
+                return title
+    return ""

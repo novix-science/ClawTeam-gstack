@@ -36,6 +36,7 @@ def _write_question(
     reversibility = kwargs.get("reversibility", "medium")
     title = kwargs.get("title", qid)
     blocking = kwargs.get("blocking", "false")
+    body = kwargs.get("body", "body")
     qpath = qdir / f"{qid}.md"
     qpath.write_text(
         f"---\n"
@@ -45,7 +46,7 @@ def _write_question(
         f"reversibility: {reversibility}\n"
         f"title: {title}\n"
         f"---\n"
-        f"body\n"
+        f"{body}\n"
     )
     return qpath
 
@@ -73,6 +74,9 @@ def test_attend_lists_top_n(runner):
     assert result.exit_code == 0, result.stdout
     # Critical should be in the top 2 output (highest-priority wins).
     assert "q2" in result.stdout
+    assert "4" in result.stdout
+    assert "CRIT" not in result.stdout
+    assert "norm" not in result.stdout
 
 
 def test_attend_json(runner):
@@ -89,13 +93,22 @@ def test_attend_json(runner):
 
 def test_attend_summary(runner):
     r, tmp = runner
-    _write_question(tmp, "t", "s", "q1", urgency="high")
+    _write_question(
+        tmp,
+        "t",
+        "s",
+        "q1",
+        urgency="high",
+        title="frontmatter-title",
+        body="# User Facing Decision\n\nquestion body",
+    )
     _write_question(tmp, "t", "s", "q2", urgency="normal")
     result = r.invoke(app, ["--json", "attend", "--summary"])
     assert result.exit_code == 0, result.stdout
     data = json.loads(result.stdout)
     assert "digest" in data
     assert isinstance(data["digest"], list)
+    assert data["digest"][0]["representative_title"] == "User Facing Decision"
 
 
 def test_attend_auto_accept_preview_requires_confirm(runner):

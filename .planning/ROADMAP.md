@@ -3,44 +3,26 @@
 ## Milestones
 
 - ✅ **v1.0 — hire-your-team + parallel-sprint gstack integration** (Phases 0-7) — shipped 2026-04-22 — see `.planning/milestones/v1.0-ROADMAP.md`
-- 🚧 **v1.1 — Reliability / integration-tested 11-agent delivery** (Phases 8-12) — started 2026-04-24 — see `.planning/REQUIREMENTS.md`
-
-## v1.1 Goal
-
-Close the three architectural gaps diagnosed during v1.0 UAT so `clawteam go "build X"` reliably produces a working X through 11-agent coordination:
-
-- **Class A — state-machine teeth:** gates must block on genuine artifact absence, not just on broken gate code.
-- **Class B — event-driven feedback loop:** phase completion becomes a push event, not something CEO has to deduce by polling.
-- **Class C — end-to-end regression coverage:** one integration test replaces 6 rounds of manual UAT bug discovery.
+- ✅ **v1.1 — Reliability / integration-tested 11-agent delivery** (Phases 8-12) — shipped 2026-04-24 — see `.planning/milestones/v1.1-ROADMAP.md`
 
 ## Phases
 
-### v1.1 (Phases 8-12) — In Progress
+### ✅ v1.1 (Phases 8-12) — SHIPPED 2026-04-24
 
-- [ ] **Phase 8 — Workflow Contract (state-machine teeth)** — RELI-01, RELI-02, RELI-03, RELI-04
-  - Wire `PHASE_REQUIREMENTS` artifact registry into `EvidenceGate` so advance-phase actually blocks on missing artifacts. Add `clawteam artifact write` CLI so agents have one uniform way to produce the required artifact.
-  - Estimated plans: 2-3.
-  - Unlocks: every phase now has concrete "done" signal; CEO's `sprint advance` can't succeed on empty work.
+<details>
+<summary>Expand to see v1.1 phase breakdown</summary>
 
-- [ ] **Phase 9 — Event-driven Coordination (close the feedback loop)** — EVT-01, EVT-02, EVT-03, EVT-04
-  - Emit `TaskCompleted` from `clawteam task update --status completed`. Subscribe a `PhaseCompletionWatcher` that calls `wake_agent(kind="phase")` when all tasks+artifacts for a phase are done. Auto-register the watcher at team-launch time.
-  - Estimated plans: 2-3.
-  - Unlocks: CEO no longer idles or blindly advances — gets a push notification when the phase is actually complete.
+- [x] Phase 8: Workflow Contract (3/3 plans) — RELI-01..04
+- [x] Phase 9: Event-driven Coordination (1/1 plan) — EVT-01..04
+- [x] Phase 10: UX Polish (1/1 plan) — UX-01..03
+- [x] Phase 11: End-to-End Integration Test (1/1 plan) — TEST-01
+- [x] Phase 12: Documentation Refresh (2/2 plans) — DOC-01..02
 
-- [ ] **Phase 10 — UX polish (attend / status sync)** — UX-01, UX-02, UX-03
-  - Fix attend "Urg" column (render numeric urgency via level map). Fix attend --summary "Representative title" (render first H1 of body, not qid). Keep `sprint.pending_question_ids` in sync with filesystem (auto-start watcher or one-shot reconcile on read).
-  - Estimated plans: 1-2.
-  - Unlocks: digest mode + sprint status accurately reflect pending work.
+Full detail: `.planning/milestones/v1.1-ROADMAP.md`
+Audit: `.planning/v1.1-MILESTONE-AUDIT.md`
+Archive requirements: `.planning/milestones/v1.1-REQUIREMENTS.md`
 
-- [ ] **Phase 11 — End-to-End Integration Test (regression shield)** — TEST-01
-  - `tests/integration/test_gstack_sprint_end_to_end.py`: subprocess backend + scripted `claude` mock + assertions on 6 PhaseTransition events, 7 artifacts persisted, every agent wake-received, final state=completed.
-  - Estimated plans: 1-2.
-  - Unlocks: future prompt / role-card / gate edits regression-caught in CI instead of manual UAT.
-
-- [ ] **Phase 12 — Documentation refresh** — DOC-01, DOC-02
-  - README rewrite: `clawteam go / status / answer / stop` as primary flow; `team spawn / launch / sprint start` as power-user escape hatch. New `docs/architecture/event-driven-wake.md` explaining wake:task / wake:inbox / wake:phase / nudge architecture.
-  - Estimated plans: 1.
-  - Unlocks: docs match the v1.1 solo-UX + event-driven architecture rather than v1.0-era flow.
+</details>
 
 ### ✅ v1.0 (Phases 0-7) — SHIPPED 2026-04-22
 
@@ -64,37 +46,6 @@ Note: Post-UAT deletion of Phase 7 cost/rate-limit observability stack (2514 LOC
 
 </details>
 
-## v1.1 Requirement → Phase Map
-
-| REQ-ID | Phase | Category | Status |
-|--------|-------|----------|--------|
-| RELI-01 | 8 | Workflow contract | Pending |
-| RELI-02 | 8 | Workflow contract | Pending |
-| RELI-03 | 8 | Workflow contract | Pending |
-| RELI-04 | 8 | Workflow contract | Pending |
-| EVT-01  | 9 | Event-driven coord | Pending |
-| EVT-02  | 9 | Event-driven coord | Pending |
-| EVT-03  | 9 | Event-driven coord | Pending |
-| EVT-04  | 9 | Event-driven coord | Pending |
-| UX-01   | 10 | UX polish | Pending |
-| UX-02   | 10 | UX polish | Pending |
-| UX-03   | 10 | UX polish | Pending |
-| TEST-01 | 11 | Regression shield | Pending |
-| DOC-01  | 12 | Docs | Pending |
-| DOC-02  | 12 | Docs | Pending |
-
-**Total:** 14 requirements, 5 phases.
-
-## Success Criteria (v1.1)
-
-The milestone is complete when all five Phases pass `/gsd-verify-phase` AND:
-
-1. `clawteam sprint advance` cannot succeed when the current phase's required artifact is missing — gate blocks with a named-artifact error message.
-2. After the last task for a phase flips to `completed` and the artifact is on disk, the leader role (CEO) receives a `[wake:phase]` within 10 seconds without polling.
-3. `tests/integration/test_gstack_sprint_end_to_end.py` runs to completion in CI (subprocess backend, scripted claude mock) asserting 6 PhaseTransition events, 7 artifacts persisted, final sprint state = `completed`.
-4. `clawteam attend` and `clawteam attend --summary` render correct urgency + representative titles against a fixture of 20 diverse questions.
-5. `README.md` front matter demonstrates the `clawteam go` flow as the primary user entry point; power-user commands are clearly marked as such.
-
 ## Progress
 
 | Phase | Milestone | Plans | Status | Completed |
@@ -107,12 +58,12 @@ The milestone is complete when all five Phases pass `/gsd-verify-phase` AND:
 | 5. Tool-Heavy Skills | v1.0 | 10/10 | Complete | 2026-04-22 |
 | 6. Browser / Design / Memory | v1.0 | 11/11 | Complete | 2026-04-22 |
 | 7. Parallel Sprints / Attention / Cost | v1.0 | 9/9 | Complete | 2026-04-22 |
-| 8. Workflow Contract | v1.1 | 0/TBD | Pending | — |
-| 9. Event-driven Coordination | v1.1 | 0/TBD | Pending | — |
-| 10. UX Polish (attend / status) | v1.1 | 0/TBD | Pending | — |
-| 11. E2E Integration Test | v1.1 | 0/TBD | Pending | — |
-| 12. Documentation Refresh | v1.1 | 0/TBD | Pending | — |
+| 8. Workflow Contract | v1.1 | 3/3 | Complete    | 2026-04-24 |
+| 9. Event-driven Coordination | v1.1 | 1/1 | Complete    | 2026-04-24 |
+| 10. UX Polish (attend / status) | v1.1 | 1/1 | Complete    | 2026-04-24 |
+| 11. E2E Integration Test | v1.1 | 1/1 | Complete    | 2026-04-24 |
+| 12. Documentation Refresh | v1.1 | 2/2 | Complete    | 2026-04-24 |
 
 ---
 
-*v1.1 milestone initialized 2026-04-24 — run `/gsd-plan-phase 8` to begin execution (or `/gsd-discuss-phase 8` first if you want to lock design decisions before planning).*
+*v1.1 shipped 2026-04-24. Start the next milestone with `$gsd-new-milestone`.*
