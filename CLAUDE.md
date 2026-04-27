@@ -63,3 +63,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+## Project State Note (2026-04-24)
+
+`.gsd/` is a broken artifact from a one-off `/gsd migrate` run — empty slice plans, lost requirements/decisions, markdown ↔ DB drift. **It is not the source of truth.** Real project state lives in `.planning/`. Do not drive work from `.gsd/` until it is either rebuilt or replaced.

@@ -65,7 +65,12 @@ Note: Post-UAT deletion of Phase 7 cost/rate-limit observability stack (2514 LOC
   3. `clawteam go "build X"` still works end-to-end (creates team + starts sprint + launches panes with kickoff), but `clawteam go --help` and the README describe it as a shortcut for `open` + `sprint start`, not the primary flow.
   4. Launching a team via `clawteam launch gstack` (the underlying primitive) without `--goal` produces agents with no injected `post_launch_prompt`; `launch --goal X` still injects (backwards compatibility for in-flight callers).
   5. Phase VALIDATION.md exists at `.planning/phases/phase-13-VALIDATION.md` with Nyquist-style live-UAT steps exercising all four behaviors above.
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 13-01-test-scaffolding-PLAN.md — Wave 0 test scaffolding (RED tests for WS-01..04)
+  - [ ] 13-02-adapter-gating-PLAN.md — Gate post_launch_prompt on goal presence (WS-02)
+  - [ ] 13-03-sprint-start-kickoff-PLAN.md — sprint start owns kickoff injection, collision rejection, --retry-kickoff (WS-04)
+  - [ ] 13-04-open-command-PLAN.md — register `clawteam open` with create/resume branching (WS-01)
+  - [ ] 13-05-go-demotion-docs-PLAN.md — demote `go` tagline + README Primary Flow rewrite (WS-03)
 
 ### Phase 14: Session Continuity
 **Goal**: Agent conversations survive terminal close / laptop reboot; opening a team again restores every pane's prior dialogue and lets a pre-sprint CEO chat flow directly into the kickoff.
@@ -107,7 +112,7 @@ Note: Post-UAT deletion of Phase 7 cost/rate-limit observability stack (2514 LOC
 | 10. UX Polish (attend / status) | v1.1 | 1/1 | Complete    | 2026-04-24 |
 | 11. E2E Integration Test | v1.1 | 1/1 | Complete    | 2026-04-24 |
 | 12. Documentation Refresh | v1.1 | 2/2 | Complete    | 2026-04-24 |
-| 13. Workspace Entry Point | v1.2 | 0/TBD | Not started | — |
+| 13. Workspace Entry Point | v1.2 | 0/5   | Planned     | — |
 | 14. Session Continuity | v1.2 | 0/TBD | Not started | — |
 | 15. Quiet & Progressive Team | v1.2 | 0/TBD | Not started | — |
 
